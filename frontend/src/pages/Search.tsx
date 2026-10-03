@@ -197,21 +197,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             />
             Szerokie wejście (min. 90 cm)
           </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={constraints.allowed_surfaces !== null}
-              onChange={(e) =>
-                setConstraints({
-                  ...constraints,
-                  allowed_surfaces: e.target.checked
-                    ? ["paved", "asphalt"]
-                    : null,
-                })
-              }
-            />
-            Utwardzona nawierzchnia
-          </label>
           <div className="advanced-filters">
             <Numeric
               label="Maks. liczba stopni"
@@ -224,24 +209,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
                     v !== null && v > 0
                       ? null
                       : constraints.require_step_free_access,
-                })
-              }
-            />
-            <Numeric
-              label="Maks. nachylenie (%)"
-              value={constraints.max_slope_percent}
-              onChange={(v) =>
-                setConstraints({ ...constraints, max_slope_percent: v })
-              }
-            />
-            <Numeric
-              label="Odpoczynek co (m)"
-              min={1}
-              value={constraints.max_distance_without_rest_m}
-              onChange={(v) =>
-                setConstraints({
-                  ...constraints,
-                  max_distance_without_rest_m: v,
                 })
               }
             />

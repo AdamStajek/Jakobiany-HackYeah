@@ -1261,13 +1261,9 @@ footer {
 }
 .route-grid {
   display: grid;
-  grid-template-columns: 285px 1fr 285px;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(220px, 0.8fr) minmax(300px, 1.4fr);
   gap: 20px;
   align-items: start;
-}
-.route-controls {
-  display: grid;
-  gap: 16px;
 }
 .route-form {
   padding: 24px;
@@ -1673,17 +1669,18 @@ legend {
     gap: 28px;
   }
   .route-grid {
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: repeat(2, minmax(240px, 340px));
+    justify-content: start;
+  }
+  .route-map,
+  .route-summary {
+    grid-column: 1 / -1;
   }
   .route-summary {
-    grid-column: 2;
     margin-top: -10px;
   }
   .route-map .map-view {
     height: 510px;
-  }
-  .route-form {
-    grid-row: span 2;
   }
   .trust-strip {
     gap: 15px;
@@ -2314,9 +2311,6 @@ legend {
   }
   .route-form {
     padding: 22px;
-  }
-  .route-controls {
-    width: 100%;
   }
   .route-map .map-view {
     height: 420px;

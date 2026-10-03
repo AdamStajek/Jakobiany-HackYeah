@@ -189,7 +189,6 @@ export function RoutePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const request = useRef<AbortController | null>(null);
-  const knownOrigin = points.some((point) => point.id === origin);
   const endpoints = useMemo(
     () => [
       ...(originCoordinates
@@ -332,36 +331,60 @@ export function RoutePage() {
         description="Wybierz cel i ustaw to, co ma znaczenie po drodze."
       />
       <div className="route-grid">
-        <div className="route-controls">
+        <section className="panel route-needs">
+          <h2>Twoje potrzeby na trasie</h2>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={constraints.require_step_free_access === true}
+              onChange={(event) =>
+                setConstraints({
+                  ...constraints,
+                  require_step_free_access: event.target.checked ? true : null,
+                  max_steps: event.target.checked ? 0 : null,
+                })
+              }
+            />
+            Unikaj schodów
+          </label>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={constraints.allowed_surfaces !== null}
+              onChange={(event) =>
+                setConstraints({
+                  ...constraints,
+                  allowed_surfaces: event.target.checked
+                    ? ["paved", "asphalt"]
+                    : null,
+                })
+              }
+            />
+            Utwardzona nawierzchnia
+          </label>
+          <Numeric
+            label="Maks. nachylenie (%)"
+            value={constraints.max_slope_percent}
+            onChange={(value) =>
+              setConstraints({ ...constraints, max_slope_percent: value })
+            }
+          />
+          <Numeric
+            label="Odpoczynek co (m)"
+            min={1}
+            value={constraints.max_distance_without_rest_m}
+            onChange={(value) =>
+              setConstraints({
+                ...constraints,
+                max_distance_without_rest_m: value,
+              })
+            }
+          />
+        </section>
         <form className="panel route-form" onSubmit={submit}>
           <h2>Dokąd się wybierasz?</h2>
-          <label className="field">
-            Skąd
-            <select
-              value={origin}
-              onChange={(event) => {
-                setOrigin(event.target.value);
-                setOriginCoordinates(
-                  event.target.value === "current-location" ? userLocation : null,
-                );
-              }}
-            >
-              {origin === "" && <option value="">Wybierz początek</option>}
-              {origin === "current-location" && (
-                <option value="current-location">Twoja lokalizacja</option>
-              )}
-              {!knownOrigin && origin !== "" && origin !== "current-location" && (
-                <option value={origin}>{originName}</option>
-              )}
-              {points.map((point) => (
-                <option key={point.id} value={point.id}>
-                  {point.name}
-                </option>
-              ))}
-            </select>
-          </label>
           <PointSearch
-            label="Wyszukaj miejsce"
+            label="Skąd"
             onSelect={(point) => {
               setOrigin(point.id);
               setOriginName(point.name);
@@ -375,27 +398,8 @@ export function RoutePage() {
           >
             Wskaż początek na mapie
           </button>
-          <label className="field">
-            Dokąd
-            <select
-              value={destination}
-              onChange={(event) => {
-                setDestination(event.target.value);
-                setDestinationCoordinates(null);
-              }}
-            >
-              {!knownDestination && (
-                <option value={destination}>{destinationName}</option>
-              )}
-              {points.map((point) => (
-                <option key={point.id} value={point.id}>
-                  {point.name}
-                </option>
-              ))}
-            </select>
-          </label>
           <PointSearch
-            label="Wyszukaj miejsce"
+            label="Dokąd"
             onSelect={(point) => {
               setDestination(point.id);
               setDestinationName(point.name);
@@ -427,47 +431,6 @@ export function RoutePage() {
             <ArrowRight size={18} />
           </button>
         </form>
-        <section className="panel route-needs">
-          <h2>Twoje potrzeby na trasie</h2>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={constraints.require_step_free_access === true}
-              onChange={(event) =>
-                setConstraints({
-                  ...constraints,
-                  require_step_free_access: event.target.checked ? true : null,
-                  max_steps: event.target.checked ? 0 : null,
-                })
-              }
-            />
-            Unikaj schodów
-          </label>
-          <Numeric
-            label="Maksymalne nachylenie (%)"
-            value={constraints.max_slope_percent}
-            onChange={(value) =>
-              setConstraints({ ...constraints, max_slope_percent: value })
-            }
-          />
-          <Numeric
-            label="Odpoczynek co (m)"
-            min={1}
-            value={constraints.max_distance_without_rest_m}
-            onChange={(value) =>
-              setConstraints({
-                ...constraints,
-                max_distance_without_rest_m: value,
-              })
-            }
-          />
-          <p className="muted small">
-            Planowanie obejmuje sieć pieszą całego Krakowa. Potrzeby z profilu
-            wpływają na wybór trasy; pozostałe niedogodności i braki danych
-            pokażemy w wyniku.
-          </p>
-        </section>
-        </div>
         <div className="route-map" ref={mapContainer}>
           <MapView
             places={noPlaces}

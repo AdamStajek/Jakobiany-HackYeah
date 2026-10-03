@@ -35,7 +35,7 @@ def _nearest_address(db: sqlite3.Connection, lat: float, lon: float) -> str | No
     return best[1] if best else None
 
 
-def assess(facts: list[m.Fact], constraints: m.Constraints | None) -> m.Assessment:
+def _checks(constraints: m.Constraints | None):
     checks = []
     if constraints is not None:
         for field, attribute, minimum in (
@@ -72,6 +72,11 @@ def assess(facts: list[m.Fact], constraints: m.Constraints | None) -> m.Assessme
                 checks.append(
                     (attribute, lambda value, allowed=allowed: value in allowed)
                 )
+    return checks
+
+
+def assess(facts: list[m.Fact], constraints: m.Constraints | None) -> m.Assessment:
+    checks = _checks(constraints)
     reasons = []
     now = datetime.now(UTC)
     for attribute, predicate in checks:
@@ -441,15 +446,21 @@ def search(
             )
         )
         matching = []
+        checks = _checks(constraints)
         unassessed = assess([], constraints)
-        has_requirements = bool(unassessed.reasons)
         for candidate in candidates:
             row = candidate[4]
-            assessment = (
-                assess(_facts(db, row, updated), constraints)
-                if has_requirements
-                else unassessed
-            )
+            facts = _facts(db, row, updated) if checks else []
+            if checks and not all(
+                any(
+                    fact.attribute == attribute
+                    and fact.value is not None
+                    and predicate(fact.value)
+                    for fact in facts)
+                for attribute, predicate in checks
+            ):
+                continue
+            assessment = assess(facts, constraints) if checks else unassessed
             if assessment.status == "does_not_meet_requirements" or (
                 not body.include_uncertain and assessment.status == "uncertain"
             ):

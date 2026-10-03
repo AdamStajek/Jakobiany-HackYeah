@@ -36,6 +36,7 @@ import { MissionsPage, MissionPage } from "./pages/Missions";
 import { Profile } from "./pages/Profile";
 import { ReviewPage } from "./pages/Review";
 import { Auth, About, NotFound } from "./pages/Info";
+import { PublicData, Privacy, DataQuality } from "./pages/DataPolicies";
 const nav = [
   { to: "/search", label: "Miejsca", icon: Search },
   { to: "/route", label: "Trasy", icon: RouteIcon },
@@ -207,7 +208,12 @@ function Layout({ children }: { children: ReactNode }) {
               Swoją Drogą
             </Link>
             <span>Więcej możliwości. Mniej barier.</span>
-            <Link to="/about">O danych i projekcie</Link>
+            <nav className="footer-links" aria-label="Informacje o projekcie">
+              <Link to="/about">O projekcie</Link>
+              <Link to="/public-data">Dane publiczne</Link>
+              <Link to="/privacy">Prywatność i bezpieczeństwo</Link>
+              <Link to="/data-quality">Źródła i aktualność</Link>
+            </nav>
           </footer>
           <nav className="bottom-nav" aria-label="Nawigacja mobilna">
             {[...nav, { to: "/profile", label: "Profil", icon: UserRound }].map(
@@ -433,6 +439,9 @@ export default function App() {
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth register />} />
             <Route path="/about" element={<About />} />
+            <Route path="/public-data" element={<PublicData />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/data-quality" element={<DataQuality />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         )}

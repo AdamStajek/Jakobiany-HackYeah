@@ -189,3 +189,16 @@ Pogoda jest pobierana w locie przy każdym zapytaniu zwracającym trasę,
 bez zapisu do SQLite lub pliku. Odpowiedź ma `weather` i sygnały ryzyka
 w odcinkach; awaria daje ostrzeżenie i `weather=null`.
 Dokumentacja: [dane czasowe](docs/dane-czasowe.md).
+
+## Frontend demonstracyjny
+
+Responsywny template React + TypeScript znajduje się w [frontend](frontend/README.md).
+Używa wyłącznie przykładowych danych, bez wywołań API.
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Wymagane Node.js >=22.12. Aplikacja: http://localhost:5173.

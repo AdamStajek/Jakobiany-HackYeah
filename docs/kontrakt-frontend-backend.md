@@ -468,3 +468,19 @@ Warunki odbioru integracji:
 9. Awaria zewnętrznego źródła pokazuje ostrzeżenie i daty danych, zamiast pozorować ich aktualność.
 
 Przy implementacji FastAPI schemat OpenAPI i przykłady odpowiedzi powinny odzwierciedlać ten plik. Zmiany kontraktu należy wprowadzać razem ze zmianami API i klienta.
+
+## 12. Template frontendu — tryb demonstracyjny
+
+Template w `frontend/` jest samodzielną aplikacją React z danymi w pamięci przeglądarki. Nie wysyła żądań do API, nie tworzy prawdziwych sesji ani nie przetwarza zdjęć. Aktywne kontrolki misji są lokalną demonstracją planowanego przepływu i stanowią wyjątek od zakazu aktywnych kontrolek w sekcji 10 wyłącznie w tym trybie. Nie oznacza to rozszerzenia obowiązkowego API v0.1.
+
+Podczas integracji należy rozstrzygnąć następujące różnice pomiędzy projektem UI a kontraktem:
+
+- Miniatury, galeria, godziny otwarcia, telefon i opis miejsca nie są polami `PlaceDetails` v0.1. Template pokazuje ilustracje oraz opis w osobnym modelu widoku `demo`; nie zakłada istnienia tych pól w API.
+- Zapisane miejsca są lokalnym stanem demonstracji; trwały zapis wymaga osobnego kontraktu albo jawnej funkcji lokalnej.
+- Filtry podjazdu, windy, siedzenia i źródeł oraz sortowanie lokalne nie mają własnych parametrów w `/places/search`. W template działają na pełnym, skończonym zbiorze przykładowym. Nie należy filtrować tylko jednej strony wyników API i prezentować jej jako pełnego wyniku.
+- Anonimowe szczegóły miejsca nie przyjmują `constraints` w v0.1. Template ocenia dane lokalnie; integracja musi korzystać z oceny backendu, a ewentualna ocena anonimowych potrzeb w szczegółach wymaga rozszerzenia kontraktu.
+- Fakt o sprzecznych źródłach nie udostępnia wartości dla każdego źródła. Lokalne `alternatives` demonstruje obie wersje. Dla takiego UI potrzebne byłoby opcjonalne `observations: [{ value, source: Source, observed_at }]` w `Fact`; propozycja ta nie jest aktywną zmianą API.
+- Formularz demonstracyjny zachowuje datę obserwacji lokalnie. `POST /reports` v0.1 nie ma `observed_at`; nie należy wysyłać tego pola bez rozszerzenia schematu. Odpowiedź „Nie wiem” jest brakiem potwierdzenia, a nie obserwacją `false`.
+- Mapa jest lokalnym schematem; trasa jest stałym scenariuszem, który nie oblicza wariantów po zmianie punktów ani potrzeb. Nawigacja zmienia kroki ręcznie, bez geolokalizacji.
+
+Do prezentacji podstawowych przepływów nie jest wymagana zmiana backendu ani obecnych schematów żądań. Przed podłączeniem rzeczywistych danych trzeba zapewnić sesję dla zapisów wymagających konta, ochronę CSRF, transport zdjęć, walidację serwera oraz odpowiednie stany błędów.

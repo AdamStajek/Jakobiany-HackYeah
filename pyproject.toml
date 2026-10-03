@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn>=0.34,<1.0",
+]
 
 [dependency-groups]
 dev = [
@@ -25,4 +28,6 @@ quote-style = "double"
 
 [tool.pyright]
 include = ["src"]
+venvPath = "."
+venv = ".venv"
 typeCheckingMode = "standard"

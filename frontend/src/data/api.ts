@@ -310,6 +310,11 @@ export type MissionActivity = { items: MissionProgress[]; points: number };
 export const getMissions = () => api<Mission[]>("/missions");
 export const getMission = (id: string) =>
   api<Mission>(`/missions/${encodeURIComponent(id)}`);
+export const requestVerificationMission = (place_id: string, fact_ids: string[]) =>
+  api<Mission[]>("/missions/verification-requests", {
+    method: "POST",
+    body: JSON.stringify({ place_id, fact_ids }),
+  });
 export const getMissionActivity = () =>
   api<MissionActivity>("/missions/progress");
 export const startMission = (id: string) =>

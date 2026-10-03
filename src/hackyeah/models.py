@@ -621,6 +621,11 @@ class Mission(Model):
     time_minutes: Count
 
 
+class MissionRequest(Model):
+    place_id: Id
+    fact_ids: Annotated[list[Id], Field(min_length=1, max_length=30)]
+
+
 class MissionSubmit(Model):
     description: Annotated[str, Field(min_length=10, max_length=4000)]
     observations: list[Observation] = Field(default_factory=list)

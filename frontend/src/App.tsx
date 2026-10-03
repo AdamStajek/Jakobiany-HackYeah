@@ -31,7 +31,7 @@ import { SearchPage } from "./pages/Search";
 import { PlacePage } from "./pages/Place";
 import { NeedsPage } from "./pages/Needs";
 import { RoutePage, RouteDetails, Navigation } from "./pages/Routes";
-import { ReportHub, ReportForm, ReportSuccess } from "./pages/Reports";
+import { ReportHub, ReportForm, ReportSuccess, VerificationRequestForm } from "./pages/Reports";
 import { MissionsPage, MissionPage } from "./pages/Missions";
 import { Profile } from "./pages/Profile";
 import { ReviewPage } from "./pages/Review";
@@ -433,6 +433,7 @@ export default function App() {
               path="/report/confirm"
               element={<ReportForm key="confirm" confirm />}
             />
+            <Route path="/report/verify" element={<VerificationRequestForm />} />
             <Route path="/report/success" element={<ReportSuccess />} />
             <Route path="/missions" element={<MissionsPage />} />
             <Route path="/missions/:id" element={<MissionPage />} />

@@ -41,6 +41,46 @@ def catalog() -> list[m.Mission]:
         return list(_catalog.values())
 
 
+def request_verification(body: m.MissionRequest) -> list[m.Mission]:
+    """Create or reuse field missions for low-confidence place facts."""
+    catalog()
+    place = places.get(body.place_id)
+    facts_by_id = {item.id: item for item in place.facts}
+    if len(set(body.fact_ids)) != len(body.fact_ids):
+        raise HTTPException(422, "VALIDATION_ERROR")
+    facts = []
+    for fact_id in body.fact_ids:
+        fact = facts_by_id.get(fact_id)
+        if fact is None:
+            raise HTTPException(404, "NOT_FOUND")
+        facts.append(fact)
+    if any(
+        fact.status != "unconfirmed"
+        and not (fact.confidence_percent is not None and fact.confidence_percent <= 60)
+        for fact in facts
+    ):
+        raise HTTPException(422, "FACT_NOT_LOW_CONFIDENCE")
+    result = []
+    with atomic:
+        for fact in facts:
+            mission_id = "mission_" + sha256(fact.id.encode()).hexdigest()[:24]
+            mission = _catalog.get(mission_id)
+            if mission is None:
+                mission = m.Mission(
+                    id=mission_id,
+                    place_id=place.id,
+                    place_name=place.name,
+                    title=f"Sprawdź: {place.name} — {fact.attribute}",
+                    fact_id=fact.id,
+                    attribute=fact.attribute,
+                    points=30,
+                    time_minutes=10,
+                )
+                _catalog[mission.id] = mission
+            result.append(mission)
+    return result
+
+
 def get(mission_id: str) -> m.Mission:
     catalog()
     mission = _catalog.get(mission_id)

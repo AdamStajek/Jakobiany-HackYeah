@@ -205,3 +205,21 @@ npm run dev
 ```
 
 Wymagane Node.js >=22.12. Aplikacja: http://localhost:5173.
+
+
+## Uzupełnianie informacji ze stron miejsc
+
+OSM zawiera adresy stron, telefony, godziny, operatorów i ograniczenia dostępu.
+Dodatkowe publiczne metadane z podanych tam stron można pobrać i zaimportować
+bezpośrednio do SQLite:
+
+```bash
+uv run python -m scripts.scrape_place_websites --limit 100
+uv run python -m scripts.import_place_web_data
+```
+
+Scraper czyta tytuł, opis i dane Schema.org JSON-LD. Ogranicza pobranie do
+1 MB na stronę, stosuje timeout i przerwę między witrynami oraz odrzuca
+prywatne adresy sieciowe. Dane trafiają do `place_web_data` z adresem źródła
+i czasem pobrania. Opis strony jest informacją źródłową, nie potwierdzeniem
+dostępności. Szczegóły są dostępne w `GET /api/v1/places/{id}`.

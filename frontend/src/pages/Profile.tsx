@@ -69,7 +69,7 @@ export function Profile() {
           </h2>
           {saved.length ? (
             saved.map((id) => (
-              <Link key={id} className="saved-row" to={`/place/${id}`}>
+              <Link key={id} className="saved-row" to={`/place/${encodeURIComponent(id)}`}>
                 <Bookmark size={20} />
                 {places.find((p) => p.id === id)?.name}
                 <ArrowRight size={18} />

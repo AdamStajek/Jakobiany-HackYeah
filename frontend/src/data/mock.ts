@@ -183,7 +183,7 @@ export const places: Place[] = [
     },
   },
 ];
-export const labels: Record<Attribute, string> = {
+export const labels: Partial<Record<Attribute, string>> = {
   steps_count: "Schody",
   threshold_height_cm: "Próg wejściowy",
   entrance_width_cm: "Szerokość wejścia",

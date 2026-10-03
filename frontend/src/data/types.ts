@@ -1,6 +1,11 @@
 export type Attribute =
   | "steps_count"
+  | "steps_present"
   | "threshold_height_cm"
+  | "kerb_height_cm"
+  | "raised_kerb"
+  | "lighting_available"
+  | "smoothness"
   | "entrance_width_cm"
   | "slope_percent"
   | "ramp_available"
@@ -10,7 +15,7 @@ export type Attribute =
   | "surface"
   | "distance_without_rest_m";
 export type Source = {
-  type: "owner" | "user" | "osm";
+  type: "owner" | "user" | "osm" | "ai" | "weather" | "other";
   label: string;
   url: string | null;
   license: string | null;
@@ -44,24 +49,42 @@ export type Constraints = {
   require_step_free_access: boolean | null;
   require_accessible_toilet: boolean | null;
   allowed_surfaces: string[] | null;
+  require_lighting?: boolean | null;
+  max_kerb_height_cm?: number | null;
+  allowed_smoothness?: string[] | null;
 };
 export type Assessment = {
   status: "meets_requirements" | "does_not_meet_requirements" | "uncertain";
   summary: string;
   reasons: { code: string; message: string; fact_ids: string[] }[];
 };
-export type Place = {
+export type PlaceSummary = {
   id: string;
   name: string;
   category: string;
-  address: string;
+  address: string | null;
   location: { lat: number; lon: number };
-  distance_m: number;
+  distance_m: number | null;
+  assessment?: Assessment;
+  facts?: Fact[];
+  website?: string | null;
+  phone?: string | null;
+  opening_hours?: string | null;
+  operator?: string | null;
+  access?: string | null;
+};
+export type Place = PlaceSummary & {
   facts: Fact[];
   updated_at: string;
   attribution: Source[];
   barriers: { id: string; description: string }[];
-  demo: { image: string; description: string; map_position: [number, number] };
+  demo?: { image: string; description: string; map_position: [number, number] };
+  website_title?: string | null;
+  website_description?: string | null;
+  website_telephone?: string | null;
+  website_opening_hours?: string | null;
+  accessibility_summary?: string | null;
+  website_source?: Source | null;
 };
 export type Report = {
   id: string;

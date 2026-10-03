@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus, MapPin } from "lucide-react";
-import type { Place } from "../data/types";
+import type { PlaceSummary } from "../data/types";
 export default function MapView({
   places,
   route = false,
 }: {
-  places: Place[];
+  places: PlaceSummary[];
   route?: boolean;
 }) {
   const [zoom, setZoom] = useState(1);
@@ -149,17 +149,19 @@ export default function MapView({
         places.map((p) => (
           <button
             key={p.id}
-            className={`map-pin ${p.facts.some((f) => f.status === "unconfirmed") ? "uncertain" : ""}`}
+            className={`map-pin ${p.assessment?.status !== "meets_requirements" ? "uncertain" : ""}`}
             style={{
-              left: `${50 + (p.demo.map_position[0] - 50) * zoom}%`,
-              top: `${50 + (p.demo.map_position[1] - 50) * zoom}%`,
+              left: `${50 + ((p.location.lon - 19.936) * 1800 + 50 - 50) * zoom}%`,
+              top: `${50 + (50 - (p.location.lat - 50.061) * 1800 - 50) * zoom}%`,
             }}
             onClick={() => setSelected(p.id)}
             aria-label={`Pokaż na mapie: ${p.name}`}
           >
             <MapPin size={26} />
             <span>
-              {p.facts.some((f) => f.status === "unconfirmed") ? "?" : "✓"}
+              {(p.facts || []).some((f) => f.status === "unconfirmed")
+                ? "?"
+                : "✓"}
             </span>
           </button>
         ))}
@@ -173,8 +175,10 @@ export default function MapView({
             ×
           </button>
           <strong>{active.name}</strong>
-          <p>{active.address}</p>
-          <Link to={`/place/${active.id}`}>Zobacz szczegóły →</Link>
+          <p>{active.address || "Adres nieznany"}</p>
+          <Link to={`/place/${encodeURIComponent(active.id)}`}>
+            Zobacz szczegóły →
+          </Link>
         </div>
       )}
       <div className="map-controls">
@@ -193,7 +197,9 @@ export default function MapView({
           <Minus />
         </button>
       </div>
-      <div className="map-caption">Mapa schematyczna · dane demonstracyjne</div>
+      <div className="map-caption">
+        Mapa poglądowa · współrzędne OpenStreetMap
+      </div>
     </div>
   );
 }

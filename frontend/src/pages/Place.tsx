@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -11,14 +11,39 @@ import {
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { Status, FactRow } from "../components/Common";
-import { assess, places } from "../data/mock";
+import { getPlace } from "../data/api";
+import type { Place } from "../data/types";
 import { NotFound } from "./Info";
 export function PlacePage() {
   const { id } = useParams();
-  const p = places.find((p) => p.id === id);
-  const { constraints, saved, toggleSave } = useDemo();
+  const [p, setPlace] = useState<Place | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!id) return;
+    getPlace(id)
+      .then(setPlace)
+      .catch((reason: unknown) =>
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Nie udało się pobrać miejsca.",
+        ),
+      );
+  }, [id]);
+  const { saved, toggleSave } = useDemo();
   const [tab, setTab] = useState("Dostępność");
-  if (!p) return <NotFound />;
+  if (error)
+    return (
+      <div className="page narrow">
+        <NotFound />
+      </div>
+    );
+  if (!p)
+    return (
+      <div className="page narrow" role="status">
+        Pobieranie danych miejsca…
+      </div>
+    );
   return (
     <div className="page place-page">
       <Link className="back-link" to="/search">
@@ -27,22 +52,19 @@ export function PlacePage() {
       </Link>
       <div className="place-detail-grid">
         <aside>
-          <img
-            className="detail-image"
-            src={`/illustrations/${p.demo.image}.svg`}
-            alt={`Ilustracja miejsca: ${p.name}`}
-          />
-          <div className="photo-note">
-            Ilustracja demonstracyjna, nie zdjęcie obiektu
+          <div className="detail-image place-placeholder" aria-hidden="true">
+            <MapPin size={42} />
           </div>
           <div className="place-address">
             <MapPin />
             <span>
-              {p.address}
-              <small>
-                {(p.distance_m / 1000).toLocaleString("pl-PL")} km od punktu
-                demonstracyjnego
-              </small>
+              {p.address || "Adres nieznany"}
+              {p.distance_m !== null && (
+                <small>
+                  {(p.distance_m / 1000).toLocaleString("pl-PL")} km od punktu
+                  wyszukiwania
+                </small>
+              )}
             </span>
           </div>
           <div className="callout">
@@ -58,7 +80,15 @@ export function PlacePage() {
             <div>
               <p className="eyebrow">{p.category}</p>
               <h1>{p.name}</h1>
-              <Status assessment={assess(p, constraints)} />
+              <Status
+                assessment={
+                  p.assessment || {
+                    status: "uncertain",
+                    summary: "Dopasowanie nieznane.",
+                    reasons: [],
+                  }
+                }
+              />
             </div>
             <button
               className="button subtle"
@@ -114,7 +144,7 @@ export function PlacePage() {
                   Konkretne informacje o dostępności
                 </h2>
                 <div className="facts-grid">
-                  {p.facts.map((f) => (
+                  {(p.facts || []).map((f) => (
                     <FactRow key={f.id} fact={f} />
                   ))}
                 </div>
@@ -128,37 +158,58 @@ export function PlacePage() {
             ) : tab === "Informacje" ? (
               <div className="info-panel">
                 <h2>O miejscu</h2>
-                <p>{p.demo.description}</p>
+                {p.website_description && <p>{p.website_description}</p>}
+                {p.accessibility_summary && <p>{p.accessibility_summary}</p>}
                 <p>
-                  <strong>Adres:</strong> {p.address}
+                  <strong>Adres:</strong> {p.address || "Adres nieznany"}
                 </p>
-                <p>
-                  Brak potwierdzonych informacji o godzinach otwarcia, telefonie
-                  i stronie internetowej.
-                </p>
+                {p.operator && (
+                  <p>
+                    <strong>Operator:</strong> {p.operator}
+                  </p>
+                )}
+                {p.phone && (
+                  <p>
+                    <strong>Telefon z OSM:</strong>{" "}
+                    <a href={`tel:${p.phone}`}>{p.phone}</a>
+                  </p>
+                )}
+                {(p.opening_hours || p.website_opening_hours) && (
+                  <p>
+                    <strong>Godziny otwarcia:</strong>{" "}
+                    {p.opening_hours || p.website_opening_hours}
+                  </p>
+                )}
+                {p.access && (
+                  <p>
+                    <strong>Dostęp:</strong> {p.access}
+                  </p>
+                )}
+                {p.website && (
+                  <p>
+                    <a href={p.website} target="_blank" rel="noreferrer">
+                      Strona miejsca
+                    </a>
+                  </p>
+                )}
               </div>
             ) : tab === "Zdjęcia" ? (
               <div className="info-panel">
-                <img
-                  className="gallery-image"
-                  src={`/illustrations/${p.demo.image}.svg`}
-                  alt="Ilustracja demonstracyjna obiektu"
-                />
-                <p>
-                  Galeria demonstracyjna. Zdjęcia wejścia i udogodnień zostaną
-                  dodane po integracji.
-                </p>
+                <p>Brak zdjęć tego miejsca w bazie.</p>
               </div>
             ) : (
               <div className="source-cards">
-                {p.attribution.map((s) => (
-                  <div className="panel" key={s.type}>
+                {[
+                  ...p.attribution,
+                  ...(p.website_source ? [p.website_source] : []),
+                ].map((s, i) => (
+                  <div className="panel" key={`${s.type}-${i}`}>
                     <ShieldCheck />
                     <h3>{s.label}</h3>
-                    <p>Aktualizacja: 02.10.2026</p>
+                    <p>Źródło: {s.type === "osm" ? "OpenStreetMap" : s.type}</p>
                     <p>
-                      Dane przykładowe. Wiarygodność jest podana osobno przy
-                      każdym fakcie.
+                      Informacje źródłowe są niepotwierdzone; sprawdź daty
+                      poszczególnych faktów.
                     </p>
                     {s.url && <a href={s.url}>Licencja {s.license}</a>}
                   </div>

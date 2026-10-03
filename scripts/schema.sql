@@ -37,6 +37,16 @@ CREATE TABLE places (
     operator TEXT,
     access TEXT
 );
+CREATE TABLE place_web_data (
+    place_id TEXT PRIMARY KEY REFERENCES places(id),
+    source_url TEXT NOT NULL,
+    retrieved_at TEXT NOT NULL,
+    title TEXT,
+    description TEXT,
+    telephone TEXT,
+    opening_hours TEXT,
+    accessibility_summary TEXT
+);
 CREATE TABLE place_categories (
     place_id TEXT NOT NULL REFERENCES places(id),
     category_id TEXT NOT NULL REFERENCES categories(id),

@@ -52,7 +52,7 @@ export function MissionsPage() {
           to={`/missions/${m.id}`}
         >
           <img
-            src={`/illustrations/${places.find((p) => p.id === m.place)!.demo.image}.svg`}
+            src={`/illustrations/${places.find((p) => p.id === m.place)?.demo?.image || "museum"}.svg`}
             alt=""
           />
           <div>

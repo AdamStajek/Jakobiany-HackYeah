@@ -160,10 +160,13 @@ def _details(
     categories = [
         item[0]
         for item in db.execute(
-            "SELECT category_id FROM place_categories WHERE place_id=? ORDER BY category_id",
+            "SELECT c.label FROM place_categories pc JOIN categories c ON c.id=pc.category_id WHERE pc.place_id=? ORDER BY c.label",
             (row["id"],),
         )
     ]
+    web = db.execute(
+        "SELECT * FROM place_web_data WHERE place_id=?", (row["id"],)
+    ).fetchone()
     address = (
         " ".join(
             str(row[key])
@@ -175,7 +178,7 @@ def _details(
     return m.PlaceDetails(
         id=row["id"],
         name=row["name"] or "Miejsce bez nazwy",
-        category=",".join(categories),
+        category=", ".join(categories),
         address=address,
         location=m.Coordinates(lat=row["lat"], lon=row["lon"]),
         distance_m=None,
@@ -184,6 +187,27 @@ def _details(
         barriers=[],
         updated_at=updated,
         attribution=[source(updated)],
+        website=row["website"],
+        phone=row["phone"],
+        opening_hours=row["opening_hours"],
+        operator=row["operator"],
+        access=row["access"],
+        website_title=web["title"] if web else None,
+        website_description=web["description"] if web else None,
+        website_telephone=web["telephone"] if web else None,
+        website_opening_hours=web["opening_hours"] if web else None,
+        accessibility_summary=web["accessibility_summary"] if web else None,
+        website_source=(
+            m.Source(
+                type="other",
+                label="Strona miejsca",
+                url=web["source_url"],
+                license=None,
+                retrieved_at=datetime.fromisoformat(web["retrieved_at"]),
+            )
+            if web
+            else None
+        ),
     )
 
 
@@ -226,7 +250,7 @@ def search(
                     *(value for category in categories for value in category),
                 )
             )
-            if body.query.strip().casefold() not in text.casefold():
+            if body.query.strip() != "*" and body.query.strip().casefold() not in text.casefold():
                 continue
             distance = None
             if body.near is not None:

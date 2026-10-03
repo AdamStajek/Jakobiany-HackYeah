@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Settings2,
@@ -11,7 +11,8 @@ import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
 import Numeric from "../components/Numeric";
 import { SearchBox, PlaceCard } from "../components/Common";
-import { assess, places } from "../data/mock";
+import { searchPlaces } from "../data/api";
+import type { PlaceSummary } from "../data/types";
 import { emptyConstraints } from "../data/types";
 const filterOptions = [
   { label: "Bez schodów", key: "require_step_free_access" },
@@ -24,62 +25,42 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [advanced, setAdvanced] = useState(false);
   const [view, setView] = useState(mapOnly ? "map" : "list");
   const [sort, setSort] = useState("match");
-  const [seats, setSeats] = useState(false);
-  const [ramp, setRamp] = useState(false);
-  const [elevator, setElevator] = useState(false);
-  const [sourceTypes, setSourceTypes] = useState<string[]>([]);
   const query = params.get("q") || "";
   const category = params.get("category") || "";
-  const normalized = (text: string) =>
-    text
-      .toLocaleLowerCase("pl")
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "");
-  const term = normalized(query);
-  const results = places
-    .filter(
-      (p) =>
-        (!term ||
-          normalized(
-            `${p.name} ${p.category} ${p.address} ${p.demo.description}`,
-          ).includes(term) ||
-          (term === "kawiarnia" && p.demo.image === "cafe")) &&
-        (!category || p.category === category) &&
-        (!seats ||
-          p.facts.some(
-            (f) =>
-              f.attribute === "rest_area_available" &&
-              f.status === "confirmed" &&
-              f.value === true,
-          )) &&
-        (!ramp ||
-          p.facts.some(
-            (f) =>
-              f.attribute === "ramp_available" &&
-              f.status === "confirmed" &&
-              f.value === true,
-          )) &&
-        (!elevator ||
-          p.facts.some(
-            (f) =>
-              f.attribute === "elevator_available" &&
-              f.status === "confirmed" &&
-              f.value === true,
-          )) &&
-        (!sourceTypes.length ||
-          p.facts.some((f) =>
-            f.sources.some((s) => sourceTypes.includes(s.type)),
-          )) &&
-        assess(p, constraints).status !== "does_not_meet_requirements",
-    )
-    .sort((a, b) =>
-      sort === "distance"
-        ? a.distance_m - b.distance_m
-        : sort === "name"
-          ? a.name.localeCompare(b.name, "pl")
-          : Number(assess(b, constraints).status === "meets_requirements") -
-            Number(assess(a, constraints).status === "meets_requirements"),
-    );
+  const [results, setResults] = useState<PlaceSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    searchPlaces(query || category, constraints)
+      .then((page) => {
+        if (active) setResults(page.items);
+      })
+      .catch((reason: unknown) => {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Nie udało się pobrać miejsc.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [query, category, constraints]);
+  const orderedResults = [...results].sort((a, b) =>
+    sort === "distance"
+      ? (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity)
+      : sort === "name"
+        ? a.name.localeCompare(b.name, "pl")
+        : Number(b.assessment?.status === "meets_requirements") -
+          Number(a.assessment?.status === "meets_requirements"),
+  );
   return (
     <div className={`search-page ${mapOnly ? "map-page" : ""}`}>
       <div className="search-top">
@@ -144,30 +125,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
               {o.label}
             </label>
           ))}
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={ramp}
-              onChange={(e) => setRamp(e.target.checked)}
-            />
-            Podjazd
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={elevator}
-              onChange={(e) => setElevator(e.target.checked)}
-            />
-            Winda
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={seats}
-              onChange={(e) => setSeats(e.target.checked)}
-            />
-            Miejsca do siedzenia
-          </label>
           <label className="check-field">
             <input
               type="checkbox"
@@ -241,35 +198,11 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             </div>
           )}
           <hr />
-          <h3>Źródła informacji</h3>
-          {[
-            { type: "owner", label: "Właściciele obiektów" },
-            { type: "user", label: "Użytkownicy" },
-            { type: "osm", label: "OpenStreetMap" },
-          ].map((s) => (
-            <label className="check-field" key={s.type}>
-              <input
-                type="checkbox"
-                checked={sourceTypes.includes(s.type)}
-                onChange={(e) =>
-                  setSourceTypes(
-                    e.target.checked
-                      ? [...sourceTypes, s.type]
-                      : sourceTypes.filter((t) => t !== s.type),
-                  )
-                }
-              />
-              {s.label}
-            </label>
-          ))}
-          <hr />
           <label className="field">
             Sortuj według
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="match">Najlepsze dopasowanie</option>
-              <option value="distance">
-                Najbliżej punktu demonstracyjnego
-              </option>
+              <option value="distance">Odległość</option>
               <option value="name">Nazwa miejsca</option>
             </select>
           </label>
@@ -277,10 +210,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             className="text-button"
             onClick={() => {
               setConstraints({ ...emptyConstraints });
-              setSeats(false);
-              setRamp(false);
-              setElevator(false);
-              setSourceTypes([]);
               setParams({});
             }}
           >
@@ -300,14 +229,26 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
         >
           <div className="results-heading">
             <h2>{category || query || "Miejsca w Krakowie"}</h2>
-            <span aria-live="polite">{results.length} wyników</span>
+            <span aria-live="polite">
+              {loading ? "Pobieranie…" : `${results.length} wyników`}
+            </span>
           </div>
-          {results.length ? (
-            results.map((p) => (
+          {error ? (
+            <p className="warning-box" role="alert">
+              {error}
+            </p>
+          ) : results.length ? (
+            orderedResults.map((p) => (
               <PlaceCard
                 key={p.id}
                 place={p}
-                assessment={assess(p, constraints)}
+                assessment={
+                  p.assessment || {
+                    status: "uncertain",
+                    summary: "Dopasowanie nieznane.",
+                    reasons: [],
+                  }
+                }
                 saved={saved.includes(p.id)}
                 toggle={() => toggleSave(p.id)}
               />
@@ -321,10 +262,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
                 className="button subtle"
                 onClick={() => {
                   setConstraints({ ...emptyConstraints });
-                  setRamp(false);
-                  setSeats(false);
-                  setElevator(false);
-                  setSourceTypes([]);
                   setParams({});
                 }}
               >
@@ -337,7 +274,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           className={`search-map ${view === "list" ? "mobile-hidden" : ""}`}
           aria-label="Mapa wyników"
         >
-          <MapView places={results} />
+          <MapView places={orderedResults} />
           <div className="map-legend">
             <span>✓ Informacje potwierdzone</span>
             <span>? Część danych niepotwierdzona</span>

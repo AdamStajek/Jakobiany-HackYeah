@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, type FormEvent } from "react";
-import type { Assessment, Fact, Place } from "../data/types";
+import type { Assessment, Fact, PlaceSummary } from "../data/types";
 import { formatFact, labels } from "../data/mock";
 export function SearchBox({
   initial = "",
@@ -68,29 +68,35 @@ export function PlaceCard({
   saved,
   toggle,
 }: {
-  place: Place;
+  place: PlaceSummary;
   assessment: Assessment;
   saved: boolean;
   toggle: () => void;
 }) {
   return (
     <article className="place-card">
-      <Link to={`/place/${place.id}`} className="place-image">
-        <img src={`/illustrations/${place.demo.image}.svg`} alt="" />
+      <Link
+        to={`/place/${encodeURIComponent(place.id)}`}
+        className="place-image"
+      >
+        <MapPin size={34} aria-hidden="true" />
       </Link>
       <div className="place-card-body">
         <p className="eyebrow">{place.category}</p>
         <h3>
-          <Link to={`/place/${place.id}`}>{place.name}</Link>
+          <Link to={`/place/${encodeURIComponent(place.id)}`}>
+            {place.name}
+          </Link>
         </h3>
         <p className="muted location">
           <MapPin size={15} />
-          {place.address} · {(place.distance_m / 1000).toLocaleString("pl-PL")}{" "}
-          km
+          {place.address || "Adres nieznany"}
+          {place.distance_m !== null &&
+            ` · ${(place.distance_m / 1000).toLocaleString("pl-PL")} km od Rynku`}
         </p>
         <Status assessment={assessment} />
         <div className="feature-chips">
-          {place.facts
+          {(place.facts || [])
             .filter((f) =>
               ["steps_count", "entrance_width_cm"].includes(f.attribute),
             )
@@ -116,7 +122,7 @@ export function PlaceCard({
       <Link
         className="card-arrow"
         aria-label={`Szczegóły: ${place.name}`}
-        to={`/place/${place.id}`}
+        to={`/place/${encodeURIComponent(place.id)}`}
       >
         <ChevronRight />
       </Link>
@@ -136,7 +142,7 @@ export function FactRow({ fact }: { fact: Fact }) {
         )}
       </div>
       <div>
-        <strong>{labels[fact.attribute]}</strong>
+        <strong>{labels[fact.attribute] || fact.attribute}</strong>
         <p>{formatFact(fact)}</p>
         <small>
           {fact.sources.map((s) => s.label).join(", ") || "Brak źródła"} ·{" "}

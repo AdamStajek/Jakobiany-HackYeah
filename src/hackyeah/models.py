@@ -285,6 +285,12 @@ class PlaceSummary(Model):
     location: Coordinates
     distance_m: NonNegative | None
     assessment: Assessment
+    facts: list[Fact]
+    website: str | None = None
+    phone: str | None = None
+    opening_hours: str | None = None
+    operator: str | None = None
+    access: str | None = None
 
 
 class PlaceSearchResponse(Page[PlaceSummary]):
@@ -305,6 +311,12 @@ class PlaceDetails(PlaceSummary):
     barriers: list[Barrier]
     updated_at: AwareDatetime
     attribution: list[Source]
+    website_title: str | None = None
+    website_description: str | None = None
+    website_telephone: str | None = None
+    website_opening_hours: str | None = None
+    accessibility_summary: str | None = None
+    website_source: Source | None = None
 
     @model_validator(mode="after")
     def check_accessibility_categories(self) -> Self:

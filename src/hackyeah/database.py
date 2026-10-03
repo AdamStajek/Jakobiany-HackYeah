@@ -117,9 +117,20 @@ atomic = Atomic()
 
 
 def initialize() -> None:
-    """Require the existing file and add only the backend table."""
+    """Require the existing file and add backend tables."""
     with atomic:
-        pass
+        _state.connection.execute(
+            """CREATE TABLE IF NOT EXISTS place_web_data (
+                place_id TEXT PRIMARY KEY REFERENCES places(id),
+                source_url TEXT NOT NULL,
+                retrieved_at TEXT NOT NULL,
+                title TEXT,
+                description TEXT,
+                telephone TEXT,
+                opening_hours TEXT,
+                accessibility_summary TEXT
+            )"""
+        )
 
 
 class Store[K, V](MutableMapping[K, V]):
@@ -194,4 +205,21 @@ def preserve_backend_data(previous: Path, target: sqlite3.Connection) -> None:
             target.executemany(
                 "INSERT INTO backend_records VALUES (?, ?, ?)",
                 source.execute("SELECT * FROM backend_records"),
+            )
+        if source.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='place_web_data'"
+        ).fetchone():
+            target.execute(
+                """CREATE TABLE IF NOT EXISTS place_web_data (
+                    place_id TEXT PRIMARY KEY REFERENCES places(id),
+                    source_url TEXT NOT NULL, retrieved_at TEXT NOT NULL,
+                    title TEXT, description TEXT, telephone TEXT,
+                    opening_hours TEXT, accessibility_summary TEXT
+                )"""
+            )
+            target.executemany(
+                "INSERT OR REPLACE INTO place_web_data VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                source.execute(
+                    "SELECT w.* FROM place_web_data w JOIN places p ON p.id=w.place_id"
+                ),
             )

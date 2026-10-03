@@ -7,22 +7,18 @@ import {
   Coffee,
   Trees,
   Landmark,
-  TrainFront,
-  Accessibility,
-  Plus,
-  Route as RouteIcon,
   Settings2,
   Heart,
 } from "lucide-react";
 import { SearchBox } from "../components/Common";
 const categories = [
-  { name: "Restauracje i kawiarnie", icon: Coffee, key: "kawiarnia" },
-  { name: "Atrakcje turystyczne", icon: Landmark, key: "muzeum" },
-  { name: "Parki i tereny zielone", icon: Trees, key: "park" },
-  { name: "Komunikacja miejska", icon: TrainFront, key: "komunikacja" },
-  { name: "Toalety publiczne", icon: Accessibility, key: "toaleta" },
-  { name: "Przychodnie i szpitale", icon: Plus, key: "przychodnia" },
-  { name: "Trasy spacerowe", icon: RouteIcon, key: "trasa" },
+  { name: "Hotele", icon: Landmark, key: "Hotele" },
+  { name: "Muzea", icon: Landmark, key: "Muzea" },
+  { name: "Urzędy", icon: Landmark, key: "Urzędy" },
+  { name: "Sklepy spożywcze", icon: Coffee, key: "Sklepy spożywcze" },
+  { name: "Ogrody", icon: Trees, key: "Ogrody" },
+  { name: "Biblioteki", icon: Landmark, key: "Biblioteki" },
+  { name: "Kluby seniora", icon: UserRound, key: "Kluby seniora" },
 ];
 export function Home() {
   const [dismiss, setDismiss] = useState(false);
@@ -45,7 +41,7 @@ export function Home() {
           <SearchBox />
           <div className="popular">
             <span>Popularne:</span>
-            {["kawiarnia", "muzeum", "toaleta", "park"].map((q) => (
+            {["muzeum", "hotel", "ogród", "biblioteka"].map((q) => (
               <Link key={q} to={`/search?q=${q}`}>
                 {q}
               </Link>

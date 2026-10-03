@@ -1,11 +1,11 @@
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, NoReturn
+from typing import Annotated
 from urllib.error import URLError
 
 from fastapi import APIRouter, File, Path, Query, Request, Response, UploadFile
 from pydantic import ValidationError
 
-from hackyeah import auth, needs, photos
+from hackyeah import auth, needs, photos, places
 from hackyeah import models as m
 from hackyeah.routing import demo_graph, plan_route
 from hackyeah.temporary_data import get_weather
@@ -121,15 +121,36 @@ def delete_profile(id: ResourceId, request: "Request", response: "Response") -> 
 
 
 @router.post("/places/search", response_model=m.PlaceSearchResponse, tags=["places"])
-def search_places(body: m.PlaceSearchRequest) -> NoReturn:
-    raise EndpointNotImplementedError
+def search_places(
+    body: m.PlaceSearchRequest, request: Request, response: Response
+) -> m.PlaceSearchResponse:
+    response.headers["Cache-Control"] = "no-store"
+    constraints = body.constraints
+    if body.profile_id is not None:
+        from hackyeah import profiles
+
+        constraints = profiles.get(
+            auth.require_session(request).id, body.profile_id
+        ).constraints
+    return places.search(body, constraints)
 
 
-@router.get("/places/{id}", response_model=m.PlaceDetails, tags=["places"])
+@router.get("/places/{id:path}", response_model=m.PlaceDetails, tags=["places"])
 def get_place(
-    id: ResourceId, profile_id: Annotated[str | None, Query(min_length=1)] = None
-) -> NoReturn:
-    raise EndpointNotImplementedError
+    id: ResourceId,
+    request: Request,
+    response: Response,
+    profile_id: Annotated[str | None, Query(min_length=1)] = None,
+) -> m.PlaceDetails:
+    response.headers["Cache-Control"] = "no-store"
+    constraints = None
+    if profile_id is not None:
+        from hackyeah import profiles
+
+        constraints = profiles.get(
+            auth.require_session(request).id, profile_id
+        ).constraints
+    return places.get(id, constraints)
 
 
 @router.post("/routes/plan", response_model=m.RoutePlanResponse, tags=["routes"])

@@ -42,25 +42,6 @@ class APIContractTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
-    def test_remaining_operations_are_stubs(self):
-        cases = [
-            ("POST", "/places/search", {"query": "Apteka"}),
-            ("GET", "/places/p1", None),
-        ]
-        for method, path, body in cases:
-            with self.subTest(method=method, path=path):
-                kwargs = (
-                    {"files": {"file": ("photo.png", b"stub", "image/png")}}
-                    if path == "/photos"
-                    else {"json": body}
-                )
-                response = self.client.request(method, "/api/v1" + path, **kwargs)
-                self.assertEqual(response.status_code, 501, response.text)
-                error = response.json()["error"]
-                self.assertEqual(error["code"], "NOT_IMPLEMENTED")
-                self.assertEqual(error["details"], [])
-                self.assertEqual(error["request_id"], response.headers["X-Request-ID"])
-
     def test_openapi_success_and_error_schemas(self):
         response = self.client.get("/openapi.json")
         self.assertEqual(response.status_code, 200)

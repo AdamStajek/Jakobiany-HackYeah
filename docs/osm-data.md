@@ -2,7 +2,7 @@
 
 Gotowa lokalna baza: `data/krakow.sqlite3`. FastAPI zapisuje w tym samym pliku
 stan zaimplementowanych endpointów w dodatkowej tabeli `backend_records`.
-Endpointy wyszukiwania i szczegółów miejsc nadal nie udostępniają danych OSM.
+Endpointy wyszukiwania i szczegółów miejsc udostępniają dane OSM.
 Wynik rzeczywistego importu: [raport pokrycia](osm-coverage.md) oraz
 [raport JSON](../data/coverage.json).
 

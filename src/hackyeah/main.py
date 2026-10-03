@@ -25,7 +25,7 @@ app = FastAPI(
         "Prototyp tras działa na syntetycznym grafie w pamięci. Auth, profile, "
         "zdjęcia, zgłoszenia i deklaracje właścicieli zapisują dane w SQLite. "
         "Interpretacja potrzeb korzysta z OpenAI przez PydanticAI. "
-        "Wyszukiwanie miejsc pozostaje niezaimplementowane. "
+        "Wyszukiwanie i szczegóły miejsc korzystają z bazy OSM. "
         "Docelowe zasady dostępu opisuje docs/kontrakt-frontend-backend.md."
     ),
 )

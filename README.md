@@ -22,8 +22,7 @@ Dokumentacja Swagger: http://localhost:8000/docs.
 ReDoc: http://localhost:8000/redoc. Schemat: http://localhost:8000/openapi.json.
 `POST /api/v1/routes/plan` planuje trasę na grafie demonstracyjnym w pamięci.
 Auth, profile, zdjęcia, zgłoszenia i deklaracje właścicieli mają logikę
-prototypową oraz trwałe magazyny SQLite. Wyszukiwanie miejsc zwraca
-`501 NOT_IMPLEMENTED`, a interpretacja potrzeb korzysta z OpenAI
+prototypową oraz trwałe magazyny SQLite. Wyszukiwanie i szczegóły miejsc korzystają z lokalnej bazy OSM, a interpretacja potrzeb korzysta z OpenAI
 przez PydanticAI. Zdjęcia są odrzucane, bo przetwarzanie
 chroniące prywatność nie jest dostępne.
 Niepoprawne dane zwracają `422 VALIDATION_ERROR`, a błędny JSON — `400 INVALID_REQUEST`.
@@ -36,7 +35,7 @@ zmian są zapisywane w tej samej bazie SQLite co dane OSM. Backend dodaje tabel�
 `backend_records`, zachowując istniejący schemat i dane. Zdjęcia są przechowywane
 jako prywatne BLOB-y; brak przetwarzania zdjęć nadal skutkuje ich odrzuceniem.
 Zapis zgłoszenia i jego powiązań ze zdjęciami odbywa się w jednej transakcji.
-Wyszukiwanie i szczegóły miejsc pozostają niezaimplementowane.
+Wyszukiwanie i szczegóły miejsc udostępniają dane OSM z atrybucją i oceną wymagań.
 
 Compose tworzy wolumen `backend_data`, początkowo wypełniony kopią
 `data/krakow.sqlite3` z obrazu. Restart, ponowny build i `docker compose down`

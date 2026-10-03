@@ -279,6 +279,20 @@ def list_missions() -> list[m.Mission]:
     return missions.catalog()
 
 
+@router.post(
+    "/missions/verification-requests",
+    response_model=list[m.Mission],
+    status_code=201,
+    tags=["missions"],
+)
+def request_verification_mission(
+    body: m.MissionRequest, request: Request, response: Response
+) -> list[m.Mission]:
+    response.headers["Cache-Control"] = "no-store"
+    auth.require_csrf(request)
+    return missions.request_verification(body)
+
+
 @router.get("/missions/progress", response_model=m.MissionActivity, tags=["missions"])
 def mission_activity(request: Request, response: Response) -> m.MissionActivity:
     response.headers["Cache-Control"] = "no-store"

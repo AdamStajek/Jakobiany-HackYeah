@@ -1,19 +1,26 @@
-"""Scrape public, OSM-linked place websites into a JSON snapshot."""
+"""Scrape place websites and update SQLite; retain a JSON snapshot for replay."""
 
 import argparse
 import json
+import re
 import socket
+import sqlite3
 import time
-from datetime import UTC, datetime
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import closing
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from ipaddress import ip_address
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+from urllib.error import URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
-USER_AGENT = "SwojaDroga/0.1 (Krakow accessibility research; contact: open-data project)"
+USER_AGENT = (
+    "SwojaDroga/0.1 (Krakow accessibility research; contact: open-data project)"
+)
 MAX_BYTES = 1_000_000
 
 
@@ -24,7 +31,11 @@ def public_url(url: str) -> bool:
     try:
         return all(
             ip_address(info[4][0]).is_global
-            for info in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+            for info in socket.getaddrinfo(
+                parsed.hostname,
+                parsed.port or (443 if parsed.scheme == "https" else 80),
+                type=socket.SOCK_STREAM,
+            )
         )
     except (OSError, ValueError):
         return False
@@ -73,15 +84,33 @@ class PlacePage(HTMLParser):
             self._script.append(data)
 
 
-def structured_values(doc: PlacePage) -> dict:
-    result = {}
+def structured_values(
+    doc: PlacePage, place: dict | None = None, shared: bool = False
+) -> dict:
+    # Never merge fields from unrelated JSON-LD entities (publisher, branch, event).
+    candidates = []
 
     def visit(value):
         if isinstance(value, dict):
-            for key in ("telephone", "openingHours", "accessibilitySummary", "description", "name"):
-                candidate = value.get(key)
-                if isinstance(candidate, str) and candidate.strip():
-                    result.setdefault(key, candidate.strip())
+            types = value.get("@type", [])
+            types = [types] if isinstance(types, str) else types
+            if any(
+                key in value
+                for key in (
+                    "openingHours",
+                    "openingHoursSpecification",
+                    "telephone",
+                    "address",
+                    "geo",
+                )
+            ) and not set(types or []) & {
+                "Person",
+                "Event",
+                "WebSite",
+                "WebPage",
+                "BreadcrumbList",
+            }:
+                candidates.append(value)
             for child in value.values():
                 visit(child)
         elif isinstance(value, list):
@@ -93,10 +122,69 @@ def structured_values(doc: PlacePage) -> dict:
             visit(json.loads(script))
         except (json.JSONDecodeError, RecursionError):
             continue
+    selected = []
+    for value in candidates:
+        if place:
+            geo = value.get("geo") or {}
+            address = value.get("address") or {}
+            try:
+                from hackyeah.place_enrichment import distance_m
+
+                nearby = (
+                    distance_m(
+                        place["lat"],
+                        place["lon"],
+                        float(geo["latitude"]),
+                        float(geo["longitude"]),
+                    )
+                    < 150
+                )
+            except (KeyError, ValueError, TypeError):
+                nearby = False
+            street = (
+                address.get("streetAddress", "")
+                if isinstance(address, dict)
+                else str(address)
+            )
+            address_match = bool(
+                place.get("street")
+                and place.get("housenumber")
+                and place["street"].casefold() in street.casefold()
+                and re.search(
+                    r"(?<!\w)" + re.escape(place["housenumber"]) + r"(?!\w)",
+                    street,
+                    re.I,
+                )
+            )
+            if nearby or address_match:
+                selected.append(value)
+    if not selected and not shared and len(candidates) == 1:
+        # OSM directly links this URL to this place; do not accept an explicit foreign location.
+        value = candidates[0]
+        if not value.get("geo") and not value.get("address"):
+            selected = candidates
+    if len(selected) != 1:
+        return {}
+    value = selected[0]
+    result = {
+        k: value[k].strip()
+        for k in ("telephone", "accessibilitySummary", "description", "name")
+        if isinstance(value.get(k), str) and value[k].strip()
+    }
+    hours = value.get("openingHours")
+    if isinstance(hours, list):
+        hours = "; ".join(x for x in hours if isinstance(x, str))
+    if isinstance(hours, str) and hours.strip():
+        result["openingHours"] = hours.strip()
+    elif value.get("openingHoursSpecification"):
+        # Keep structured dates, exceptions and overnight periods without guessing an OSM expression.
+        result["openingHours"] = json.dumps(
+            value["openingHoursSpecification"], ensure_ascii=False
+        )
     return result
 
 
-def scrape(url: str) -> dict:
+def scrape(url: str, place: dict | None = None, shared: bool = False) -> dict:
     if "://" not in url:
         url = "https://" + url
     if not public_url(url):
@@ -112,12 +200,17 @@ def scrape(url: str) -> dict:
         raise ValueError("Website exceeded 1 MB")
     doc = PlacePage()
     doc.feed(body.decode("utf-8", errors="replace"))
-    values = structured_values(doc)
+    values = structured_values(doc, place, shared)
     return {
-        "source_url": url,
+        "source_url": response.geturl(),
         "retrieved_at": datetime.now(UTC).isoformat(),
-        "title": values.get("name") or doc.meta.get("og:title") or " ".join(doc.title).strip() or None,
-        "description": values.get("description") or doc.meta.get("og:description") or doc.meta.get("description"),
+        "title": values.get("name")
+        or doc.meta.get("og:title")
+        or " ".join(doc.title).strip()
+        or None,
+        "description": values.get("description")
+        or doc.meta.get("og:description")
+        or doc.meta.get("description"),
         "telephone": values.get("telephone"),
         "opening_hours": values.get("openingHours"),
         "accessibility_summary": values.get("accessibilitySummary"),
@@ -128,35 +221,95 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, default=ROOT / "data/krakow.sqlite3")
     parser.add_argument("--output", type=Path, default=ROOT / "data/place-web.json")
-    parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--limit", type=int, default=0, help="Maximum places; 0 = all")
+    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--snapshot-only", action="store_true")
+    parser.add_argument(
+        "--refresh", action="store_true", help="Also revisit successfully scraped URLs"
+    )
     parser.add_argument("--place-id", action="append", default=[])
     parser.add_argument("--delay", type=float, default=1.0)
     args = parser.parse_args()
-    if args.limit < 1 or args.delay < 0:
-        parser.error("--limit must be positive and --delay non-negative")
-    import sqlite3
-    from contextlib import closing
+    if args.limit < 0 or args.delay < 0 or args.workers < 1:
+        parser.error("--limit/--delay must be non-negative; --workers positive")
+    from hackyeah.place_enrichment import effective_places, ensure_schema
+    from scripts.import_place_web_data import import_records
 
-    with closing(sqlite3.connect(args.database)) as db:
-        query = "SELECT id, website FROM places WHERE website IS NOT NULL ORDER BY id"
-        rows = db.execute(query).fetchall()
-    if args.place_id:
-        wanted = set(args.place_id)
-        rows = [row for row in rows if row[0] in wanted]
-    records = []
-    for index, (place_id, url) in enumerate(rows[: args.limit]):
-        try:
-            records.append({"place_id": place_id, **scrape(url)})
-            print(f"OK {place_id}", flush=True)
-        except (OSError, HTTPError, URLError, ValueError, TimeoutError) as error:
-            print(f"Pominięto {place_id}: {error}", flush=True)
-        if index + 1 < min(len(rows), args.limit):
-            time.sleep(args.delay)
+    with closing(
+        sqlite3.connect(args.database.resolve().as_uri() + "?mode=rw", uri=True)
+    ) as db:
+        ensure_schema(db)
+        rows = effective_places(db)
+        visited = {
+            row[0]
+            for row in db.execute("SELECT place_id, retrieved_at FROM place_web_data")
+            if datetime.fromisoformat(row[1]) > datetime.now(UTC) - timedelta(days=7)
+        }
+    groups = defaultdict(list)
+    for row in rows:
+        if not row.get("website"):
+            continue
+        url = row["website"].strip()
+        if "://" not in url:
+            url = "https://" + url
+        row["website"] = url
+        groups[url.rstrip("/")].append(row)
+    wanted = set(args.place_id)
+    selected = [
+        row
+        for group in groups.values()
+        for row in group
+        if (not wanted or row["id"] in wanted)
+        and (args.refresh or row["id"] not in visited)
+    ]
+    if args.limit:
+        selected = selected[: args.limit]
+    hosts = defaultdict(list)
+    for row in selected:
+        hosts[urlsplit(row["website"]).netloc].append(row)
+
+    def scrape_host(rows):
+        results, errors = [], []
+        # Sequential per host: delay also applies to different branch URLs on a chain's website.
+        cache = {}
+        for row in rows:
+            url = row["website"]
+            shared = len(groups[url.rstrip("/")]) > 1
+            # Shared chain homepages carry no reliable branch-specific details.
+            if shared and urlsplit(url).path in ("", "/"):
+                continue
+            try:
+                if url not in cache:
+                    cache[url] = scrape(url, row, shared)
+                    time.sleep(args.delay)
+                elif shared:
+                    continue
+                results.append({"place_id": row["id"], **cache[url]})
+            except (OSError, URLError, ValueError, TimeoutError) as error:
+                errors.append({"place_id": row["id"], "url": url, "error": str(error)})
+        return results, errors
+
+    records, errors = [], []
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        jobs = [pool.submit(scrape_host, rows) for rows in hosts.values()]
+        for job in as_completed(jobs):
+            fetched, failures = job.result()
+            if fetched and not args.snapshot_only:
+                import_records(args.database, fetched)
+            records.extend(fetched)
+            errors.extend(failures)
+            print(f"Zapisano: {len(records)}; błędy: {len(errors)}", flush=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix(args.output.suffix + ".part")
     temporary.write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n")
     temporary.replace(args.output)
-    print(f"Zapisano {len(records)} rekordów do {args.output}")
+    args.output.with_suffix(".errors.json").write_text(
+        json.dumps(errors, ensure_ascii=False, indent=2) + "\n"
+    )
+    print(
+        f"Zapisano {len(records)} rekordów do {args.output}"
+        + (" i SQLite" if not args.snapshot_only else "")
+    )
 
 
 if __name__ == "__main__":

@@ -125,6 +125,69 @@ def make_fixture(directory: Path) -> tuple[Path, Path]:
 
 
 class OSMImportTests(unittest.TestCase):
+    def test_additive_import_retains_uncategorized_places(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            source, boundary = make_fixture(folder)
+            destination = folder / "places.sqlite3"
+            build_database(source, boundary, destination)
+            with sqlite3.connect(destination) as db:
+                db.execute(
+                    "INSERT INTO osm_objects VALUES ('node/999','node',999,'https://www.openstreetmap.org/node/999','ODbL',NULL,NULL,'{}','{}')"
+                )
+                db.execute(
+                    "INSERT INTO places(id,name,lat,lon) VALUES ('node/999','Existing place',50,20)"
+                )
+                db.execute(
+                    "INSERT INTO accessibility_facts VALUES ('node/999','steps_count','3','count','unconfirmed','pending_verification',NULL,NULL)"
+                )
+                db.execute(
+                    "INSERT INTO accessibility_facts VALUES ('node/999','surface','\"fine_gravel\"',NULL,'unconfirmed','pending_verification',NULL,NULL)"
+                )
+            build_database(source, boundary, destination, additive=True)
+            with sqlite3.connect(destination) as db:
+                self.assertEqual(
+                    db.execute(
+                        "SELECT name FROM places WHERE id='node/999'"
+                    ).fetchone()[0],
+                    "Existing place",
+                )
+                self.assertEqual(
+                    db.execute(
+                        "SELECT value_json FROM accessibility_facts WHERE place_id='node/999' AND attribute='steps_count'"
+                    ).fetchone()[0],
+                    "3",
+                )
+                self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+                self.assertEqual(
+                    db.execute(
+                        "SELECT value_json FROM accessibility_facts WHERE place_id='node/999' AND attribute='surface'"
+                    ).fetchone()[0],
+                    '"gravel"',
+                )
+
+    def test_obstacle_categories_and_api_facts(self):
+        tags = {
+            "highway": "steps",
+            "step_count": "12",
+            "lit": "no",
+            "surface": "paving_stones",
+            "smoothness": "bad",
+        }
+        obj = OSMObject("node/1", "node", 1, tags, Point(19.94, 50.06))
+        values = {e.attribute: e.value for e in observations(obj)}
+        self.assertEqual(classify(tags), ["steps"])
+        self.assertEqual(values["steps_count"], 12)
+        self.assertIs(values["steps_present"], True)
+        self.assertIs(values["lighting_available"], False)
+        self.assertEqual(values["surface"], "paved")
+        self.assertEqual(values["smoothness"], "bad")
+        obj.tags = {"barrier": "kerb", "height": "15 cm", "kerb": "raised"}
+        values = {e.attribute: e.value for e in observations(obj)}
+        self.assertEqual(classify(obj.tags), ["kerb"])
+        self.assertEqual(values["kerb_height_cm"], 15)
+        self.assertIs(values["raised_kerb"], True)
+
     def test_lengths_do_not_guess_ambiguous_measurements(self):
         self.assertEqual(length_cm("0.9"), 90)
         self.assertEqual(length_cm("90 cm"), 90)
@@ -232,7 +295,6 @@ class OSMImportTests(unittest.TestCase):
             ({"shop": "convenience"}, "grocery"),
             ({"amenity": "post_office"}, "post_office"),
             ({"amenity": "bank"}, "bank"),
-            ({"leisure": "garden"}, "garden"),
             ({"heritage": "2"}, "historic"),
             ({"tourism": "viewpoint"}, "viewpoint"),
             ({"amenity": "library"}, "library"),
@@ -274,7 +336,7 @@ class OSMImportTests(unittest.TestCase):
                         db.execute("PRAGMA foreign_key_check").fetchall(), []
                     )
                     self.assertEqual(
-                        db.execute("SELECT COUNT(*) FROM places").fetchone()[0], 4
+                        db.execute("SELECT COUNT(*) FROM places").fetchone()[0], 7
                     )
                     self.assertIsNone(
                         db.execute(
@@ -285,7 +347,7 @@ class OSMImportTests(unittest.TestCase):
                         db.execute(
                             "SELECT COUNT(*) FROM accessibility_facts"
                         ).fetchone()[0],
-                        4 * len(FIELDS),
+                        7 * len(FIELDS),
                     )
                     row = db.execute(
                         "SELECT steps_count, threshold_height_cm, elevator_available, entrance_width_cm, accessible_toilet FROM place_accessibility WHERE id='way/100'"
@@ -302,7 +364,7 @@ class OSMImportTests(unittest.TestCase):
                         0,
                     )
                 report = coverage(destination)
-                self.assertEqual(report["total_places"], 4)
+                self.assertEqual(report["total_places"], 7)
                 self.assertEqual(report["all_five_primary_fields"], 1)
                 self.assertEqual(
                     next(

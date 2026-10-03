@@ -12,6 +12,27 @@ from pydantic import ValidationError
 
 from hackyeah import models as m
 from hackyeah.database import database_path
+from hackyeah.place_enrichment import accessibility_facts, enrichment
+
+
+def _nearest_address(db: sqlite3.Connection, lat: float, lon: float) -> str | None:
+    """Return the address of the closest place with a known OSM address."""
+    best: tuple[float, str] | None = None
+    for item in db.execute(
+        """SELECT lat, lon, street, housenumber, address_unit, postcode, city
+        FROM places WHERE street IS NOT NULL OR housenumber IS NOT NULL
+        OR postcode IS NOT NULL OR city IS NOT NULL"""
+    ):
+        label = " ".join(str(value) for value in item[2:] if value)
+        if not label:
+            continue
+        distance = (
+            111_320
+            * ((lat - item[0]) ** 2 + ((lon - item[1]) * cos(radians(lat))) ** 2) ** 0.5
+        )
+        if best is None or distance < best[0]:
+            best = distance, label
+    return best[1] if best else None
 
 
 def assess(facts: list[m.Fact], constraints: m.Constraints | None) -> m.Assessment:
@@ -157,6 +178,7 @@ def _details(
                 unconfirmed_reason="missing",
             )
         facts.append(fact)
+    facts = accessibility_facts(db, row["id"], facts)
     categories = [
         item[0]
         for item in db.execute(
@@ -167,36 +189,113 @@ def _details(
     web = db.execute(
         "SELECT * FROM place_web_data WHERE place_id=?", (row["id"],)
     ).fetchone()
+    extra, extra_sources = enrichment(db, row["id"])
+    photos = []
+    if extra_sources:
+        seen = set()
+        for record in db.execute(
+            "SELECT data_json FROM external_place_data WHERE place_id=? AND source='commons' ORDER BY source_id",
+            (row["id"],),
+        ):
+            photo = json.loads(record[0]).get("photo")
+            if photo and photo["url"] not in seen:
+                seen.add(photo["url"])
+                photos.append(m.PlacePhoto.model_validate(photo))
     address = (
         " ".join(
-            str(row[key])
+            str(row[key] or extra.get(key))
             for key in ("street", "housenumber", "address_unit", "postcode", "city")
-            if row[key]
+            if row[key] or extra.get(key)
         )
+        or extra.get("address")
         or None
     )
+    address_is_nearest = False
+    if address is None:
+        address = _nearest_address(db, row["lat"], row["lon"])
+        address_is_nearest = address is not None
     return m.PlaceDetails(
         id=row["id"],
         name=row["name"] or "Miejsce bez nazwy",
         category=", ".join(categories),
         address=address,
+        address_is_nearest=address_is_nearest,
         location=m.Coordinates(lat=row["lat"], lon=row["lon"]),
         distance_m=None,
         assessment=assess(facts, constraints),
         facts=facts,
-        barriers=[],
+        barriers=[
+            m.Barrier(
+                id=f"{fact.id}:barrier",
+                kind="permanent",
+                description=description,
+                location=m.Coordinates(lat=row["lat"], lon=row["lon"]),
+                fact_ids=[fact.id],
+                starts_at=None,
+                ends_at=None,
+                status=fact.status,
+            )
+            for fact in facts
+            for attribute, value, description in (
+                (
+                    "steps_present",
+                    True,
+                    "Schody — lokalizacja obiektu OSM; przebieg wejścia wymaga sprawdzenia.",
+                ),
+                ("raised_kerb", True, "Podniesiony krawężnik."),
+                ("lighting_available", False, "Brak oświetlenia według źródła."),
+                (
+                    "accessible_toilet",
+                    False,
+                    "Brak toalety dostosowanej do potrzeb osób z niepełnosprawnościami.",
+                ),
+                *(
+                    ("smoothness", state, "Nierówna nawierzchnia: " + state)
+                    for state in (
+                        "bad",
+                        "very_bad",
+                        "horrible",
+                        "very_horrible",
+                        "impassable",
+                    )
+                ),
+            )
+            if fact.attribute == attribute and fact.value == value
+        ],
         updated_at=updated,
-        attribution=[source(updated)],
-        website=row["website"],
-        phone=row["phone"],
-        opening_hours=row["opening_hours"],
+        attribution=[
+            source(updated),
+            *[
+                m.Source(
+                    type="other",
+                    label={
+                        "msip": "MSIP Kraków",
+                        "bip_libraries": "BIP — Biblioteka Kraków",
+                        "wikidata": "Wikidata",
+                        "commons": "Wikimedia Commons",
+                    }.get(item["source"], str(item["source"])),
+                    url=item["source_url"],
+                    license=item["license"],
+                    retrieved_at=datetime.fromisoformat(item["retrieved_at"]),
+                )
+                for item in extra_sources
+            ],
+        ],
+        photos=photos,
+        website=row["website"] or extra.get("website"),
+        phone=row["phone"] or extra.get("phone") or (web["telephone"] if web else None),
+        opening_hours=row["opening_hours"]
+        or extra.get("opening_hours")
+        or (web["opening_hours"] if web else None),
         operator=row["operator"],
         access=row["access"],
         website_title=web["title"] if web else None,
-        website_description=web["description"] if web else None,
+        website_description=(web["description"] if web else None)
+        or extra.get("description"),
         website_telephone=web["telephone"] if web else None,
         website_opening_hours=web["opening_hours"] if web else None,
-        accessibility_summary=web["accessibility_summary"] if web else None,
+        accessibility_summary=(web["accessibility_summary"] if web else None)
+        or extra.get("accessibility_summary"),
         website_source=(
             m.Source(
                 type="other",
@@ -235,9 +334,30 @@ def search(
             row["id"] == body.cursor for row in rows
         ):
             raise HTTPException(422, "VALIDATION_ERROR")
+        known_facts = dict(
+            db.execute(
+                "SELECT place_id, COUNT(*) FROM accessibility_facts WHERE value_json IS NOT NULL GROUP BY place_id"
+            )
+        )
+        web_data = {
+            row[0]: sum(value is not None and value != "" for value in row[1:])
+            for row in db.execute("SELECT * FROM place_web_data")
+        }
+        external_data = {}
+        if db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+        ).fetchone():
+            external_data = {
+                row[0]: (row[1], row[2])
+                for row in db.execute(
+                    """SELECT place_id,
+                    MAX(source='commons' AND json_extract(data_json, '$.photo.url') IS NOT NULL),
+                    SUM((SELECT COUNT(*) FROM json_each(data_json) WHERE value IS NOT NULL AND value != ''))
+                    FROM external_place_data WHERE place_id IS NOT NULL GROUP BY place_id"""
+                )
+            }
+        candidates = []
         for row in rows:
-            if body.cursor is not None and row["id"] <= body.cursor:
-                continue
             categories = db.execute(
                 "SELECT c.id, c.label FROM categories c JOIN place_categories pc ON pc.category_id=c.id WHERE pc.place_id=?",
                 (row["id"],),
@@ -250,7 +370,10 @@ def search(
                     *(value for category in categories for value in category),
                 )
             )
-            if body.query.strip() != "*" and body.query.strip().casefold() not in text.casefold():
+            if (
+                body.query.strip() != "*"
+                and body.query.strip().casefold() not in text.casefold()
+            ):
                 continue
             distance = None
             if body.near is not None:
@@ -264,6 +387,50 @@ def search(
                 distance = 6371000 * 2 * asin(sqrt(min(1, a)))
                 if distance > body.radius_m:
                     continue
+            has_photo, extra_fields = external_data.get(row["id"], (0, 0))
+            populated_fields = sum(
+                row[field] is not None and row[field] != ""
+                for field in (
+                    "name",
+                    "street",
+                    "housenumber",
+                    "postcode",
+                    "city",
+                    "address_unit",
+                    "website",
+                    "phone",
+                    "opening_hours",
+                    "operator",
+                    "access",
+                )
+            )
+            candidates.append(
+                (
+                    -has_photo,
+                    -(
+                        populated_fields
+                        + known_facts.get(row["id"], 0)
+                        + web_data.get(row["id"], 0)
+                        + extra_fields
+                    ),
+                    distance if distance is not None else 0,
+                    row["id"],
+                    row,
+                    distance,
+                )
+            )
+        candidates.sort(key=lambda candidate: candidate[:4])
+        if body.cursor is not None:
+            try:
+                cursor_index = next(
+                    index
+                    for index, candidate in enumerate(candidates)
+                    if candidate[3] == body.cursor
+                )
+            except StopIteration:
+                raise HTTPException(422, "VALIDATION_ERROR") from None
+            candidates = candidates[cursor_index + 1 :]
+        for *_, row, distance in candidates:
             place = _details(db, row, constraints)
             if place.assessment.status == "does_not_meet_requirements" or (
                 not body.include_uncertain and place.assessment.status == "uncertain"
@@ -294,3 +461,36 @@ def search(
         ],
         attribution=[source(updated)],
     )
+
+
+def route_points(query: str) -> m.Page[m.PlaceSummary]:
+    """Named places/addresses for endpoint selection, without accessibility filtering."""
+    with closing(_connect()) as db:
+        rows = db.execute(
+            "SELECT id,name,lat,lon,street,housenumber FROM places WHERE name IS NOT NULL ORDER BY name"
+        ).fetchall()
+    needle = query.strip().casefold()
+    items = []
+    for row in rows:
+        address = " ".join(filter(None, (row["street"], row["housenumber"])))
+        if needle not in f"{row['name']} {address}".casefold():
+            continue
+        items.append(
+            m.PlaceSummary(
+                id=row["id"],
+                name=row["name"],
+                category="Punkt trasy",
+                assessment=m.Assessment(
+                    status="uncertain",
+                    summary="Punkt trasy z katalogu OSM.",
+                    reasons=[],
+                ),
+                facts=[],
+                address=address or None,
+                location=m.Coordinates(lat=row["lat"], lon=row["lon"]),
+                distance_m=None,
+            )
+        )
+        if len(items) == 20:
+            break
+    return m.Page[m.PlaceSummary](items=items, next_cursor=None)

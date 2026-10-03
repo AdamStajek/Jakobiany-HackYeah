@@ -64,7 +64,6 @@ Grupa zależności `data` nie jest potrzebna do startu API ani instalowana w jeg
 | Sklepy spożywcze | `shop=supermarket/convenience/grocery/greengrocer` |
 | Poczty | `amenity=post_office` |
 | Banki | `amenity=bank`; bez samych bankomatów |
-| Ogrody | `leisure=garden` |
 | Zabytki | `historic=*` lub `heritage=*`, z wyłączeniem wartości `no` |
 | Punkty widokowe | `tourism=viewpoint` |
 | Biblioteki | `amenity=library` |
@@ -81,9 +80,9 @@ Kategorie mogą się nakładać. Obiekt identyfikuje para typu i ID OSM:
 area nie tworzy duplikatu. Osobne punkty i obrysy tej samej placówki nie są
 automatycznie scalane na podstawie podobnej nazwy.
 
-W bazie pozostają nienazwane ogrody, ogródki ozdobne, pomniki, nagrobki i inne
-obiekty z powyższymi tagami. To szeroki katalog obiektów OSM, a nie wyłącznie
-lista nazwanych atrakcji turystycznych. Pole `access` zachowuje ograniczenia
+W bazie pozostają pomniki, nagrobki i inne obiekty z powyższymi tagami. To
+szeroki katalog obiektów OSM, a nie wyłącznie lista nazwanych atrakcji
+turystycznych. Pole `access` zachowuje ograniczenia
 wejścia, w tym `private` i `no`; brak tego tagu nie gwarantuje dostępu publicznego.
 Do kwalifikacji do miasta używany jest punkt reprezentatywny geometrii
 wewnątrz pełnej granicy Krakowa, a nie tag `addr:city` ani prostokąt wyciągu.

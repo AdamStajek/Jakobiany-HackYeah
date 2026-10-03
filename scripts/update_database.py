@@ -38,7 +38,12 @@ def update_database(
                 )
             snapshot = ROOT / "data/temporary/construction.json"
             if not snapshot.exists():
-                run_script("scripts.scrape_construction", "--output", str(snapshot))
+                run_script(
+                    "scripts.scrape_construction",
+                    "--output",
+                    str(snapshot),
+                    "--snapshot-only",
+                )
             run_script(
                 "scripts.import_temporary_data",
                 "--database",
@@ -67,11 +72,17 @@ def update_database(
                     previous.backup(target)
             run_script("scripts.download_osm", *([] if cached_osm else ["--refresh"]))
             run_script(
+                "scripts.build_route_graph", "--output", str(stage / "city.sqlite3")
+            )
+            run_script(
                 "scripts.scrape_construction",
                 "--output",
                 str(stage / "construction.json"),
+                "--snapshot-only",
             )
-            run_script("scripts.build_places_db", "--database", str(candidate))
+            run_script(
+                "scripts.build_places_db", "--database", str(candidate), "--additive"
+            )
             run_script(
                 "scripts.import_temporary_data",
                 "--database",
@@ -79,6 +90,18 @@ def update_database(
                 "--input",
                 str(stage / "construction.json"),
             )
+            for module, filename in (
+                ("scripts.scrape_public_places", "public-places.json"),
+                ("scripts.scrape_place_websites", "place-web.json"),
+                ("scripts.scrape_place_photos", "place-photos.json"),
+            ):
+                run_script(
+                    module,
+                    "--database",
+                    str(candidate),
+                    "--output",
+                    str(stage / filename),
+                )
             run_script(
                 "scripts.report_places",
                 "--database",
@@ -107,9 +130,21 @@ def update_database(
                     database.with_suffix(".previous.sqlite3")
                 )
             candidate.replace(database)
+            route_dir = ROOT / "data/routes"
+            route_dir.mkdir(parents=True, exist_ok=True)
+            (stage / "city.sqlite3").replace(route_dir / "city.sqlite3")
             temporary_dir = ROOT / "data/temporary"
             temporary_dir.mkdir(parents=True, exist_ok=True)
             (stage / "construction.json").replace(temporary_dir / "construction.json")
+            for filename in (
+                "public-places.json",
+                "place-web.json",
+                "place-photos.json",
+            ):
+                (stage / filename).replace(ROOT / "data" / filename)
+            for pattern in ("*.summary.json", "*.errors.json"):
+                for snapshot in stage.glob(pattern):
+                    snapshot.replace(ROOT / "data" / snapshot.name)
             (stage / "coverage.json").replace(ROOT / "data/coverage.json")
             (stage / "osm-coverage.md").replace(ROOT / "docs/osm-coverage.md")
     print(

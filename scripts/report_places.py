@@ -6,6 +6,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+from hackyeah.place_enrichment import effective_places
 from scripts.build_places_db import CATEGORIES, FIELDS
 from scripts.download_osm import ROOT
 
@@ -73,7 +74,13 @@ def coverage(database: Path) -> dict:
                     else 0,
                 }
             )
-        primary = list(FIELDS)[:5]
+        primary = [
+            "steps_count",
+            "threshold_height_cm",
+            "elevator_available",
+            "entrance_width_cm",
+            "accessible_toilet",
+        ]
         placeholders = ",".join("?" for _ in primary)
         all_five = db.execute(
             f"""
@@ -118,7 +125,40 @@ def coverage(database: Path) -> dict:
                 "SELECT COUNT(*) FROM places WHERE access IN ('private','no')"
             ).fetchone()[0],
         }
+        enrichment_report = {}
+        if db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+        ).fetchone():
+            effective = effective_places(db)
+            enrichment_report = {
+                "sources": [
+                    dict(row)
+                    for row in db.execute(
+                        "SELECT source, COUNT(*) AS records, COUNT(DISTINCT place_id) AS matched_places FROM external_place_data GROUP BY source"
+                    )
+                ],
+                "website_pages": db.execute(
+                    "SELECT COUNT(*) FROM place_web_data"
+                ).fetchone()[0],
+                "effective_fields": {
+                    key: sum(bool(row.get(key)) for row in effective)
+                    for key in (
+                        "website",
+                        "phone",
+                        "opening_hours",
+                        "street",
+                        "postcode",
+                    )
+                },
+                "places_with_photos": db.execute(
+                    "SELECT COUNT(DISTINCT place_id) FROM external_place_data WHERE source='commons' AND place_id IS NOT NULL"
+                ).fetchone()[0],
+                "enriched_places": db.execute(
+                    "SELECT COUNT(*) FROM (SELECT place_id FROM external_place_data WHERE place_id IS NOT NULL UNION SELECT place_id FROM place_web_data)"
+                ).fetchone()[0],
+            }
     return {
+        "enrichment": enrichment_report,
         "metadata": metadata,
         "total_places": total,
         "all_five_primary_fields": all_five,
@@ -158,7 +198,6 @@ def markdown(report: dict) -> str:
         [
             "",
             "Kategorie mogą się nakładać, np. muzeum i zabytek. Nie utożsamiamy liczby obiektów OSM z liczbą unikalnych placówek.",
-            "Ogrody obejmują także nienazwane ogródki i zieleń ozdobną z `leisure=garden`; dostęp publiczny nie jest domyślnie zakładany.",
             f"Obiekty z `access=private/no`: {report['basic_fields']['explicitly_private_or_no_access']}.",
             "",
             "## Pola dostępności",
@@ -222,6 +261,42 @@ def markdown(report: dict) -> str:
             "",
         ]
     )
+    if report.get("enrichment"):
+        enriched = report["enrichment"]
+        lines.extend(
+            [
+                "",
+                "## Uzupełnienie z innych źródeł",
+                "",
+                f"Miejsca z dodatkowymi danymi lub zdjęciami: **{enriched['enriched_places']}**. Zdjęcia Commons: **{enriched['places_with_photos']} miejsc**.",
+                f"Metadane stron miejsc: {enriched['website_pages']}.",
+                "",
+                "| Źródło | Rekordy źródłowe | Dopasowane miejsca OSM |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for item in enriched["sources"]:
+            lines.append(
+                f"| {item['source']} | {item['records']} | {item['matched_places']} |"
+            )
+        lines.extend(
+            [
+                "",
+                "Pokrycie po uzupełnieniu braków OSM (tak jak w API):",
+                "",
+                "| Pole | Miejsca |",
+                "| --- | ---: |",
+            ]
+        )
+        for key, value in enriched["effective_fields"].items():
+            lines.append(f"| `{key}` | {value} |")
+        lines.extend(
+            [
+                "",
+                "Rekordy niedopasowane pozostają w `external_place_data` z `place_id=NULL`; nie są automatycznie nowymi punktami katalogu. Zdjęcia to URL-e i metadane licencyjne, bez plików binarnych.",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 

@@ -1,4 +1,4 @@
-"""Fetch public ZDMK roadworks into a local JSON file; no database writes."""
+"""Fetch public ZDMK roadworks and update SQLite, retaining a JSON snapshot."""
 
 from hackyeah.temporary_data import main
 

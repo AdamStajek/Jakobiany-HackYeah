@@ -19,17 +19,23 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import polygonize_full, unary_union
 
 from hackyeah.database import preserve_backend_data
+from hackyeah.place_enrichment import preserve_enrichment
+from hackyeah.route_data import SMOOTHNESS, SURFACES, height_cm
 from hackyeah.temporary_store import preserve_temporary_data
 from scripts.download_osm import ROOT, sha256
 
 CATEGORIES = {
+    "steps": "Schody",
+    "kerb": "Krawężniki",
+    "toilets": "Toalety publiczne",
+    "rest_point": "Miejsca odpoczynku",
+    "elevator": "Windy",
     "hotel": "Hotele",
     "museum": "Muzea",
     "government": "Urzędy",
     "grocery": "Sklepy spożywcze",
     "post_office": "Poczty",
     "bank": "Banki",
-    "garden": "Ogrody",
     "historic": "Zabytki",
     "viewpoint": "Punkty widokowe",
     "library": "Biblioteki",
@@ -39,6 +45,11 @@ CATEGORIES = {
     "senior_club": "Kluby seniora",
 }
 FIELDS = {
+    "steps_present": ("Obecność schodów", None),
+    "kerb_height_cm": ("Wysokość krawężnika", "cm"),
+    "raised_kerb": ("Podniesiony krawężnik", None),
+    "lighting_available": ("Oświetlenie", None),
+    "smoothness": ("Stan nawierzchni", None),
     "steps_count": ("Liczba stopni wejściowych", "count"),
     "threshold_height_cm": ("Wysokość progu", "cm"),
     "elevator_available": ("Winda", None),
@@ -88,6 +99,16 @@ class Evidence:
 
 def classify(tags: dict[str, str]) -> list[str]:
     categories = []
+    if tags.get("highway") == "steps" or tags.get("barrier") == "step":
+        categories.append("steps")
+    if tags.get("barrier") == "kerb" or "kerb" in tags or "kerb:height" in tags:
+        categories.append("kerb")
+    if tags.get("amenity") == "toilets":
+        categories.append("toilets")
+    if tags.get("amenity") == "bench" or tags.get("leisure") == "picnic_table":
+        categories.append("rest_point")
+    if tags.get("highway") == "elevator":
+        categories.append("elevator")
     tourism, amenity = tags.get("tourism"), tags.get("amenity")
     if tourism in {"hotel", "museum", "viewpoint"}:
         categories.append(tourism)
@@ -97,8 +118,6 @@ def classify(tags: dict[str, str]) -> list[str]:
         categories.append("government")
     if tags.get("shop") in {"supermarket", "convenience", "grocery", "greengrocer"}:
         categories.append("grocery")
-    if tags.get("leisure") == "garden":
-        categories.append("garden")
     if tags.get("historic") not in {None, "no"} or tags.get("heritage") not in {
         None,
         "no",
@@ -212,6 +231,9 @@ def read_extract(
         "building",
         "entrance",
         "highway",
+        "barrier",
+        "kerb",
+        "kerb:height",
     ]
     processor = (
         osmium.FileProcessor(str(path))
@@ -320,6 +342,22 @@ def observations(obj: OSMObject, scope: str = "place") -> list[Evidence]:
             add(attribute, tag, boolean(tags[tag]))
 
     entrance = tags.get("entrance") not in {None, "no"}
+    if scope == "place":
+        tag_bool("lighting_available", "lit")
+        if tags.get("smoothness") in SMOOTHNESS:
+            add("smoothness", "smoothness", tags["smoothness"])
+        for tag in ("kerb:height",) + (
+            ("height",) if tags.get("barrier") == "kerb" else ()
+        ):
+            if tag in tags:
+                add("kerb_height_cm", tag, height_cm(tags[tag]))
+        if tags.get("kerb") in {"raised", "flush", "no"}:
+            add("raised_kerb", "kerb", tags["kerb"] == "raised")
+        if tags.get("highway") == "steps" or tags.get("barrier") == "step":
+            key = "highway" if tags.get("highway") == "steps" else "barrier"
+            add("steps_present", key, True)
+            if re.fullmatch(r"\d+", tags.get("step_count", "")):
+                add("steps_count", "step_count", int(tags["step_count"]))
     if scope in {"place", "entrance_on_outline"}:
         for tag in (
             "entrance:step_count",
@@ -398,7 +436,7 @@ def observations(obj: OSMObject, scope: str = "place") -> list[Evidence]:
         for tag in ("elevator", "wheelchair:elevator"):
             tag_bool("elevator_available", tag)
         if "surface" in tags:
-            add("surface", "surface", tags["surface"])
+            add("surface", "surface", SURFACES.get(tags["surface"], "other"))
         if "incline" in tags:
             match = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*(%|°)", tags["incline"])
             if match:
@@ -424,6 +462,20 @@ def observations(obj: OSMObject, scope: str = "place") -> list[Evidence]:
         if tags.get("amenity") == "bench" or tags.get("leisure") == "picnic_table":
             tag = "amenity" if tags.get("amenity") == "bench" else "leisure"
             add("rest_area_available", tag, True, "mapped_feature")
+    # Keep the historical database field and expose the API's canonical attribute.
+    values.extend(
+        Evidence(
+            "steps_present",
+            e.value,
+            e.object_id,
+            e.tag_key,
+            e.raw_value,
+            e.scope,
+            e.method,
+        )
+        for e in list(values)
+        if e.attribute == "stairs_present"
+    )
     return values
 
 
@@ -460,7 +512,33 @@ def link_features(
     return links
 
 
-def build_database(source: Path, boundary_path: Path, destination: Path) -> dict:
+def normalize_surfaces(db: sqlite3.Connection) -> None:
+    """Normalize retained legacy facts too; raw OSM tags remain untouched."""
+    for table, column in (
+        ("accessibility_facts", "value_json"),
+        ("fact_evidence", "parsed_value_json"),
+    ):
+        for (raw,) in db.execute(
+            f"SELECT DISTINCT {column} FROM {table} WHERE attribute='surface' AND {column} IS NOT NULL"
+        ).fetchall():
+            value = json.loads(raw)
+            if value not in {
+                "paved",
+                "asphalt",
+                "gravel",
+                "cobblestone",
+                "ground",
+                "other",
+            }:
+                db.execute(
+                    f"UPDATE {table} SET {column}=? WHERE attribute='surface' AND {column}=?",
+                    (json.dumps(SURFACES.get(value, "other")), raw),
+                )
+
+
+def build_database(
+    source: Path, boundary_path: Path, destination: Path, *, additive: bool = False
+) -> dict:
     boundary = load_boundary(boundary_path)
     print("Odczyt geometrii i tagów OSM...", flush=True)
     objects, stats = read_extract(source, boundary)
@@ -552,7 +630,24 @@ def build_database(source: Path, boundary_path: Path, destination: Path) -> dict
                     "INSERT INTO places VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         place.id,
-                        tags.get("name") or tags.get("name:pl") or tags.get("brand"),
+                        tags.get("name")
+                        or tags.get("name:pl")
+                        or tags.get("brand")
+                        or next(
+                            (
+                                CATEGORIES[c]
+                                for c in classify(tags)
+                                if c
+                                in {
+                                    "steps",
+                                    "kerb",
+                                    "toilets",
+                                    "rest_point",
+                                    "elevator",
+                                }
+                            ),
+                            None,
+                        ),
                         point.y,
                         point.x,
                         tags.get("addr:street") or tags.get("addr:place"),
@@ -632,8 +727,49 @@ def build_database(source: Path, boundary_path: Path, destination: Path) -> dict
                                 e.method,
                             ),
                         )
+            if additive and destination.exists():
+                # Retain old catalogue entries outside this importer's categories.
+                # INSERT OR IGNORE refreshes generated rows while retaining prior evidence
+                # only for places absent from the new extract. No external/backend writes.
+                with closing(
+                    sqlite3.connect(destination.as_uri() + "?mode=ro", uri=True)
+                ) as previous:
+                    missing = {
+                        r[0] for r in previous.execute("SELECT id FROM places")
+                    } - {r[0] for r in db.execute("SELECT id FROM places")}
+                    for table in (
+                        "categories",
+                        "osm_objects",
+                        "places",
+                        "place_categories",
+                        "place_features",
+                        "accessibility_facts",
+                        "fact_evidence",
+                    ):
+                        rows = previous.execute(f"SELECT * FROM {table}")
+                        placeholders = ",".join("?" for _ in rows.description)
+                        db.executemany(
+                            f"INSERT OR IGNORE INTO {table} VALUES ({placeholders})",
+                            (
+                                r
+                                for r in rows
+                                if table in {"categories", "osm_objects"}
+                                or r[0] in missing
+                            ),
+                        )
+                    metadata["retained_places"] = len(missing)
+                    metadata["place_count"] = db.execute(
+                        "SELECT count(*) FROM places"
+                    ).fetchone()[0]
+                    for key in ("retained_places", "place_count"):
+                        db.execute(
+                            "INSERT OR REPLACE INTO metadata VALUES (?, ?)",
+                            (key, json.dumps(metadata[key])),
+                        )
+            normalize_surfaces(db)
             preserve_temporary_data(destination, db)
             preserve_backend_data(destination, db)
+            preserve_enrichment(destination, db)
             if (
                 db.execute("PRAGMA integrity_check").fetchone()[0] != "ok"
                 or db.execute("PRAGMA foreign_key_check").fetchall()
@@ -655,8 +791,15 @@ def main() -> None:
         "--boundary", type=Path, default=ROOT / "data/raw/krakow-boundary.json"
     )
     parser.add_argument("--database", type=Path, default=ROOT / "data/krakow.sqlite3")
+    parser.add_argument(
+        "--additive",
+        action="store_true",
+        help="Retain existing places outside the imported catalogue.",
+    )
     args = parser.parse_args()
-    build_database(args.source, args.boundary, args.database)
+    build_database(
+        args.source, args.boundary, args.database.resolve(), additive=args.additive
+    )
 
 
 if __name__ == "__main__":

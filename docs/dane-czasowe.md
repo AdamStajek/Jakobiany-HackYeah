@@ -46,9 +46,9 @@ jako `krakow.sqlite3`.
 ```bash
 # Prognoza na stdout, bez zapisu:
 PYTHONPATH=src uv run python scripts/scrape_weather.py
-# Remonty do pliku:
+# Remonty do pliku i domyślnej SQLite:
 PYTHONPATH=src uv run python scripts/scrape_construction.py
-# Remonty do pliku i SQLite:
+# Remonty do pliku i wskazanej SQLite:
 PYTHONPATH=src uv run python scripts/scrape_construction.py --database data/krakow.sqlite3
 # Import wcześniej pobranych remontów:
 PYTHONPATH=src uv run python -m scripts.import_temporary_data --missing-only
@@ -59,6 +59,8 @@ zmienia tę ścieżkę. Pogoda odrzuca `--output` i `--database`. `--input` pozw
 przetworzyć lokalny JSON prognozy lub KML mapy bez połączenia z internetem.
 Próg upału: `--heat-c 30`; punkt: `--lat 50.0614 --lon 19.9366`;
 horyzont: `--days 3` (1–7). Domyślny punkt to centrum Krakowa.
+
+`scrape_construction --snapshot-only` zapisuje tylko plik, bez importu do SQLite.
 
 ## Model danych i SQLite
 

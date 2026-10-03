@@ -56,6 +56,7 @@ export type RoutePlan = {
 export async function searchPlaces(
   query: string,
   constraints: Constraints,
+  cursor?: string | null,
 ): Promise<PlacePage> {
   return api("/places/search", {
     method: "POST",
@@ -64,6 +65,7 @@ export async function searchPlaces(
       constraints,
       include_uncertain: true,
       limit: 50,
+      cursor,
       near: { lat: 50.0614, lon: 19.9366 },
       radius_m: 20000,
     }),

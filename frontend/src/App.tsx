@@ -89,12 +89,6 @@ function Layout({ children }: { children: ReactNode }) {
           {menu ? <X /> : <Menu />}
         </button>
       </header>
-      <div className="demo-banner">
-        <span className="demo-dot" /> Wersja demonstracyjna{" "}
-        <span className="demo-detail">
-          · Przykładowe miejsca i trasy, bez połączenia z API
-        </span>
-      </div>
       <main id="content" tabIndex={-1}>
         {children}
       </main>

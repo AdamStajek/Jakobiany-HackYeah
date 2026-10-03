@@ -29,14 +29,21 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const category = params.get("category") || "";
   const [results, setResults] = useState<PlaceSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
+    setResults([]);
+    setNextCursor(null);
     searchPlaces(query || category, constraints)
       .then((page) => {
-        if (active) setResults(page.items);
+        if (active) {
+          setResults(page.items);
+          setNextCursor(page.next_cursor);
+        }
       })
       .catch((reason: unknown) => {
         if (active)
@@ -53,6 +60,28 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       active = false;
     };
   }, [query, category, constraints]);
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const page = await searchPlaces(
+        query || category,
+        constraints,
+        nextCursor,
+      );
+      setResults((current) => [...current, ...page.items]);
+      setNextCursor(page.next_cursor);
+    } catch (reason: unknown) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Nie udało się pobrać kolejnych miejsc.",
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   const orderedResults = [...results].sort((a, b) =>
     sort === "distance"
       ? (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity)
@@ -233,27 +262,39 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
               {loading ? "Pobieranie…" : `${results.length} wyników`}
             </span>
           </div>
-          {error ? (
+          {error && (
             <p className="warning-box" role="alert">
               {error}
             </p>
-          ) : results.length ? (
-            orderedResults.map((p) => (
-              <PlaceCard
-                key={p.id}
-                place={p}
-                assessment={
-                  p.assessment || {
-                    status: "uncertain",
-                    summary: "Dopasowanie nieznane.",
-                    reasons: [],
+          )}
+          {results.length ? (
+            <>
+              {orderedResults.map((p) => (
+                <PlaceCard
+                  key={p.id}
+                  place={p}
+                  assessment={
+                    p.assessment || {
+                      status: "uncertain",
+                      summary: "Dopasowanie nieznane.",
+                      reasons: [],
+                    }
                   }
-                }
-                saved={saved.includes(p.id)}
-                toggle={() => toggleSave(p.id)}
-              />
-            ))
-          ) : (
+                  saved={saved.includes(p.id)}
+                  toggle={() => toggleSave(p.id)}
+                />
+              ))}
+              {nextCursor && (
+                <button
+                  className="button subtle"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Pobieranie…" : "Pokaż kolejne miejsca"}
+                </button>
+              )}
+            </>
+          ) : !error ? (
             <div className="empty-state">
               <Search size={36} />
               <h2>Nie znaleźliśmy miejsc</h2>
@@ -268,7 +309,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
                 Pokaż wszystkie miejsca
               </button>
             </div>
-          )}
+          ) : null}
         </section>
         <section
           className={`search-map ${view === "list" ? "mobile-hidden" : ""}`}

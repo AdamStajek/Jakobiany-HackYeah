@@ -40,11 +40,15 @@ function Layout({ children }: { children: ReactNode }) {
     if (!root) return;
     const apply = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-        node.textContent = translate(node.textContent);
+        const translated = translate(node.textContent);
+        if (translated !== node.textContent) node.textContent = translated;
       } else if (node instanceof HTMLElement) {
         for (const attr of ["aria-label", "placeholder", "title", "alt"]) {
           const value = node.getAttribute(attr);
-          if (value) node.setAttribute(attr, translate(value));
+          if (value) {
+            const translated = translate(value);
+            if (translated !== value) node.setAttribute(attr, translated);
+          }
         }
         node.childNodes.forEach(apply);
       }
@@ -56,7 +60,10 @@ function Layout({ children }: { children: ReactNode }) {
       if (record.type === "attributes" && record.target instanceof HTMLElement) {
         const attr = record.attributeName;
         const value = attr && record.target.getAttribute(attr);
-        if (attr && value) record.target.setAttribute(attr, translate(value));
+        if (attr && value) {
+          const translated = translate(value);
+          if (translated !== value) record.target.setAttribute(attr, translated);
+        }
       }
     }));
     observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "placeholder", "title", "alt"] });

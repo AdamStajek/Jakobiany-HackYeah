@@ -1,0 +1,24 @@
+services:
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_PATH: /app/data/krakow.sqlite3
+      # Local HTTP only. Set true behind HTTPS in a deployment.
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+    volumes:
+      - backend_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  backend_data:

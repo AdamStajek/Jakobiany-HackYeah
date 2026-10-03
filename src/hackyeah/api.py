@@ -1,0 +1,279 @@
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, NoReturn
+from urllib.error import URLError
+
+from fastapi import APIRouter, File, Path, Query, Request, Response, UploadFile
+from pydantic import ValidationError
+
+from hackyeah import auth, needs, photos
+from hackyeah import models as m
+from hackyeah.routing import demo_graph, plan_route
+from hackyeah.temporary_data import get_weather
+
+
+class EndpointNotImplementedError(Exception):
+    pass
+
+
+ResourceId = Annotated[str, Path(min_length=1)]
+Limit = Annotated[int, Query(ge=1, le=100)]
+Cursor = Annotated[str | None, Query()]
+
+router = APIRouter(
+    prefix="/api/v1",
+    responses={
+        400: {"model": m.ErrorResponse, "description": "Niepoprawny JSON żądania."},
+        501: {
+            "model": m.ErrorResponse,
+            "description": "Logika operacji nie jest zaimplementowana.",
+        },
+        422: {"model": m.ErrorResponse, "description": "Niepoprawne dane żądania."},
+    },
+)
+
+
+@router.post("/auth/register", response_model=m.User, status_code=201, tags=["auth"])
+def register(body: m.RegisterRequest, request: Request, response: Response) -> m.User:
+    return auth.register(body, request, response)
+
+
+@router.post("/auth/login", response_model=m.Session, tags=["auth"])
+def login(body: m.LoginRequest, request: Request, response: Response) -> m.Session:
+    return auth.login(body, request, response)
+
+
+@router.get("/auth/session", response_model=m.Session, tags=["auth"])
+def get_session(request: Request, response: Response) -> m.Session:
+    response.headers["Cache-Control"] = "no-store"
+    return auth.get_session(request)
+
+
+@router.post("/auth/logout", status_code=204, response_model=None, tags=["auth"])
+def logout(request: Request, response: Response) -> None:
+    auth.logout(request, response)
+
+
+@router.post(
+    "/needs/interpret",
+    response_model=m.InterpretResponse,
+    tags=["needs"],
+    responses={503: {"model": m.ErrorResponse}},
+)
+async def interpret_needs(
+    body: m.InterpretRequest, response: Response
+) -> m.InterpretResponse:
+    response.headers["Cache-Control"] = "no-store"
+    return await needs.interpret(body.description)
+
+
+@router.get("/profiles", response_model=m.Page[m.Profile], tags=["profiles"])
+def list_profiles(
+    request: "Request", response: "Response", limit: Limit = 20, cursor: Cursor = None
+) -> m.Page[m.Profile]:
+    from hackyeah import auth, profiles
+
+    response.headers["Cache-Control"] = "no-store"
+    return profiles.list_page(auth.require_session(request).id, limit, cursor)
+
+
+@router.post("/profiles", response_model=m.Profile, status_code=201, tags=["profiles"])
+def create_profile(
+    body: m.ProfileCreate, request: "Request", response: "Response"
+) -> m.Profile:
+    from hackyeah import auth, profiles
+
+    user = auth.require_session(request)
+    auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    return profiles.create(user.id, body)
+
+
+@router.get("/profiles/{id}", response_model=m.Profile, tags=["profiles"])
+def get_profile(id: ResourceId, request: "Request", response: "Response") -> m.Profile:
+    from hackyeah import auth, profiles
+
+    response.headers["Cache-Control"] = "no-store"
+    return profiles.get(auth.require_session(request).id, id)
+
+
+@router.patch("/profiles/{id}", response_model=m.Profile, tags=["profiles"])
+def update_profile(
+    id: ResourceId, body: m.ProfilePatch, request: "Request", response: "Response"
+) -> m.Profile:
+    from hackyeah import auth, profiles
+
+    user = auth.require_session(request)
+    auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    return profiles.update(user.id, id, body)
+
+
+@router.delete(
+    "/profiles/{id}", status_code=204, response_model=None, tags=["profiles"]
+)
+def delete_profile(id: ResourceId, request: "Request", response: "Response") -> None:
+    from hackyeah import auth, profiles
+
+    user = auth.require_session(request)
+    auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    profiles.delete(user.id, id)
+
+
+@router.post("/places/search", response_model=m.PlaceSearchResponse, tags=["places"])
+def search_places(body: m.PlaceSearchRequest) -> NoReturn:
+    raise EndpointNotImplementedError
+
+
+@router.get("/places/{id}", response_model=m.PlaceDetails, tags=["places"])
+def get_place(
+    id: ResourceId, profile_id: Annotated[str | None, Query(min_length=1)] = None
+) -> NoReturn:
+    raise EndpointNotImplementedError
+
+
+@router.post("/routes/plan", response_model=m.RoutePlanResponse, tags=["routes"])
+def plan_routes(body: m.RoutePlanRequest, request: Request) -> m.RoutePlanResponse:
+    nodes, edges = demo_graph()
+    saved_profiles = None
+    if body.profile_id is not None:
+        from hackyeah import profiles
+
+        profile = profiles.get(auth.require_session(request).id, body.profile_id)
+        saved_profiles = {profile.id: profile}
+    response = plan_route(body, nodes, edges, saved_profiles)
+    if not response.routes:
+        return response
+    lon, lat = response.routes[0].geometry.coordinates[0]
+    try:
+        response.weather = get_weather(m.Coordinates(lat=lat, lon=lon), days=7)
+    except (OSError, URLError, ValueError, KeyError, TypeError, ValidationError):
+        response.warnings.append(
+            "Nie udało się pobrać aktualnej pogody; ryzyka pogodowe pozostają nieznane."
+        )
+        return response
+    response.warnings.extend(response.weather.warnings)
+    departure = body.departure_at or datetime.now(UTC)
+    for route in response.routes:
+        arrival = departure + timedelta(seconds=route.estimated_duration_s or 0)
+        if not any(
+            h.starts_at <= arrival and h.ends_at > departure
+            for h in response.weather.weather_hours
+        ):
+            response.warnings.append("Brak prognozy dla czasu przejścia trasy.")
+        for segment in route.segments:
+            segment.temporary_difficulties = [
+                item
+                for item in response.weather.items
+                if item.starts_at is not None
+                and item.ends_at is not None
+                and item.starts_at <= arrival
+                and item.ends_at > departure
+            ]
+    return response
+
+
+@router.post("/photos", response_model=m.PhotoCreated, status_code=201, tags=["photos"])
+def upload_photo(
+    request: Request,
+    file: Annotated[
+        UploadFile,
+        File(description="JPEG, PNG lub WebP; docelowo maks. 10 MiB i 20 mln pikseli."),
+    ],
+) -> m.PhotoCreated:
+    user = auth.require_csrf(request)
+    try:
+        return photos.create(user.id, file.file.read(photos.MAX_BYTES + 1))
+    finally:
+        file.file.close()
+
+
+@router.get("/photos/{id}", response_model=m.Photo, tags=["photos"])
+def get_photo(id: ResourceId, request: Request) -> m.Photo:
+    return photos.get(auth.require_session(request), id)
+
+
+@router.delete("/photos/{id}", status_code=204, response_model=None, tags=["photos"])
+def delete_photo(id: ResourceId, request: Request) -> Response:
+    photos.delete(auth.require_csrf(request), id)
+    return Response(status_code=204)
+
+
+@router.post("/reports", response_model=m.Report, status_code=201, tags=["reports"])
+def create_report(
+    body: m.ReportCreate, request: Request, response: Response
+) -> m.Report:
+    from hackyeah import reports
+
+    user = auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    return reports.create(user, body)
+
+
+@router.get("/reports", response_model=m.Page[m.Report], tags=["reports"])
+def list_reports(
+    request: Request,
+    response: Response,
+    mine: Annotated[bool | None, Query()] = None,
+    status: Annotated[m.ReportStatus | None, Query()] = None,
+    limit: Limit = 20,
+    cursor: Cursor = None,
+) -> m.Page[m.Report]:
+    from hackyeah import reports
+
+    response.headers["Cache-Control"] = "no-store"
+    return reports.list_page(auth.require_session(request), mine, status, limit, cursor)
+
+
+@router.get("/reports/{id}", response_model=m.Report, tags=["reports"])
+def get_report(id: ResourceId, request: Request, response: Response) -> m.Report:
+    from hackyeah import reports
+
+    response.headers["Cache-Control"] = "no-store"
+    return reports.get(auth.require_session(request), id)
+
+
+@router.patch("/reports/{id}", response_model=m.Report, tags=["reports"])
+def update_report(
+    id: ResourceId, body: m.ReportPatch, request: Request, response: Response
+) -> m.Report:
+    from hackyeah import reports
+
+    user = auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    return reports.update(user, id, body)
+
+
+@router.post("/reports/{id}/review", response_model=m.Report, tags=["reports"])
+def review_report(
+    id: ResourceId, body: m.ReportReview, request: Request, response: Response
+) -> m.Report:
+    from hackyeah import reports
+
+    user = auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    return reports.review(user, id, body)
+
+
+@router.get("/owner/places", response_model=m.Page[m.PlaceSummary], tags=["owner"])
+def list_owner_places(
+    request: Request, response: Response, limit: Limit = 20, cursor: Cursor = None
+) -> m.Page[m.PlaceSummary]:
+    from hackyeah import owner
+
+    response.headers["Cache-Control"] = "no-store"
+    return owner.list_page(auth.require_session(request), limit, cursor)
+
+
+@router.put(
+    "/owner/places/{id}/declaration",
+    response_model=m.DeclarationResponse,
+    tags=["owner"],
+)
+def declare_place(
+    id: ResourceId, body: m.DeclarationRequest, request: Request, response: Response
+) -> m.DeclarationResponse:
+    from hackyeah import owner
+
+    response.headers["Cache-Control"] = "no-store"
+    return owner.declare(auth.require_csrf(request), id, body)

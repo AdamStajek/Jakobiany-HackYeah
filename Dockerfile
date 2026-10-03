@@ -14,8 +14,12 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project --no-cache
 
 COPY src ./src
+COPY data/krakow.sqlite3 ./data/krakow.sqlite3
 
 RUN useradd --uid 10001 --create-home app
+RUN chown -R app:app /app/data
+ENV DATABASE_PATH=/app/data/krakow.sqlite3
+VOLUME ["/app/data"]
 USER app
 
 EXPOSE 8000

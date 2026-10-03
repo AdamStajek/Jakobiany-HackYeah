@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated route network (rebuild from the OSM extract)
+data/routes/
+
+# Generated OSM downloads and standalone database (rebuild with scripts/).
+/data/raw/
+/data/*.sqlite3
+/data/*.sqlite3-*
+
+# Generated weather / roadworks snapshots
+data/temporary/
+
+/data/*.sqlite3.update.lock
+/data/.database-update-*/

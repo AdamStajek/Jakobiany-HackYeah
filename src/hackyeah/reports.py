@@ -1,4 +1,4 @@
-"""SQLite-backed reports and review history; no AI service is used.
+"""SQLite-backed reports with local photo verification and review history.
 
 Target/fact existence and publishing accepted facts await the place data service.
 """
@@ -11,7 +11,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from hackyeah import models as m
-from hackyeah import photos
+from hackyeah import photos, report_ai
 from hackyeah.database import Store, atomic
 
 _lock = atomic
@@ -46,25 +46,42 @@ def get(user: m.User, report_id: str) -> m.Report:
         return report.model_copy(deep=True)
 
 
-def create(user: m.User, body: m.ReportCreate) -> m.Report:
+def prepare(
+    user: m.User,
+    body: m.ReportCreate,
+    *,
+    verification_attribute: m.Attribute | None = None,
+) -> m.Report:
     now = datetime.now(UTC)
     report = m.Report(
         **body.model_dump(),
         id=f"report_{uuid4().hex}",
         author_id=user.id,
         status="pending",
-        ai_status="failed" if body.photo_ids else "not_requested",
+        ai_status="not_requested",
         ai_proposals=[],
         review_comment=None,
         created_at=now,
         updated_at=now,
     )
+    images = photos.owned_contents(user, report.photo_ids)
+    report_ai.verify(report, images, verification_attribute)
+    return report
+
+
+def save(user: m.User, report: m.Report) -> m.Report:
     with _lock:
         photos.replace_report_links(user, report.id, report.photo_ids)
         _reports[report.id] = report
         _history[report.id] = []
+        if report.status == "accepted":
+            _accepted_observations[report.id] = report.observations
         _refresh_confidence(report)
     return report.model_copy(deep=True)
+
+
+def create(user: m.User, body: m.ReportCreate) -> m.Report:
+    return save(user, prepare(user, body))
 
 
 def list_page(
@@ -135,24 +152,24 @@ def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
         values = {**report.model_dump(), **body.model_dump(exclude_unset=True)}
         # Revalidate the resulting content, including attempts to clear every field.
         try:
-            m.ReportCreate.model_validate(
+            content = m.ReportCreate.model_validate(
                 {name: values[name] for name in m.ReportCreate.model_fields}
             )
         except ValueError:
             raise HTTPException(422, "VALIDATION_ERROR") from None
-        values.update(
-            status="pending",
-            ai_status="failed" if values["photo_ids"] else "not_requested",
-            ai_proposals=[],
-            review_comment=None,
-            updated_at=datetime.now(UTC),
-        )
-        updated = m.Report.model_validate(values)
+    updated = prepare(user, content)
+    updated.id = report.id
+    updated.created_at = report.created_at
+    with _lock:
+        if _reports[report_id] != report:
+            raise HTTPException(409, "CONFLICT")
         photos.replace_report_links(user, report_id, updated.photo_ids)
         _history[report_id] = [*_history[report_id], report]
         _reports[report_id] = updated
         _reviews.pop(report_id, None)
         _accepted_observations.pop(report_id, None)
+        if updated.status == "accepted":
+            _accepted_observations[report_id] = updated.observations
         _refresh_confidence(report)
         return updated.model_copy(deep=True)
 

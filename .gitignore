@@ -227,6 +227,7 @@ data/routes/
 
 # Generated weather / roadworks snapshots
 data/temporary/
+data/mobility/
 
 /data/*.sqlite3.update.lock
 /data/.database-update-*/

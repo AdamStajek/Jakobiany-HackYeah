@@ -4,6 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 from secrets import token_bytes
+from unittest.mock import patch
 
 import uvicorn
 from account_fixture import create_database
@@ -18,7 +19,7 @@ if __name__ == "__main__":
             SESSION_COOKIE_SECURE="false",
             OPENAI_API_KEY="browser-test-key",
         )
-        from hackyeah import auth
+        from hackyeah import auth, report_ai
         from hackyeah import models as m
         from hackyeah.main import app
         from hackyeah.needs import needs_agent
@@ -44,5 +45,12 @@ if __name__ == "__main__":
             "questions": [],
             "requires_confirmation": True,
         }
-        with needs_agent.override(model=TestModel(custom_output_args=output)):
+        with (
+            needs_agent.override(model=TestModel(custom_output_args=output)),
+            patch.object(
+                report_ai,
+                "extract_metric",
+                side_effect=RuntimeError("test model unavailable"),
+            ),
+        ):
             uvicorn.run(app, host="127.0.0.1", port=8137)

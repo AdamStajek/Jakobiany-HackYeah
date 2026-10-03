@@ -15,6 +15,7 @@ SESSION_COOKIE_SECURE=false uv run uvicorn hackyeah.main:app --app-dir src --rel
 ## Docker
 
 ```bash
+PYTHONPATH=src uv run python -m scripts.import_mobility_data
 docker compose up --build -d --wait
 ```
 
@@ -24,6 +25,7 @@ przekazuje żądania do backendu.
 Dokumentacja Swagger: http://localhost:8000/docs.
 ReDoc: http://localhost:8000/redoc. Schemat: http://localhost:8000/openapi.json.
 `POST /api/v1/routes/plan` planuje trasę na sieci pieszej całego Krakowa z OSM, uwzględniając potrzeby z profilu. Przed startem przygotuj graf: [planowanie miejskie](docs/city-routing.md).
+Planer obsługuje też komunikację miejską z aktualnym rozkładem ZTP, opóźnieniami i pozycjami pojazdów oraz dojazd samochodem, opcjonalnie do miejskiego miejsca postojowego OZN. Źródła, aktualizacja i konfiguracja: [komunikacja i parkingi Krakowa](docs/krakow-mobility.md).
 Konta, profile, zdjęcia, zgłoszenia, misje i deklaracje właścicieli korzystają
 z trwałych magazynów SQLite. Wyszukiwanie i szczegóły miejsc korzystają z lokalnej bazy OSM, a interpretacja potrzeb korzysta z OpenAI
 przez PydanticAI. Zdjęcia są dekodowane i pozbawiane metadanych; dostęp do nich ma autor i moderator.
@@ -61,7 +63,7 @@ PYTHONPATH=src uv run python -m hackyeah.auth moderator@example.com
 docker compose exec api python -m hackyeah.auth moderator@example.com
 ```
 
-Użyj adresu istniejącego konta administratora. Polecenie unieważnia jego sesje; po ponownym logowaniu pojawi się panel weryfikacji. Dodanie `--revoke` odbiera rolę. Użytkownik nie może sam nadać sobie roli przez API. Moderator nie może zatwierdzać własnej misji. Punkty są zapisywane w tej samej transakcji co decyzja; ponowienie identycznej decyzji nie zwiększa salda.
+Użyj adresu istniejącego konta administratora. Polecenie unieważnia jego sesje; po ponownym logowaniu pojawi się panel weryfikacji. Dodanie `--revoke` odbiera rolę. Użytkownik nie może sam nadać sobie roli przez API. Moderator nie może zatwierdzać własnej misji. Punkty są zapisywane w tej samej transakcji co decyzja (również automatyczna); ponowienie identycznej decyzji nie zwiększa salda.
 
 Uruchomienie bez Compose:
 
@@ -206,3 +208,30 @@ oraz są widoczne w szczegółach miejsca. `--snapshot-only` wyłącza import re
 Pełny proces `scripts.update_database` obejmuje także te źródła.
 Wyniki, komendy, zasady dopasowania i możliwości Google Places:
 [uzupełnianie miejsc i zdjęcia](docs/place-enrichment.md).
+
+## Automatyczna weryfikacja zdjęć zgłoszeń
+
+Zgłoszenia zawierające zdjęcia i `observations` są weryfikowane automatycznie
+przy utworzeniu i edycji. Lokalny [SmolVLM-256M-Instruct](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct)
+otrzymuje zdjęcia i prompt z nazwą oraz typem metryki, bez wartości użytkownika
+ani jego opisu. Inferencja używa wyłącznie CPU (PyTorch float32, eager attention),
+bez klucza API. `uv sync` instaluje wariant PyTorch CPU; Docker używa tych samych zależności.
+
+Model jest pobierany z Hugging Face przy pierwszym użyciu i następnie przechowywany
+w cache. `REPORT_VLM_MODEL` pozwala wskazać kompatybilny model lub jego lokalny katalog;
+`HF_HOME` zmienia katalog cache, a `HF_HUB_OFFLINE=1` umożliwia pracę z wcześniej
+pobranymi wagami. `REPORT_VLM_THREADS` ustawia liczbę wątków CPU (domyślnie 4). Pierwsze zgłoszenie trwa dłużej z powodu pobrania i ładowania.
+Zdjęcia pozostają lokalne. Model jest ładowany raz na proces, a inferencje są wykonywane kolejno.
+
+Zgodność **wszystkich** wartości daje `status=accepted`, różnica lub nieodczytana
+wartość (`null`, także błędny format odpowiedzi) daje `status=rejected`.
+Porównanie liczb jest dokładne, bez tolerancji; `3` i `3.0` oznaczają tę samą wartość.
+`ai_status=completed`, `ai_proposals` i `review_comment` zawierają wynik weryfikacji.
+Propozycje mają `confidence_percent=0`, ponieważ model nie zwraca skalibrowanej pewności.
+Metryki wymiarowe wymagają widocznej skali lub pomiaru na zdjęciu.
+
+Brak zdjęcia lub metryk pozostawia `pending` / `not_requested`; awaria modelu
+pozostawia `pending` / `failed` do weryfikacji moderatora. Decyzja automatyczna
+aktualizuje również misję i punkty. Zmiana treści zwykłego zgłoszenia uruchamia
+weryfikację ponownie. Mały VLM może błędnie odczytać zdjęcie; zgodność wyniku
+z deklaracją nie gwarantuje poprawności fizycznego pomiaru.

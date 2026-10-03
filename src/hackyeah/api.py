@@ -1,14 +1,25 @@
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.error import URLError
 
-from fastapi import APIRouter, Body, File, Path, Query, Request, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    Body,
+    File,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from pydantic import ValidationError
 
-from hackyeah import auth, missions, needs, photos, places
+from hackyeah import auth, missions, needs, photos, places, search_ai
 from hackyeah import models as m
-from hackyeah.city_routing import plan_city_route
 from hackyeah.database import Store, atomic
+from hackyeah.mobility_data import mobility_map
+from hackyeah.mobility_routing import plan_mobility_route
 from hackyeah.temporary_data import get_weather
 
 
@@ -65,6 +76,32 @@ async def interpret_needs(
 ) -> m.InterpretResponse:
     response.headers["Cache-Control"] = "no-store"
     return await needs.interpret(body.description)
+
+
+@router.post(
+    "/places/interpret",
+    response_model=search_ai.PlaceProposal,
+    tags=["places"],
+    responses={503: {"model": m.ErrorResponse}},
+)
+async def interpret_place_search(
+    body: search_ai.SearchPrompt, response: Response
+) -> search_ai.PlaceProposal:
+    response.headers["Cache-Control"] = "no-store"
+    return await search_ai.interpret_places(body)
+
+
+@router.post(
+    "/routes/interpret",
+    response_model=search_ai.RouteProposal,
+    tags=["routes"],
+    responses={503: {"model": m.ErrorResponse}},
+)
+async def interpret_route_search(
+    body: search_ai.SearchPrompt, response: Response
+) -> search_ai.RouteProposal:
+    response.headers["Cache-Control"] = "no-store"
+    return await search_ai.interpret_route(body)
 
 
 @router.get("/profiles", response_model=m.Page[m.Profile], tags=["profiles"])
@@ -170,7 +207,7 @@ def plan_routes(body: m.RoutePlanRequest, request: Request) -> m.RoutePlanRespon
         body = body.model_copy(
             update={"constraints": profile.constraints, "profile_id": None}
         )
-    response = plan_city_route(body)
+    response = plan_mobility_route(body)
     if not response.routes:
         return response
     lon, lat = response.routes[0].geometry.coordinates[0]
@@ -200,6 +237,24 @@ def plan_routes(body: m.RoutePlanRequest, request: Request) -> m.RoutePlanRespon
                 and item.ends_at > departure
             ]
     return response
+
+
+@router.get("/routes/mobility", response_model=m.MobilityMap, tags=["routes"])
+def route_mobility(
+    response: Response,
+    kind: Literal["stops", "parking", "vehicles"] = "stops",
+) -> m.MobilityMap:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return mobility_map(kind)
+    except (OSError, ValueError, KeyError):
+        return m.MobilityMap(
+            items=[],
+            warnings=[
+                "Nie udało się pobrać wybranej warstwy miejskiej mapy. Spróbuj ponownie."
+            ],
+            attribution=[],
+        )
 
 
 @router.post("/photos", response_model=m.PhotoCreated, status_code=201, tags=["photos"])
@@ -275,8 +330,17 @@ def save_bookmarks(
 
 
 @router.get("/missions", response_model=list[m.Mission], tags=["missions"])
-def list_missions() -> list[m.Mission]:
-    return missions.catalog()
+def list_missions(
+    lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    lon: Annotated[float | None, Query(ge=-180, le=180)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[m.Mission]:
+    if (lat is None) != (lon is None):
+        raise HTTPException(422, "VALIDATION_ERROR")
+    near = (
+        m.Coordinates(lat=lat, lon=lon) if lat is not None and lon is not None else None
+    )
+    return missions.catalog(near, offset)
 
 
 @router.post(

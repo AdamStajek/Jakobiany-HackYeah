@@ -7,11 +7,14 @@ requires-python = ">=3.13"
 dependencies = [
     "email-validator>=2.2,<3",
     "fastapi>=0.115,<1.0",
+    "gtfs-realtime-bindings>=2,<3",
     "pillow>=11,<13",
     "pydantic-ai-slim[openai]>=1,<2",
     "python-dotenv>=1,<2",
     "python-multipart>=0.0.20,<1",
     "uvicorn>=0.34,<1.0",
+    "torch>=2.6,<3",
+    "transformers>=4.49,<5",
 ]
 
 [dependency-groups]
@@ -41,3 +44,11 @@ include = ["src"]
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "standard"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

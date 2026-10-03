@@ -14,7 +14,7 @@ from account_fixture import create_database
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from hackyeah import auth
+from hackyeah import auth, report_ai
 from hackyeah import models as m
 from hackyeah.main import app
 
@@ -32,6 +32,16 @@ class AccountFlowTests(unittest.TestCase):
         environment = patch.dict(os.environ, DATABASE_PATH=str(self.path))
         environment.start()
         self.addCleanup(environment.stop)
+        inference = patch.object(
+            report_ai,
+            "extract_metric",
+            side_effect=RuntimeError("test model unavailable"),
+        )
+        inference.start()
+        self.addCleanup(inference.stop)
+        logging = patch.object(report_ai.logger, "exception")
+        logging.start()
+        self.addCleanup(logging.stop)
         auth._attempts.clear()
         self.user = self.client()
         self.moderator = self.client()
@@ -185,6 +195,64 @@ assert photos.content(session.user, {photo_id!r}).startswith(b"\\x89PNG")
             "accepted",
         )
 
+    def test_automatic_mission_priorities_refresh_and_guest_access(self):
+        import sqlite3
+        from contextlib import closing
+
+        initial = self.user.get("/api/v1/missions").json()
+        self.assertTrue(initial)
+        self.assertTrue(all(item["priority"] == 2 for item in initial))
+        selected = initial[-1]
+        response = self.user.post(
+            "/api/v1/missions/verification-requests",
+            json={
+                "place_id": selected["place_id"],
+                "fact_ids": [selected["fact_id"]],
+            },
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()[0]["priority"], 1)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute(
+                "UPDATE accessibility_facts SET value_json='1', unconfirmed_reason='conflicting' WHERE attribute='steps_count'"
+            )
+            for number in range(2, 16):
+                place_id = f"node/{number}"
+                db.execute(
+                    "INSERT INTO places (id, name, lat, lon) VALUES (?, ?, 50.0614, 19.9366)",
+                    (place_id, f"Miejsce {number}"),
+                )
+                db.execute(
+                    "INSERT INTO accessibility_facts VALUES (?, 'steps_count', NULL, 'count', 'unconfirmed', 'missing', NULL, NULL)",
+                    (place_id,),
+                )
+        refreshed = self.user.get("/api/v1/missions").json()
+        self.assertEqual(refreshed[0]["id"], selected["id"])
+        priorities = [item["priority"] for item in refreshed]
+        self.assertEqual(priorities, sorted(priorities))
+        self.assertIn(3, priorities)
+        self.assertTrue(any(item["place_id"] == "node/15" for item in refreshed))
+        self.assertTrue(
+            all(item["location"] and item["description"] for item in refreshed)
+        )
+        nearby = self.user.get("/api/v1/missions?lat=50.0614&lon=19.9366").json()
+        self.assertTrue(any(item["place_id"] == "node/15" for item in nearby))
+        far = self.user.get("/api/v1/missions?lat=52&lon=21").json()
+        self.assertTrue(all(item["priority"] == 1 for item in far))
+        self.assertEqual(self.user.get("/api/v1/missions?lat=50").status_code, 422)
+        self.assertEqual(self.user.get("/api/v1/missions?offset=-1").status_code, 422)
+        guest = self.client()
+        for endpoint in ("start", "submit"):
+            response = guest.post(
+                f"/api/v1/missions/{selected['id']}/{endpoint}",
+                json={
+                    "description": "Sprawdzono wejście do obiektu.",
+                    "photo_ids": ["guest-photo"],
+                },
+            )
+            self.assertEqual(response.status_code, 401)
+        self.assertEqual(guest.get("/api/v1/missions/progress").status_code, 401)
+
     def test_mission_review_awards_once_and_cannot_be_bypassed(self):
         mission = self.user.get("/api/v1/missions").json()[0]
         mission_id = mission["id"]
@@ -194,9 +262,22 @@ assert photos.content(session.user, {photo_id!r}).startswith(b"\\x89PNG")
             self.user.post(f"/api/v1/missions/{mission_id}/start").json()["id"],
             start.json()["id"],
         )
+        photo_id = self.user.post(
+            "/api/v1/photos", files={"file": ("mission.png", self.image(), "image/png")}
+        ).json()["id"]
+        self.assertEqual(
+            self.user.post(
+                f"/api/v1/missions/{mission_id}/submit",
+                json={"description": "Odpowiedź bez zdjęcia"},
+            ).status_code,
+            422,
+        )
         submitted = self.user.post(
             f"/api/v1/missions/{mission_id}/submit",
-            json={"description": "Wejście ma szerokość 95 centymetrów."},
+            json={
+                "description": "Wejście ma szerokość 95 centymetrów.",
+                "photo_ids": [photo_id],
+            },
         )
         self.assertEqual(submitted.status_code, 200, submitted.text)
         progress_id = submitted.json()["id"]
@@ -205,7 +286,10 @@ assert photos.content(session.user, {photo_id!r}).startswith(b"\\x89PNG")
         self.assertEqual(
             self.user.post(
                 f"/api/v1/missions/{mission_id}/submit",
-                json={"description": "Ponownie wysłana odpowiedź"},
+                json={
+                    "description": "Ponownie wysłana odpowiedź",
+                    "photo_ids": [photo_id],
+                },
             ).status_code,
             409,
         )
@@ -248,14 +332,20 @@ assert photos.content(session.user, {photo_id!r}).startswith(b"\\x89PNG")
         self.assertEqual(
             self.user.patch(
                 f"/api/v1/reports/{report_id}",
-                json={"description": "Próba ponownego naliczenia"},
+                json={
+                    "description": "Próba ponownego naliczenia",
+                    "photo_ids": [photo_id],
+                },
             ).status_code,
             409,
         )
         self.assertEqual(
             self.user.post(
                 f"/api/v1/missions/{mission_id}/submit",
-                json={"description": "Próba ponownego naliczenia"},
+                json={
+                    "description": "Próba ponownego naliczenia",
+                    "photo_ids": [photo_id],
+                },
             ).status_code,
             409,
         )
@@ -284,9 +374,15 @@ assert activity.items[0].status == "accepted"
             403,
         )
         self.user.post(f"/api/v1/missions/{mission_id}/start")
+        photo_id = self.user.post(
+            "/api/v1/photos", files={"file": ("mission.png", self.image(), "image/png")}
+        ).json()["id"]
         first = self.user.post(
             f"/api/v1/missions/{mission_id}/submit",
-            json={"description": "Niedostateczne informacje o wejściu"},
+            json={
+                "description": "Niedostateczne informacje o wejściu",
+                "photo_ids": [photo_id],
+            },
         ).json()
         rejected = self.moderator.post(
             f"/api/v1/missions/progress/{first['id']}/review",
@@ -296,7 +392,7 @@ assert activity.items[0].status == "accepted"
         self.assertEqual(rejected.json()["awarded_points"], 0)
         second = self.user.post(
             f"/api/v1/missions/{mission_id}/submit",
-            json={"description": "Szerokość zmierzono: 95 cm"},
+            json={"description": "Szerokość zmierzono: 95 cm", "photo_ids": [photo_id]},
         )
         self.assertEqual(second.status_code, 200, second.text)
         self.assertNotEqual(second.json()["report_id"], first["report_id"])

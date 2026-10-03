@@ -361,6 +361,14 @@ class RoutePlanRequest(ProfileSelection):
     origin: Coordinates | PlaceReference
     destination: Coordinates | PlaceReference
     departure_at: AwareDatetime | None = None
+    mode: Literal["walk", "transit", "car"] = "walk"
+    accessible_parking: StrictBool = False
+
+    @model_validator(mode="after")
+    def check_parking_mode(self) -> Self:
+        if self.accessible_parking and self.mode != "car":
+            raise ValueError("Wybór parkingu wymaga trybu samochodowego.")
+        return self
 
 
 class LineString(Model):
@@ -496,6 +504,13 @@ class RouteSegment(Model):
     facts: list[Fact]
     barriers: list[Barrier]
     rest_points: list[RestPoint]
+    mode: Literal["walk", "transit", "car"] = "walk"
+    line: str | None = None
+    departure_at: AwareDatetime | None = None
+    arrival_at: AwareDatetime | None = None
+    delay_s: int | None = None
+    from_stop: str | None = None
+    to_stop: str | None = None
     temporary_difficulties: list[TemporaryDifficulty] = Field(
         default_factory=list,
         description="Czasowe ryzyka: upał, oblodzenie, śnieg i remonty. Pusta lista nie potwierdza pokrycia źródeł.",
@@ -511,6 +526,7 @@ class RouteSegment(Model):
 
 
 class Route(Model):
+    variant: Literal["fastest", "constrained"] | None = None
     id: Id
     distance_m: NonNegative
     estimated_duration_s: NonNegative | None
@@ -519,6 +535,23 @@ class Route(Model):
     segments: list[RouteSegment]
     facts: list[Fact]
     computed_at: AwareDatetime
+    mode: Literal["walk", "transit", "car"] = "walk"
+    parking: "MobilityPoint | None" = None
+
+
+class MobilityPoint(Model):
+    id: Id
+    name: str
+    location: Coordinates
+    kind: Literal["stop", "parking", "vehicle"]
+    line: str | None = None
+    updated_at: AwareDatetime | None = None
+
+
+class MobilityMap(Model):
+    items: list[MobilityPoint]
+    warnings: list[str]
+    attribution: list[Source]
 
 
 class RoutePlanResponse(Model):
@@ -614,6 +647,12 @@ class ReportReview(Model):
 
 
 class Mission(Model):
+    priority: Literal[1, 2, 3] = 3
+    description: str = (
+        "Sprawdź wskazaną cechę na miejscu, opisz wynik i dołącz wymagane zdjęcie."
+    )
+    location: Coordinates | None = None
+    available: bool = True
     id: Id
     place_id: Id
     place_name: str
@@ -632,7 +671,7 @@ class MissionRequest(Model):
 class MissionSubmit(Model):
     description: Annotated[str, Field(min_length=10, max_length=4000)]
     observations: list[Observation] = Field(default_factory=list)
-    photo_ids: Annotated[list[Id], Field(max_length=5)] = Field(default_factory=list)
+    photo_ids: Annotated[list[Id], Field(min_length=1, max_length=5)]
 
     @model_validator(mode="after")
     def check_description(self) -> Self:

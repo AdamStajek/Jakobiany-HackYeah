@@ -27,6 +27,7 @@ X_SCALE = 111_195 * math.cos(math.radians(50.06))
 Y_SCALE = 111_195
 ATTRIBUTE_NAMES = {
     "steps_count": "liczba stopni",
+    "steps_present": "schody",
     "surface": "nawierzchnia",
     "smoothness": "nierówności nawierzchni",
     "lighting_available": "oświetlenie",
@@ -329,9 +330,20 @@ def requirement_checks(constraints):
     return checks
 
 
-def edge_cost(edge, graph, constraints, checks):
+def walking_time(edge, graph):
+    data = graph.ways[edge.way].values if edge.way is not None else {}
+    factor = {"gravel": 1.25, "cobblestone": 1.3, "ground": 1.4}.get(
+        data.get("surface") or "", 1
+    )
+    return (
+        edge.distance / 1.2 * factor * (1 + (data.get("slope_percent") or 0) * 0.06)
+        + edge.steps * 1.5
+    )
+
+
+def edge_cost(edge, graph, constraints, checks, fastest=False):
     if edge.way is None:
-        return edge.distance / 1.2 * 3, 0
+        return edge.distance / 1.2 * (1 if fastest else 3), 0
     way = graph.ways[edge.way]
     tags = way.tags
     data = way.values
@@ -393,6 +405,8 @@ def edge_cost(edge, graph, constraints, checks):
                 if value is not None and not predicate(value):
                     node_penalty += 1200
     steps = edge.steps + node_steps
+    if fastest:
+        return walking_time(edge, graph), steps
     return edge.distance / 1.2 * multiplier + steps * 1.5 + node_penalty, steps
 
 
@@ -407,11 +421,18 @@ class Label:
     edge: Edge | None
 
 
-def plan_city_route(request: m.RoutePlanRequest, graph: CityGraph | None = None):
+def plan_city_route(
+    request: m.RoutePlanRequest, graph: CityGraph | None = None, *, fastest=False
+):
     graph = graph or get_graph()
     constraints = request.constraints or m.Constraints.model_validate(
         {field: None for field in m.Constraints.model_fields}
     )
+    assessment_constraints = constraints
+    if fastest:
+        constraints = m.Constraints.model_validate(
+            {field: None for field in m.Constraints.model_fields}
+        )
     warnings = [
         "Trasa oparta na OSM. Brak danych nie oznacza braku bariery; dostępność nie została zweryfikowana w terenie.",
         "Dojścia od wskazanych punktów do sieci pieszej są orientacyjne i wymagają sprawdzenia.",
@@ -550,7 +571,7 @@ def plan_city_route(request: m.RoutePlanRequest, graph: CityGraph | None = None)
             # Cache shared directed edges across resource labels.
             key = (edge.a, edge.b, edge.way, edge.distance, edge.steps)
             if key not in costs:
-                costs[key] = edge_cost(edge, graph, constraints, checks)
+                costs[key] = edge_cost(edge, graph, constraints, checks, fastest)
             result = costs[key]
             if result is None:
                 continue
@@ -609,7 +630,9 @@ def plan_city_route(request: m.RoutePlanRequest, graph: CityGraph | None = None)
             path.append(current.edge)
         cursor = current.previous
     path.reverse()
-    return route_response(path, coordinates, graph, constraints, warnings, attribution)
+    return route_response(
+        path, coordinates, graph, assessment_constraints, warnings, attribution
+    )
 
 
 def facts_for(tags, object_id, updated, retrieved):
@@ -679,6 +702,10 @@ def route_response(path, coordinates, graph, constraints, warnings, attribution)
     violated = set()
     unknown_resources = []
     checks = requirement_checks(constraints)
+    if constraints.max_steps is not None:
+        checks.append(("steps_count", lambda value: value <= constraints.max_steps))
+    if constraints.require_step_free_access:
+        checks.append(("steps_present", lambda value: value is False))
     total_steps = sum(
         edge.steps
         + (
@@ -829,6 +856,12 @@ def route_response(path, coordinates, graph, constraints, warnings, attribution)
                 fact_ids=reasons.get(attribute, []),
             )
             for attribute in sorted(violated)
+        ]
+        + [
+            m.AssessmentReason(
+                code="OSM_MISSING_RESOURCE", message=message, fact_ids=[]
+            )
+            for message in unknown_resources
         ],
     )
     geometry = (
@@ -838,16 +871,7 @@ def route_response(path, coordinates, graph, constraints, warnings, attribution)
     )
     if len(geometry) < 2:
         geometry *= 2
-    duration = 0
-    for edge in path:
-        data = graph.ways[edge.way].values if edge.way is not None else {}
-        factor = {"gravel": 1.25, "cobblestone": 1.3, "ground": 1.4}.get(
-            data.get("surface") or "", 1
-        )
-        duration += (
-            edge.distance / 1.2 * factor * (1 + (data.get("slope_percent") or 0) * 0.06)
-            + edge.steps * 1.5
-        )
+    duration = sum(walking_time(edge, graph) for edge in path)
     route = m.Route(
         id=f"city-{uuid4().hex}",
         distance_m=sum(edge.distance for edge in path),

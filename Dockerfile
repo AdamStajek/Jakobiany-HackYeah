@@ -15,6 +15,7 @@ RUN uv sync --locked --no-dev --no-install-project --no-cache
 
 COPY src ./src
 COPY data/krakow.sqlite3 ./data/krakow.sqlite3
+COPY data/mobility ./data/mobility
 COPY data/routes/city.sqlite3 ./routes/city.sqlite3
 ENV ROUTE_GRAPH_PATH=/app/routes/city.sqlite3
 

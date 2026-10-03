@@ -74,6 +74,16 @@ def content(user: m.User, photo_id: str) -> bytes:
         return _files[photo_id]
 
 
+def owned_contents(user: m.User, photo_ids: list[str]) -> list[bytes]:
+    """Read owned images before inference without keeping a transaction open."""
+    with _lock:
+        for photo_id in photo_ids:
+            stored = _photos.get(photo_id)
+            if stored is None or stored[0] != user.id:
+                raise HTTPException(404, "NOT_FOUND")
+        return [content(user, photo_id) for photo_id in photo_ids]
+
+
 def replace_report_links(user: m.User, report_id: str, photo_ids: list[str]) -> None:
     """Validate ownership and replace references atomically with respect to deletion."""
     with _lock:

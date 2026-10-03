@@ -113,6 +113,43 @@ class CityRoutingTests(unittest.TestCase):
         self.assertEqual(detour.geometry.coordinates[0], self.nodes[1])
         self.assertEqual(detour.geometry.coordinates[-1], self.nodes[3])
 
+    def test_walk_returns_fastest_with_stairs_and_constrained_detour(self):
+        from hackyeah.mobility_routing import plan_mobility_route
+
+        graph = self.graph(direct={"highway": "steps", "step_count": "6"})
+        with patch("hackyeah.mobility_routing.get_graph", return_value=graph):
+            result = plan_mobility_route(
+                self.request(max_steps=0, require_step_free_access=True)
+            )
+        routes = {route.variant: route for route in result.routes}
+        self.assertEqual(set(routes), {"fastest", "constrained"})
+        self.assertLess(
+            routes["fastest"].estimated_duration_s,
+            routes["constrained"].estimated_duration_s,
+        )
+        self.assertIn(self.nodes[4], routes["constrained"].geometry.coordinates)
+        self.assertNotIn(self.nodes[4], routes["fastest"].geometry.coordinates)
+        self.assertEqual(
+            routes["fastest"].assessment.status, "does_not_meet_requirements"
+        )
+        self.assertTrue(
+            any(
+                "Schody" in reason.message
+                for reason in routes["fastest"].assessment.reasons
+            )
+        )
+
+    def test_fastest_still_available_when_step_free_route_is_missing(self):
+        from hackyeah.mobility_routing import plan_mobility_route
+
+        graph = self.graph(
+            direct={"highway": "steps", "step_count": "6"},
+            links=[(1, 2, 10, 0), (2, 3, 10, 1)],
+        )
+        with patch("hackyeah.mobility_routing.get_graph", return_value=graph):
+            result = plan_mobility_route(self.request(max_steps=0))
+        self.assertEqual([route.variant for route in result.routes], ["fastest"])
+
     def test_profile_prefers_lit_smooth_paved_less_steep_path_and_low_kerbs(self):
         for tags, constraints in [
             ({"lit": "no"}, {"require_lighting": True}),
@@ -197,6 +234,7 @@ class CityRoutingTests(unittest.TestCase):
         graph = self.graph(direct={"highway": "steps", "step_count": "6"})
         with (
             patch("hackyeah.city_routing.get_graph", return_value=graph),
+            patch("hackyeah.mobility_routing.get_graph", return_value=graph),
             patch("hackyeah.api.get_weather", side_effect=OSError("offline")),
             TestClient(app) as client,
         ):
@@ -224,6 +262,7 @@ class CityRoutingTests(unittest.TestCase):
         body["profile_id"] = "saved-profile"
         with (
             patch("hackyeah.city_routing.get_graph", return_value=graph),
+            patch("hackyeah.mobility_routing.get_graph", return_value=graph),
             patch("hackyeah.api.get_weather", side_effect=OSError("offline")),
             patch(
                 "hackyeah.api.auth.require_session",

@@ -1,6 +1,6 @@
 # Kontrakt frontend–backend: Swoją Drogą / By the Way
 
-Wersja: **0.1 — propozycja do implementacji**. Podstawa: [opis projektu](opis.md) i [technologie](technologies.md). Repozytorium nie zawiera jeszcze implementacji API; nazwy endpointów, typy, limity i sposób logowania poniżej są decyzjami proponowanymi w tym kontrakcie, a nie opisem istniejącego systemu.
+Wersja: **0.1 — kontrakt prototypu**. Podstawa: [opis projektu](opis.md) i [technologie](technologies.md). Repozytorium zawiera modele danych i szkielet endpointów FastAPI. Poprawne żądania zwracają na razie `501 NOT_IMPLEMENTED` w formacie błędu z sekcji 9. Opisane poniżej odpowiedzi sukcesu, logowanie i logika biznesowa są docelowym zachowaniem do implementacji; aktywna jest walidacja struktury żądań.
 
 ## 1. Zakres
 
@@ -53,7 +53,7 @@ Email musi mieć poprawny format; hasło: 12–128 znaków; nazwa: 1–100 znak�
 
 ### 4.1. Profil potrzeb
 
-`Constraints` zawiera wszystkie poniższe pola. `null` oznacza, że użytkownik nie określił wymagania; brak profilu nie oznacza potwierdzonej dostępności dla wszystkich.
+`Constraints` zawiera wszystkie poniższe pola podstawowe. Nowe opcjonalne pola dla tras: `max_kerb_height_cm` (liczba ≥ 0 lub `null`), `allowed_smoothness` (niepusta lista enum stanu nawierzchni lub `null`) i `require_lighting` (boolean lub `null`); domyślnie `null`. `require_lighting=true` wymaga oświetlenia, `false/null` nie nakłada tego wymagania. Enum stanu: `excellent | good | intermediate | bad | very_bad | horrible | very_horrible | impassable`. `null` oznacza, że użytkownik nie określił wymagania; brak profilu nie oznacza potwierdzonej dostępności dla wszystkich.
 
 ```json
 {
@@ -101,10 +101,11 @@ Email musi mieć poprawny format; hasło: 12–128 znaków; nazwa: 1–100 znak�
 | `attribute` | Typ `value` / `unit` |
 | --- | --- |
 | `steps_count` | integer ≥ 0 / `count` |
-| `threshold_height_cm`, `entrance_width_cm` | number ≥ 0 / `cm` |
+| `threshold_height_cm`, `kerb_height_cm`, `entrance_width_cm` | number ≥ 0 / `cm` |
 | `slope_percent` | number ≥ 0 / `percent` |
-| `ramp_available`, `elevator_available`, `accessible_toilet`, `rest_area_available` | boolean / `null` |
+| `steps_present`, `raised_kerb`, `lighting_available`, `ramp_available`, `elevator_available`, `accessible_toilet`, `rest_area_available` | boolean / `null` |
 | `surface` | enum nawierzchni jak w profilu / `null` |
+| `smoothness` | enum stanu nawierzchni jak w profilu / `null` |
 | `distance_without_rest_m` | number ≥ 0 / `m` |
 
 Każdy typ `value` dopuszcza też `null`. `status`: `confirmed | unconfirmed`. `unconfirmed_reason`: `missing | conflicting | stale | pending_verification` lub `null`; dla `unconfirmed` powód jest wymagany. `confidence_percent`: liczba 0–100 lub `null`, gdy brak podstaw do oceny. `observed_at` i `valid_until` mogą być `null`; `updated_at` jest wymagane. `sources` może być puste tylko przy braku danych.
@@ -189,9 +190,43 @@ Odpowiedź `200`: `{ items: PlaceSummary[], next_cursor, warnings: string[], att
 
 `GET /places/{id}` zwraca publicznie `200`, `PlaceDetails = PlaceSummary + { facts: Fact[], barriers: Barrier[], updated_at, attribution: Source[] }`. Opcjonalny parametr `profile_id` daje ocenę dla własnego profilu; bez niego ocena ma status `uncertain` i wyjaśnienie braku wymagań. Wszystkie kategorie faktów z sekcji 4.2 występują w szczegółach; brak wiedzy jest reprezentowany faktem z `value=null`, a nie pominięciem kategorii.
 
+Specyfikacja dostępności każdego miejsca obejmuje następujące niedogodności i udogodnienia:
+
+| Kategoria | Atrybut w `facts` | Znaczenie wartości | Jednostka |
+| --- | --- | --- | --- |
+| Schody | `steps_count` | Liczba stopni; `0` oznacza brak stopni | `count` |
+| Progi | `threshold_height_cm` | Wysokość progu; `0` oznacza brak progu | `cm` |
+| Windy | `elevator_available` | `true` — winda dostępna, `false` — brak dostępnej windy | `null` |
+| Szerokość wejść | `entrance_width_cm` | Szerokość wejścia w centymetrach | `cm` |
+| Łazienki dla osób z niepełnosprawnościami | `accessible_toilet` | `true` — dostępna łazienka dostosowana, `false` — brak takiej łazienki | `null` |
+
+Każda z tych pięciu kategorii musi wystąpić w `PlaceDetails.facts`, także gdy wartość jest nieznana. Wtedy fakt ma `value: null`, `status: "unconfirmed"` i `unconfirmed_reason: "missing"`. Każdy fakt zachowuje źródła, datę i informacje o weryfikacji zgodnie z sekcją 4.2. Dostępna winda lub łazienka jest udogodnieniem; ich brak może stanowić niedogodność zależnie od profilu potrzeb.
+
 Frontend prezentuje osobno status dopasowania i wiarygodność faktów. Każdy fakt ma widoczne źródło, datę i procent albo informację o braku oceny. Mapa i lista korzystają z tych samych wyników; lista nie wymaga włączonej geolokalizacji.
 
 ## 7. Wyznaczanie tras
+
+Dane wejściowe sieci tras są eksportowane bez bazy danych przez `hackyeah.route_data`;
+format `RouteDataFeature`, źródła, uruchomienie i ograniczenia opisuje
+[dokumentacja danych tras](dane-tras.md). Samo wyznaczanie tras pozostaje do implementacji.
+
+Każdy `RouteSegment.facts` musi zawierać kategorie:
+
+| Kategoria | Atrybuty |
+| --- | --- |
+| Schody | `steps_present`, `steps_count` |
+| Progi | `threshold_height_cm` |
+| Wysokie krawężniki | `raised_kerb`, `kerb_height_cm` |
+| Podjazdy | `ramp_available` |
+| Słaba nawierzchnia | `surface`, `smoothness` |
+| Brak oświetlenia | `lighting_available` |
+
+Wartość nieznana jest jawnie reprezentowana przez `value=null`, `status=unconfirmed`,
+`unconfirmed_reason=missing`. `raised_kerb=true` nie określa wysokości w cm;
+`steps_present=true` nie określa liczby stopni. Podjazd jest udogodnieniem,
+a jego brak może stanowić barierę zależnie od profilu. Stan nawierzchni i materiał
+są odrębnymi faktami. Brak oświetlenia jest cechą infrastruktury, nie informacją
+o czasowej awarii. Dane OSM są niepotwierdzone i nie gwarantują dostępności.
 
 `POST /routes/plan` jest publiczne. Wymagane: `origin`, `destination`. Każdy punkt to dokładnie `{ lat, lon }` albo `{ place_id: string }`. Opcjonalne: `constraints` lub `profile_id` na zasadach wyszukiwania miejsc, `departure_at` (domyślnie czas żądania).
 
@@ -229,7 +264,17 @@ Odpowiedź `200`:
             "summary": "Nieznana szerokość przejścia.",
             "reasons": [{ "code": "MISSING_DATA", "message": "Nieznana szerokość przejścia.", "fact_ids": ["fact_456"] }]
           },
-          "facts": [],
+          "facts": [
+            {"id": "fact_steps_present", "attribute": "steps_present", "value": null, "unit": null, "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_steps_count", "attribute": "steps_count", "value": null, "unit": "count", "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_threshold_height_cm", "attribute": "threshold_height_cm", "value": null, "unit": "cm", "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_raised_kerb", "attribute": "raised_kerb", "value": null, "unit": null, "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_kerb_height_cm", "attribute": "kerb_height_cm", "value": null, "unit": "cm", "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_ramp_available", "attribute": "ramp_available", "value": null, "unit": null, "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_surface", "attribute": "surface", "value": null, "unit": null, "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_smoothness", "attribute": "smoothness", "value": null, "unit": null, "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"},
+            {"id": "fact_lighting_available", "attribute": "lighting_available", "value": null, "unit": null, "status": "unconfirmed", "confidence_percent": null, "observed_at": null, "updated_at": "2026-10-03T12:00:00Z", "valid_until": null, "sources": [], "unconfirmed_reason": "missing"}
+          ],
           "barriers": [],
           "rest_points": []
         }

@@ -339,6 +339,11 @@ def main(source: str | None = None) -> None:
     )
     parser.add_argument("--output", type=Path)
     parser.add_argument(
+        "--snapshot-only",
+        action="store_true",
+        help="Construction: write JSON without updating SQLite",
+    )
+    parser.add_argument(
         "--database", type=Path, help="Also import into an existing SQLite database."
     )
     if source != "construction":
@@ -366,10 +371,10 @@ def main(source: str | None = None) -> None:
         print(snapshot.model_dump_json(indent=2))
         return
     save_snapshot(snapshot, output)
-    if args.database:
+    if not args.snapshot_only:
         from hackyeah.temporary_store import import_snapshots
 
-        import_snapshots(args.database, [snapshot])
+        import_snapshots(args.database or Path("data/krakow.sqlite3"), [snapshot])
     print(
         json.dumps(
             {

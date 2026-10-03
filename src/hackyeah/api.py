@@ -2,12 +2,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.error import URLError
 
-from fastapi import APIRouter, File, Path, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Body, File, Path, Query, Request, Response, UploadFile
 from pydantic import ValidationError
 
-from hackyeah import auth, needs, photos, places
+from hackyeah import auth, missions, needs, photos, places
 from hackyeah import models as m
-from hackyeah.routing import demo_graph, plan_route
+from hackyeah.city_routing import plan_city_route
+from hackyeah.database import Store, atomic
 from hackyeah.temporary_data import get_weather
 
 
@@ -153,16 +154,23 @@ def get_place(
     return places.get(id, constraints)
 
 
+@router.get("/routes/points", response_model=m.Page[m.PlaceSummary], tags=["routes"])
+def route_points(
+    query: Annotated[str, Query(min_length=2, max_length=200)],
+) -> m.Page[m.PlaceSummary]:
+    return places.route_points(query)
+
+
 @router.post("/routes/plan", response_model=m.RoutePlanResponse, tags=["routes"])
 def plan_routes(body: m.RoutePlanRequest, request: Request) -> m.RoutePlanResponse:
-    nodes, edges = demo_graph()
-    saved_profiles = None
     if body.profile_id is not None:
         from hackyeah import profiles
 
         profile = profiles.get(auth.require_session(request).id, body.profile_id)
-        saved_profiles = {profile.id: profile}
-    response = plan_route(body, nodes, edges, saved_profiles)
+        body = body.model_copy(
+            update={"constraints": profile.constraints, "profile_id": None}
+        )
+    response = plan_city_route(body)
     if not response.routes:
         return response
     lon, lat = response.routes[0].geometry.coordinates[0]
@@ -218,6 +226,112 @@ def get_photo(id: ResourceId, request: Request) -> m.Photo:
 def delete_photo(id: ResourceId, request: Request) -> Response:
     photos.delete(auth.require_csrf(request), id)
     return Response(status_code=204)
+
+
+@router.get(
+    "/photos/{id}/content",
+    tags=["photos"],
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}
+        }
+    },
+)
+def photo_content(id: ResourceId, request: Request) -> Response:
+    return Response(
+        content=photos.content(auth.require_session(request), id),
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+_bookmarks = Store[str, list[str]]("profiles.bookmarks")
+
+
+@router.get("/bookmarks", response_model=list[str], tags=["profiles"])
+def get_bookmarks(request: Request, response: Response) -> list[str]:
+    response.headers["Cache-Control"] = "no-store"
+    return _bookmarks.get(auth.require_session(request).id, [])
+
+
+@router.put("/bookmarks", response_model=list[str], tags=["profiles"])
+def save_bookmarks(
+    body: Annotated[list[m.Id], Body(max_length=1000)],
+    request: Request,
+    response: Response,
+) -> list[str]:
+    user = auth.require_csrf(request)
+    response.headers["Cache-Control"] = "no-store"
+    values = list(dict.fromkeys(body))
+    for place_id in values:
+        places.get(place_id)
+    with atomic:
+        _bookmarks[user.id] = values
+    return values
+
+
+@router.get("/missions", response_model=list[m.Mission], tags=["missions"])
+def list_missions() -> list[m.Mission]:
+    return missions.catalog()
+
+
+@router.get("/missions/progress", response_model=m.MissionActivity, tags=["missions"])
+def mission_activity(request: Request, response: Response) -> m.MissionActivity:
+    response.headers["Cache-Control"] = "no-store"
+    return missions.activity(auth.require_session(request))
+
+
+@router.get(
+    "/missions/review-queue",
+    response_model=m.Page[m.MissionProgress],
+    tags=["missions"],
+)
+def mission_queue(
+    request: Request, response: Response, limit: Limit = 20, cursor: Cursor = None
+) -> m.Page[m.MissionProgress]:
+    response.headers["Cache-Control"] = "no-store"
+    return missions.queue(auth.require_session(request), limit, cursor)
+
+
+@router.get("/missions/{id}", response_model=m.Mission, tags=["missions"])
+def get_mission(id: ResourceId) -> m.Mission:
+    return missions.get(id)
+
+
+@router.post(
+    "/missions/{id}/start", response_model=m.MissionProgress, tags=["missions"]
+)
+def start_mission(
+    id: ResourceId, request: Request, response: Response
+) -> m.MissionProgress:
+    response.headers["Cache-Control"] = "no-store"
+    return missions.start(auth.require_csrf(request), id)
+
+
+@router.post(
+    "/missions/{id}/submit", response_model=m.MissionProgress, tags=["missions"]
+)
+def submit_mission(
+    id: ResourceId, body: m.MissionSubmit, request: Request, response: Response
+) -> m.MissionProgress:
+    response.headers["Cache-Control"] = "no-store"
+    return missions.submit(auth.require_csrf(request), id, body)
+
+
+@router.post(
+    "/missions/progress/{id}/review",
+    response_model=m.MissionProgress,
+    tags=["missions"],
+)
+def review_mission(
+    id: ResourceId, body: m.ReportReview, request: Request, response: Response
+) -> m.MissionProgress:
+    response.headers["Cache-Control"] = "no-store"
+    return missions.review(auth.require_csrf(request), id, body)
 
 
 @router.post("/reports", response_model=m.Report, status_code=201, tags=["reports"])

@@ -51,7 +51,9 @@ class APIContractTests(unittest.TestCase):
             for path in schema["paths"].values()
             for operation in path.values()
         ]
-        self.assertEqual(len(operations), 23)
+        self.assertTrue(operations)
+        self.assertIn("/api/v1/missions/progress", schema["paths"])
+        self.assertIn("/api/v1/bookmarks", schema["paths"])
         for operation in operations:
             self.assertIn("501", operation["responses"])
             self.assertIn("422", operation["responses"])

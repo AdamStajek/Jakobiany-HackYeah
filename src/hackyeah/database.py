@@ -34,6 +34,8 @@ _models = {
         m.PlaceSummary,
         m.Fact,
         m.DeclarationRequest,
+        m.Mission,
+        m.MissionProgress,
     )
 }
 _state = local()
@@ -219,7 +221,11 @@ def preserve_backend_data(previous: Path, target: sqlite3.Connection) -> None:
             )
             target.executemany(
                 "INSERT OR REPLACE INTO place_web_data VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                source.execute(
-                    "SELECT w.* FROM place_web_data w JOIN places p ON p.id=w.place_id"
+                (
+                    row
+                    for row in source.execute("SELECT * FROM place_web_data")
+                    if target.execute(
+                        "SELECT 1 FROM places WHERE id=?", (row[0],)
+                    ).fetchone()
                 ),
             )

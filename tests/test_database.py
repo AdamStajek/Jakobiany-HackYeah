@@ -9,11 +9,13 @@ import tempfile
 import unittest
 from contextlib import closing
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from hackyeah import auth, database, owner, photos, reports
 from hackyeah import models as m
@@ -85,11 +87,11 @@ class PersistenceTests(unittest.TestCase):
             json={"decision": "accepted", "comment": "Checked"},
         )
         self.assertEqual(review.status_code, 200, review.text)
-        png_header = (
-            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (1).to_bytes(4) * 2 + bytes(9)
-        )
+        image = BytesIO()
+        Image.new("RGB", (1, 1), "red").save(image, "PNG")
         photo = self.client.post(
-            "/api/v1/photos", files={"file": ("image.png", png_header, "image/png")}
+            "/api/v1/photos",
+            files={"file": ("image.png", image.getvalue(), "image/png")},
         )
         self.assertEqual(photo.status_code, 201, photo.text)
         place = m.PlaceSummary(
@@ -100,6 +102,7 @@ class PersistenceTests(unittest.TestCase):
             location=m.Coordinates(lat=50.0617, lon=19.9373),
             distance_m=None,
             assessment=m.Assessment(status="uncertain", summary="Unknown", reasons=[]),
+            facts=[],
         )
         owner.assign_place(user.id, place)
         declaration = self.client.put(
@@ -141,7 +144,7 @@ with TestClient(app, base_url="https://testserver") as client:
     assert client.get("/api/v1/auth/session").status_code == 200
     assert client.get("/api/v1/profiles/" + args["profile"]).json()["name"] == "Saved"
     assert client.get("/api/v1/reports/" + args["report"]).json()["status"] == "accepted"
-    assert client.get("/api/v1/photos/" + args["photo"]).json()["status"] == "rejected"
+    assert client.get("/api/v1/photos/" + args["photo"]).json()["status"] == "ready"
     assert client.get("/api/v1/owner/places").json()["items"][0]["id"] == "rynek"
     assert owner._declarations["rynek"].observations[0].value == 0
     assert len(owner._history["rynek"]) == 1

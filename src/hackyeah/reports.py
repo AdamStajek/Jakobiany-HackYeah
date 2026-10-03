@@ -110,8 +110,12 @@ def list_page(
 
 
 def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
+    from hackyeah import missions
+
     with _lock:
         report = get(user, report_id)
+        if missions.linked_progress(report_id) is not None:
+            raise HTTPException(409, "CONFLICT")
         if report.author_id != user.id:
             raise HTTPException(404, "NOT_FOUND")
         values = {**report.model_dump(), **body.model_dump(exclude_unset=True)}
@@ -139,10 +143,13 @@ def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
 
 
 def review(user: m.User, report_id: str, body: m.ReportReview) -> m.Report:
+    from hackyeah import missions
+
     if "moderator" not in user.roles:
         raise HTTPException(403, "FORBIDDEN")
     with _lock:
         report = get(user, report_id)
+        missions.check_review(user, report_id)
         if report.status != "pending":
             if _reviews.get(report_id) == body:
                 return report
@@ -175,4 +182,5 @@ def review(user: m.User, report_id: str, body: m.ReportReview) -> m.Report:
                 )
                 for index in indexes
             ]
+        missions.sync_review(updated)
         return updated.model_copy(deep=True)

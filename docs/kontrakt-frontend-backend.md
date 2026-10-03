@@ -8,7 +8,7 @@ Wersja: **0.1 — kontrakt prototypu**. Podstawa: [opis projektu](opis.md) i [te
 
 **Dane czasowe tras:** upał, ryzyko oblodzenia, śnieg i remonty mają modele i skrypty; remonty są importowane do SQLite, pogoda jest pobierana w locie przy planowaniu tras; szczegóły w sekcji 7.1.
 
-**Rozszerzenia:** misje i punkty, wymiana punktów na zniżki, powiadomienia dla osób w okolicy, panel samorządu. Sekcja 10 wyznacza ich granice; nie należą do obowiązkowego API prototypu.
+**Rozszerzenia:** misje i naliczanie punktów są zaimplementowane zgodnie z sekcją 12. Wymiana punktów na zniżki, powiadomienia dla osób w okolicy i panel samorządu pozostają kierunkiem rozwoju z sekcji 10.
 
 ## 2. Zasady komunikacji
 
@@ -27,7 +27,7 @@ Wersja: **0.1 — kontrakt prototypu**. Podstawa: [opis projektu](opis.md) i [te
 
 Frontend ignoruje nieznane pola i pokazuje neutralną etykietę dla nieznanych wartości enum. Backend odrzuca nieznane pola w żądaniach zapisu i zwraca błędy walidacji. Pola w odpowiedziach opisane poniżej są wymagane, chyba że oznaczono je jako opcjonalne; nullable nie oznacza opcjonalne.
 
-Listy przyjmują `limit` i `cursor`, oprócz list z jawnie określonym formatem odpowiedzi. Kontynuacja zachowuje pozostałe filtry i kolejność. Lista miejsc jest sortowana według dopasowania, potem odległości i ID; zgłoszenia według daty malejąco i ID.
+Listy przyjmują `limit` i `cursor`, oprócz list z jawnie określonym formatem odpowiedzi. Kontynuacja zachowuje pozostałe filtry i kolejność. Lista miejsc jest sortowana według dopasowania, obecności zdjęcia, kompletności danych, odległości i ID; zgłoszenia według daty malejąco i ID.
 
 ## 3. Uwierzytelnianie i uprawnienia
 
@@ -205,9 +205,16 @@ Specyfikacja dostępności każdego miejsca obejmuje następujące niedogodnośc
 
 Każda z tych pięciu kategorii musi wystąpić w `PlaceDetails.facts`, także gdy wartość jest nieznana. Wtedy fakt ma `value: null`, `status: "unconfirmed"` i `unconfirmed_reason: "missing"`. Każdy fakt zachowuje źródła, datę i informacje o weryfikacji zgodnie z sekcją 4.2. Dostępna winda lub łazienka jest udogodnieniem; ich brak może stanowić niedogodność zależnie od profilu potrzeb.
 
+Frontend nie pokazuje dokładnych wartości liczbowych stopni ani wymiarów. Liczbę stopni prezentuje jako `Less than 5`, `5–10` lub `10 or more`. Próg i krawężnik do 2 cm oraz wejście o szerokości co najmniej 90 cm otrzymują etykietę `Accessible for wheelchairs`; pozostałe wartości otrzymują `Inaccessible for wheelchairs`. Surowe wartości pozostają w API na potrzeby oceny profilu i tras. `slope_percent` jest nadal prezentowane liczbowo.
+
 Frontend prezentuje osobno status dopasowania i wiarygodność faktów. Każdy fakt ma widoczne źródło, datę i procent albo informację o braku oceny. Mapa i lista korzystają z tych samych wyników; lista nie wymaga włączonej geolokalizacji.
 
 ## 7. Wyznaczanie tras
+
+Aktualna implementacja korzysta z grafu pieszej sieci całego Krakowa z pełnego wyciągu OSM.
+Import, zasady minimalizacji niedogodności oraz niepewność danych opisuje [planowanie miejskie](city-routing.md).
+`GET /routes/points?query=...` zwraca do 20 punktów katalogu pasujących nazwą lub adresem.
+Wymagane co najmniej dwa znaki. Odpowiedź to `Page<PlaceSummary>`.
 
 Dane wejściowe sieci tras są eksportowane bez bazy danych przez `hackyeah.route_data`;
 format `RouteDataFeature`, źródła, uruchomienie i ograniczenia opisuje
@@ -300,7 +307,7 @@ Odpowiedź `200`:
 
 `estimated_duration_s` może być `null`; podana wartość jest szacunkiem. `rest_points` to lista `{ id, location, description, fact_ids }`; frontend pokazuje ich wiarygodność przez wskazane fakty. Fakty odcinków i trasy wspólnie tworzą zbiór wskazywany przez `fact_ids`.
 
-Backend zwraca maksymalnie trzy warianty, najpierw spełniające wymagania, następnie niepewne. Trasy z potwierdzonym naruszeniem wymagań nie są proponowane. Brak wariantu: `200`, `{ routes: [], warnings: ["Nie znaleziono trasy dla podanych wymagań."], attribution: [] }`. Brak danych zwiększa niepewność; nie usuwa bariery. Błędny punkt lub punkt poza obsługiwanym obszarem daje `422`. Ocena trasy uwzględnia wszystkie odcinki, wejście do celu i odległości pomiędzy miejscami odpoczynku również przez granice odcinków.
+Backend obecnie zwraca jeden wariant minimalizujący koszt czasu i niedogodności z profilu. Znane nieprzejezdne odcinki oraz schody przy wymogu bez stopni są wykluczane. Wariant kompromisowy może zawierać inne niedogodności wg OSM; ma jawne ostrzeżenia oraz ocenę `does_not_meet_requirements`, a trasa bez zmapowanych naruszeń pozostaje `uncertain`. Brak wariantu: `200`, `{ routes: [], warnings: ["Nie znaleziono trasy dla podanych wymagań."], attribution: [] }`. Brak danych zwiększa niepewność; nie usuwa bariery. Błędny punkt lub punkt poza obsługiwanym obszarem daje `422`. Ocena trasy uwzględnia wszystkie odcinki, wejście do celu i odległości pomiędzy miejscami odpoczynku również przez granice odcinków.
 
 Frontend wyświetla `segments` w kolejności jako tekstowe kroki, wraz z barierami, odpoczynkiem i powodami oceny. Backend dostarcza zarówno geometrię, jak i tekst; frontend nie musi odczytywać kroków z mapy.
 
@@ -309,7 +316,7 @@ Frontend wyświetla `segments` w kolejności jako tekstowe kroki, wraz z bariera
 `RouteSegment` ma nowe opcjonalne pole `temporary_difficulties: TemporaryDifficulty[]`,
 domyślnie `[]`. Opcjonalne `RoutePlanResponse.weather` ma typ `TemporaryDataSnapshot | null`, domyślnie `null`. Jest pobierane w locie dla początku niepustej trasy bez zapisu do bazy lub pliku. Kategorie: `heat` (upał), `icing` (ryzyko oblodzenia), `snow`
 (śnieg), `construction` (remonty i prace drogowe). Pusta lista nie jest
-potwierdzeniem pokrycia źródeł czasowych. Geometria pozostaje syntetyczna; do trasy dołączana jest rzeczywista prognoza.
+potwierdzeniem pokrycia źródeł czasowych. Geometria pochodzi z miejskiego grafu OSM; do trasy dołączana jest rzeczywista prognoza.
 Remonty w SQLite nie są jeszcze powiązane z grafem.
 
 `TemporaryDifficulty = { id, kind: "temporary", category, description, geometry,
@@ -362,7 +369,7 @@ kategorii stałych każdego odcinka.
 
 `POST /photos`: konto, `multipart/form-data`, jedno pole `file`; JPEG, PNG lub WebP, maksymalnie 10 MiB i 20 mln pikseli po dekodowaniu. Backend sprawdza rzeczywisty format, usuwa metadane EXIF i przygotowuje kopię z ochroną danych osób przed jakimkolwiek publicznym udostępnieniem. Oryginały pozostają prywatne.
 
-Odpowiedź `201`: `{ id, status: "processing", created_at }`. `GET /photos/{id}` dla autora lub moderatora: `{ id, status, preview_url, error_code }`, gdzie `status` to `processing | ready | rejected`, a dwa ostatnie pola są nullable. `preview_url` prowadzi do prywatnej, oczyszczonej kopii i również wymaga autoryzacji. Frontend odpytuje status co 2 s, potem co 5 s, maksymalnie przez 60 s; po tym czasie pozwala sprawdzić status ponownie. `DELETE /photos/{id}` usuwa własny niepowiązany plik (`204`); powiązany daje `409 PHOTO_IN_USE`.
+Odpowiedź `201`: `{ id, status: "ready", created_at }`. Obecna implementacja dekoduje plik i usuwa metadane synchronicznie; zapisuje wyłącznie kopię PNG, a nie oryginał. `GET /photos/{id}` dla autora lub moderatora: `{ id, status, preview_url, error_code }`, gdzie `status` to `processing | ready | rejected`, a dwa ostatnie pola są nullable. `preview_url` prowadzi do `/photos/{id}/content`, prywatnego obrazu PNG wymagającego sesji autora lub moderatora. Nie ma publicznej galerii; udostępnienie publiczne wymagałoby dodatkowej anonimizacji. `DELETE /photos/{id}` usuwa własny niepowiązany plik (`204`); powiązany daje `409 PHOTO_IN_USE`.
 
 ### 8.2. Zgłoszenia użytkowników
 
@@ -389,7 +396,7 @@ Utworzenie wymaga `target`, `kind`; pozostałe pola są opcjonalne:
 
 `target.type`: `place | segment`; ID odcinka jest stabilne i wskazuje odcinek grafu routingu. `kind`: `correction | confirmation | missing_data`. `fact_id` jest wymagane dla korekty lub potwierdzenia i musi należeć do celu. Wymagany jest co najmniej jeden element: niepusty opis, obserwacja lub zdjęcie. Opis do 4000 znaków, maksymalnie pięć własnych zdjęć w stanie `ready`. Obserwacje używają typów z sekcji 4.2; źródło, status i wiarygodność ustala backend.
 
-`Report = { id, author_id, target, kind, fact_id, description, observations, photo_ids, status, ai_status, ai_proposals, review_comment, created_at, updated_at }`. `fact_id`, `description`, `review_comment` mogą być `null`; pozostałe kolekcje są listami. `status`: `pending | accepted | rejected`; `ai_status`: `not_requested | pending | completed | failed`; `ai_proposals`: lista `{ attribute, value, confidence_percent, explanation }`.
+`Report = { id, author_id, target, kind, fact_id, description, observations, photo_ids, status, ai_status, ai_proposals, review_comment, created_at, updated_at, observed_at }`. Opcjonalne `observed_at` przy utworzeniu przyjmuje datę z czasem i strefą lub `null`; data nie może wskazywać przyszłości. `fact_id`, `description`, `review_comment` mogą być `null`; pozostałe kolekcje są listami. `status`: `pending | accepted | rejected`; `ai_status`: `not_requested | pending | completed | failed`; `ai_proposals`: lista `{ attribute, value, confidence_percent, explanation }`.
 
 Analiza zdjęć działa asynchronicznie; odczyt zgłoszenia udostępnia wynik. Awaria AI nie usuwa zgłoszenia i nie blokuje ręcznej weryfikacji. Wynik AI nie nadpisuje faktów samodzielnie. `PATCH` dopuszcza `description`, `observations`, `photo_ids`; kolekcje zastępuje w całości. Korekta przyjętego zgłoszenia przywraca `pending`, zachowuje historię i unieważnia wcześniejszą analizę; backend ponownie wylicza fakty z pozostałych źródeł.
 
@@ -443,8 +450,7 @@ Poniższe interfejsy są kierunkiem rozwoju, **nie gotowym kontraktem v0.1**. Fr
 
 | Funkcja | Proponowany interfejs | Warunek przed implementacją |
 | --- | --- | --- |
-| Misje | `GET /missions`, `POST /missions/{id}/claim`, `POST /missions/{id}/submit` | Stany misji, termin i przydział, zgłoszenie jako dowód, naliczanie punktów dopiero po zatwierdzeniu |
-| Punkty i zniżki | `GET /points`, `GET /rewards`, `POST /rewards/{id}/redeem` | Historia naliczeń, mniejsza nagroda bez misji, atomowe rozliczenie i ochrona przed podwójnym użyciem |
+| Wymiana punktów na zniżki | `GET /rewards`, `POST /rewards/{id}/redeem` | Katalog nagród i ochrona przed podwójnym użyciem; saldo punktów za misje jest już dostępne przez `/missions/progress` |
 | Powiadomienia | `GET /notifications`, `PATCH /notifications/{id}` | Zgoda na lokalizację, zasięg, retencja i status przeczytania; polling jako początkowy transport |
 | Integracja pogody i remontów z routingiem | Modele i skrypty już opisane w sekcji 7.1 | Powiązanie z odcinkami i czasem przejścia; propagowanie świeżości i niepewności |
 | Panel samorządu | `GET /municipality/barriers`, `POST /municipality/impact` | Osobna rola, agregacja bez danych osób, metodologia priorytetów i symulacji wpływu naprawy |
@@ -469,18 +475,25 @@ Warunki odbioru integracji:
 
 Przy implementacji FastAPI schemat OpenAPI i przykłady odpowiedzi powinny odzwierciedlać ten plik. Zmiany kontraktu należy wprowadzać razem ze zmianami API i klienta.
 
-## 12. Template frontendu — tryb demonstracyjny
+## 12. Integracja kont, zapisów i misji
 
-Template w `frontend/` jest samodzielną aplikacją React z danymi w pamięci przeglądarki. Nie wysyła żądań do API, nie tworzy prawdziwych sesji ani nie przetwarza zdjęć. Aktywne kontrolki misji są lokalną demonstracją planowanego przepływu i stanowią wyjątek od zakazu aktywnych kontrolek w sekcji 10 wyłącznie w tym trybie. Nie oznacza to rozszerzenia obowiązkowego API v0.1.
+Frontend korzysta z istniejących endpointów kont, profili, analizy potrzeb, zdjęć i zgłoszeń. Sesja jest odtwarzana przez `/auth/session`; CSRF pozostaje w pamięci aplikacji. Gość może interpretować potrzeby i wyszukiwać miejsca, a zapisy prywatne wymagają zalogowania. Formularze zachowują dane przy błędzie; potwierdzenie wysyłki pojawia się dopiero po odpowiedzi serwera.
 
-Podczas integracji należy rozstrzygnąć następujące różnice pomiędzy projektem UI a kontraktem:
+`GET /bookmarks` zwraca listę identyfikatorów miejsc własnego konta. `PUT /bookmarks` przyjmuje listę maksymalnie 1000 identyfikatorów, sprawdza istnienie miejsc i zastępuje zapis w SQLite. Wymaga własnej sesji oraz CSRF. Profil potrzeb jest tworzony lub aktualizowany przez `/profiles` i `/profiles/{id}` po zatwierdzeniu ustawień.
 
-- Miniatury i galeria zdjęć nie są dostarczane. `PlaceDetails` zawiera dane kontaktowe z OSM oraz opcjonalny opis, godziny i informacje o dostępności pobrane ze strony miejsca; opis strony pozostaje niepotwierdzoną informacją źródłową.
-- Zapisane miejsca są lokalnym stanem demonstracji; trwały zapis wymaga osobnego kontraktu albo jawnej funkcji lokalnej.
-- Filtry podjazdu, windy, siedzenia i źródeł oraz sortowanie lokalne nie mają własnych parametrów w `/places/search`. W template działają na pełnym, skończonym zbiorze przykładowym. Nie należy filtrować tylko jednej strony wyników API i prezentować jej jako pełnego wyniku.
-- Anonimowe szczegóły miejsca nie przyjmują `constraints` w v0.1. Template ocenia dane lokalnie; integracja musi korzystać z oceny backendu, a ewentualna ocena anonimowych potrzeb w szczegółach wymaga rozszerzenia kontraktu.
-- Fakt o sprzecznych źródłach nie udostępnia wartości dla każdego źródła. Lokalne `alternatives` demonstruje obie wersje. Dla takiego UI potrzebne byłoby opcjonalne `observations: [{ value, source: Source, observed_at }]` w `Fact`; propozycja ta nie jest aktywną zmianą API.
-- Formularz demonstracyjny zachowuje datę obserwacji lokalnie. `POST /reports` v0.1 nie ma `observed_at`; nie należy wysyłać tego pola bez rozszerzenia schematu. Odpowiedź „Nie wiem” jest brakiem potwierdzenia, a nie obserwacją `false`.
-- Mapa jest lokalnym schematem; trasa jest stałym scenariuszem, który nie oblicza wariantów po zmianie punktów ani potrzeb. Nawigacja zmienia kroki ręcznie, bez geolokalizacji.
+Misje są tworzone dla rzeczywistych miejsc z brakującymi faktami i zapisane w SQLite. Katalog zawiera do 12 zadań, po 30 punktów każde. Jedna misja może być wykonana raz przez dane konto.
 
-Wyszukiwanie i szczegóły miejsc korzystają z rzeczywistego katalogu OSM. Pozostałe demonstracyjne przepływy nadal wymagają integracji opisanej powyżej. Przed podłączeniem rzeczywistych danych trzeba zapewnić sesję dla zapisów wymagających konta, ochronę CSRF, transport zdjęć, walidację serwera oraz odpowiednie stany błędów.
+| Operacja | Odpowiedź / warunki |
+| --- | --- |
+| `GET /missions`, `GET /missions/{id}` | Publiczny katalog i szczegóły `{ id, place_id, place_name, title, fact_id, attribute, points, time_minutes }` |
+| `GET /missions/progress` | Własne `{ items: MissionProgress[], points }`; suma przyznanych punktów |
+| `POST /missions/{id}/start` | Wymaga sesji i CSRF; idempotentnie tworzy postęp `in_progress` |
+| `POST /missions/{id}/submit` | `{ description, observations?, photo_ids? }`; opis 10–4000 znaków, maksymalnie 5 własnych zdjęć; dozwolone w `in_progress` lub `rejected` |
+| `GET /missions/review-queue` | Stronicowana kolejka `pending`, tylko moderator; pomija własne odpowiedzi |
+| `POST /missions/progress/{id}/review` | `{ decision: "accepted" \| "rejected", comment }`, sesja moderatora i CSRF; nie może dotyczyć jego własnej misji |
+
+`MissionProgress = { id, mission_id, user_id, status, report_id, answer, awarded_points, review_comment, created_at, updated_at }`. Statusy: `in_progress | pending | accepted | rejected`. Odpowiedź tworzy zwykłe zgłoszenie z dowodami; jego decyzja i punkty są zapisane w jednej transakcji. Weryfikacja przez `/reports/{id}/review` aktualizuje również misję. Identyczna ponowiona decyzja nie powiela punktów; inna decyzja dla rozpatrzonego zgłoszenia daje `409`. Zgłoszenie misji poprawia się wyłącznie przez ponowne wysłanie odrzuconej odpowiedzi; zwykły `PATCH /reports/{id}` jest dla niego blokowany. Przyjętej misji nie można wysłać ponownie.
+
+Panel `/review` pokazuje moderatorowi opisy i prywatne zdjęcia. Rolę nadaje administrator poleceniem `python -m hackyeah.auth EMAIL` dla istniejącego konta; `--revoke` ją odbiera. Zmiana unieważnia dotychczasowe sesje tego konta. Publiczna rejestracja nigdy nie nadaje roli moderatora.
+
+Odpowiedź „Nie wiem” w formularzu potwierdzenia jest brakiem wiedzy, a nie obserwacją `false`. Zdjęcia do zgłoszeń nie stanowią publicznej galerii miejsca. Mapa i planowanie tras korzystają z API i OSM; podgląd nawigacji nadal wymaga ręcznej zmiany kroków.

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated, Literal, Self
 
 from pydantic import (
@@ -277,11 +278,24 @@ class PlaceSearchRequest(ProfileSelection):
         return self
 
 
+class PlacePhoto(Model):
+    url: str
+    original_url: str
+    source_url: str
+    title: str
+    author: str
+    credit: str = ""
+    license: str
+    license_url: str | None = None
+    description: str = ""
+
+
 class PlaceSummary(Model):
     id: Id
     name: str
     category: str
     address: str | None
+    address_is_nearest: bool = False
     location: Coordinates
     distance_m: NonNegative | None
     assessment: Assessment
@@ -291,6 +305,7 @@ class PlaceSummary(Model):
     opening_hours: str | None = None
     operator: str | None = None
     access: str | None = None
+    photos: list[PlacePhoto] = Field(default_factory=list)
 
 
 class PlaceSearchResponse(Page[PlaceSummary]):
@@ -514,7 +529,7 @@ class RoutePlanResponse(Model):
 
 class PhotoCreated(Model):
     id: Id
-    status: Literal["processing"]
+    status: Literal["processing", "ready"]
     created_at: AwareDatetime
 
 
@@ -537,6 +552,7 @@ class ReportCreate(Model):
     description: Description | None = None
     observations: list[Observation] = Field(default_factory=list)
     photo_ids: Annotated[list[Id], Field(max_length=5)] = Field(default_factory=list)
+    observed_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def check_content(self) -> Self:
@@ -544,6 +560,8 @@ class ReportCreate(Model):
             raise ValueError("Korekta lub potwierdzenie wymaga fact_id.")
         if not (self.description or self.observations or self.photo_ids):
             raise ValueError("Przekaż opis, obserwację lub zdjęcie.")
+        if self.observed_at is not None and self.observed_at > datetime.now(UTC):
+            raise ValueError("Data obserwacji nie może wskazywać przyszłości.")
         return self
 
 
@@ -582,12 +600,54 @@ class Report(Model):
     review_comment: str | None
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    observed_at: AwareDatetime | None = None
 
 
 class ReportReview(Model):
     decision: Literal["accepted", "rejected"]
     comment: Annotated[str, Field(min_length=1, max_length=4000)]
     accepted_ai_proposal_indexes: list[Count] = Field(default_factory=list)
+
+
+class Mission(Model):
+    id: Id
+    place_id: Id
+    place_name: str
+    title: str
+    fact_id: Id
+    attribute: Attribute
+    points: Count
+    time_minutes: Count
+
+
+class MissionSubmit(Model):
+    description: Annotated[str, Field(min_length=10, max_length=4000)]
+    observations: list[Observation] = Field(default_factory=list)
+    photo_ids: Annotated[list[Id], Field(max_length=5)] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_description(self) -> Self:
+        if len(self.description.strip()) < 10:
+            raise ValueError("Opisz wynik sprawdzenia w co najmniej 10 znakach.")
+        return self
+
+
+class MissionProgress(Model):
+    id: Id
+    mission_id: Id
+    user_id: Id
+    status: Literal["in_progress", "pending", "accepted", "rejected"]
+    report_id: Id | None
+    answer: str
+    awarded_points: Count
+    review_comment: str | None
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class MissionActivity(Model):
+    items: list[MissionProgress]
+    points: Count
 
 
 class DeclarationRequest(Model):

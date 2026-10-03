@@ -130,3 +130,37 @@ def logout(request: Request, response: Response) -> None:
         COOKIE_NAME, path="/", secure=COOKIE_SECURE, httponly=True, samesite="lax"
     )
     response.headers["Cache-Control"] = "no-store"
+
+
+def set_moderator(email: str, enabled: bool = True) -> None:
+    """Administrative CLI only; public registration never grants privileged roles."""
+    with _lock:
+        key = email.strip().casefold()
+        account = users.get(key)
+        if account is None:
+            raise ValueError("Nie znaleziono konta. Najpierw zarejestruj użytkownika.")
+        user, salt, password_hash = account
+        roles = set(user.roles) - {"moderator"}
+        if enabled:
+            roles.add("moderator")
+        user.roles = sorted(roles)
+        users[key] = (user, salt, password_hash)
+        for token in list(sessions):
+            if sessions[token][0].user.id == user.id:
+                del sessions[token]
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Nadaj lub odbierz rolę moderatora istniejącemu kontu."
+    )
+    parser.add_argument("email")
+    parser.add_argument("--revoke", action="store_true")
+    arguments = parser.parse_args()
+    try:
+        set_moderator(arguments.email, not arguments.revoke)
+    except ValueError as error:
+        parser.error(str(error))
+    print("Zmieniono rolę. Użytkownik musi zalogować się ponownie.")

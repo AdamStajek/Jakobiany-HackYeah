@@ -22,7 +22,7 @@ app = FastAPI(
     title="Swoją Drogą API",
     version="0.1.0",
     description=(
-        "Prototyp tras działa na syntetycznym grafie w pamięci. Auth, profile, "
+        "Planowanie tras działa na sieci pieszej Krakowa z OSM i uwzględnia profil. Auth, profile, "
         "zdjęcia, zgłoszenia i deklaracje właścicieli zapisują dane w SQLite. "
         "Interpretacja potrzeb korzysta z OpenAI przez PydanticAI. "
         "Wyszukiwanie i szczegóły miejsc korzystają z bazy OSM. "

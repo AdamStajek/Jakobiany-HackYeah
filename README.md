@@ -1,6 +1,6 @@
 # Swoją Drogą — API
 
-Szkielet FastAPI na Pythonie 3.13 z modelami Pydantic i 23 operacjami prototypu
+API FastAPI na Pythonie 3.13 z modelami Pydantic
 pod prefiksem `/api/v1`. Endpointy i docelowe odpowiedzi są opisane w OpenAPI.
 Modele są w `src/hackyeah/models.py`, endpointy w `src/hackyeah/api.py`.
 Kontrakt API: [docs/kontrakt-frontend-backend.md](docs/kontrakt-frontend-backend.md).
@@ -9,7 +9,7 @@ Kontrakt API: [docs/kontrakt-frontend-backend.md](docs/kontrakt-frontend-backend
 
 ```bash
 uv sync
-uv run uvicorn hackyeah.main:app --app-dir src --reload
+SESSION_COOKIE_SECURE=false uv run uvicorn hackyeah.main:app --app-dir src --reload
 ```
 
 ## Docker
@@ -18,16 +18,15 @@ uv run uvicorn hackyeah.main:app --app-dir src --reload
 docker compose up --build -d --wait
 ```
 
-Frontend demonstracyjny: http://localhost:5173. Compose buduje obie aplikacje;
-frontend nadal używa przykładowych danych. Ścieżka `/api/` na porcie frontendu
+Frontend: http://localhost:5173. Compose buduje obie aplikacje;
+frontend korzysta z API. Ścieżka `/api/` na porcie frontendu
 przekazuje żądania do backendu.
 Dokumentacja Swagger: http://localhost:8000/docs.
 ReDoc: http://localhost:8000/redoc. Schemat: http://localhost:8000/openapi.json.
-`POST /api/v1/routes/plan` planuje trasę na grafie demonstracyjnym w pamięci.
-Auth, profile, zdjęcia, zgłoszenia i deklaracje właścicieli mają logikę
-prototypową oraz trwałe magazyny SQLite. Wyszukiwanie i szczegóły miejsc korzystają z lokalnej bazy OSM, a interpretacja potrzeb korzysta z OpenAI
-przez PydanticAI. Zdjęcia są odrzucane, bo przetwarzanie
-chroniące prywatność nie jest dostępne.
+`POST /api/v1/routes/plan` planuje trasę na sieci pieszej całego Krakowa z OSM, uwzględniając potrzeby z profilu. Przed startem przygotuj graf: [planowanie miejskie](docs/city-routing.md).
+Konta, profile, zdjęcia, zgłoszenia, misje i deklaracje właścicieli korzystają
+z trwałych magazynów SQLite. Wyszukiwanie i szczegóły miejsc korzystają z lokalnej bazy OSM, a interpretacja potrzeb korzysta z OpenAI
+przez PydanticAI. Zdjęcia są dekodowane i pozbawiane metadanych; dostęp do nich ma autor i moderator.
 Niepoprawne dane zwracają `422 VALIDATION_ERROR`, a błędny JSON — `400 INVALID_REQUEST`.
 Błędy mają format `{ "error": { "code", "message", "details", "request_id" } }`.
 Ścieżka `/` zwraca `404`.
@@ -36,7 +35,7 @@ Kontener uruchamia aplikację jako użytkownik bez uprawnień roota.
 Konta, sesje, profile, zdjęcia, zgłoszenia, przypisania właścicieli i historie
 zmian są zapisywane w tej samej bazie SQLite co dane OSM. Backend dodaje tabelę
 `backend_records`, zachowując istniejący schemat i dane. Zdjęcia są przechowywane
-jako prywatne BLOB-y; brak przetwarzania zdjęć nadal skutkuje ich odrzuceniem.
+jako prywatne BLOB-y po usunięciu metadanych. Postępy misji i przyznane punkty również są trwałe.
 Zapis zgłoszenia i jego powiązań ze zdjęciami odbywa się w jednej transakcji.
 Wyszukiwanie i szczegóły miejsc udostępniają dane OSM z atrybucją i oceną wymagań.
 
@@ -52,7 +51,17 @@ zmienić zmienną `DATABASE_PATH`. Plik musi istnieć. Compose wczytuje opcjonal
 plik `.env` i dla lokalnego HTTP ustawia `SESSION_COOKIE_SECURE=false`.
 Przy HTTPS ustaw `SESSION_COOKIE_SECURE=true`. Poza Compose bezpieczne cookie
 jest domyślnie włączone. Rola właściciela/moderatora i przypisania obiektów
-nadal wymagają zaufanego bootstrapu poza publicznym API.
+wymagają zaufanego nadania poza publiczną rejestracją. Moderator może weryfikować zgłoszenia i misje na stronie `/review`.
+
+Po zarejestrowaniu konta nadaj rolę moderatora na serwerze:
+
+```bash
+PYTHONPATH=src uv run python -m hackyeah.auth moderator@example.com
+# Compose:
+docker compose exec api python -m hackyeah.auth moderator@example.com
+```
+
+Użyj adresu istniejącego konta administratora. Polecenie unieważnia jego sesje; po ponownym logowaniu pojawi się panel weryfikacji. Dodanie `--revoke` odbiera rolę. Użytkownik nie może sam nadać sobie roli przez API. Moderator nie może zatwierdzać własnej misji. Punkty są zapisywane w tej samej transakcji co decyzja; ponowienie identycznej decyzji nie zwiększa salda.
 
 Uruchomienie bez Compose:
 
@@ -61,7 +70,7 @@ docker build -t hackyeah-api .
 docker run --rm -p 8000:8000 -e SESSION_COOKIE_SECURE=false \
   -v hackyeah_backend_data:/app/data hackyeah-api
 ```
-Rozszerzenia z sekcji 10 kontraktu pozostają poza zakresem szkieletu prototypu.
+Wymiana punktów na zniżki, powiadomienia i panel samorządu pozostają poza zakresem obecnego interfejsu.
 
 ## Interpretacja potrzeb
 
@@ -112,67 +121,32 @@ cache; odświeżenie: `python -m scripts.download_osm --refresh`.
 Instrukcje, reguły importu i źródła uzupełniające: [baza OSM](docs/osm-data.md).
 Rzeczywiste pokrycie pól: [raport](docs/osm-coverage.md).
 
-## Prototyp planowania tras pieszych
+## Planowanie tras pieszych w całym mieście
 
-Endpoint obsługuje również własne zapisane profile przez `profile_id`; wymaga
-wtedy aktywnej sesji.
+Planer korzysta z pełnego wyciągu Małopolski i granicy administracyjnej Krakowa.
+Punkty mogą pochodzić z katalogu miejsc lub być dowolnymi współrzędnymi
+wybranymi na mapie. A* minimalizuje czas i niedogodności określone w profilu;
+znane nieprzejezdne odcinki oraz schody przy wymogu bez stopni są wykluczane.
+Pozostałe naruszenia i braki danych są widoczne w wyniku.
 
-`src/hackyeah/routing.py` korzysta wyłącznie z modeli API oraz biblioteki
-standardowej. Graf w pamięci zawiera syntetyczne połączenia Rynek–Wawel
-(12 stopni) i Rynek–Planty–Wawel (bez stopni), w obu kierunkach.
-Geometrie i fakty są demonstracyjne, a nie zweryfikowanymi trasami ulicznymi.
+```bash
+uv sync --group data
+PYTHONPATH=src uv run --group data python -m scripts.build_route_graph
+```
+
+Gotowy graf: `data/routes/city.sqlite3`. `ROUTE_GRAPH_PATH` zmienia jego lokalizację.
+Zapisany `profile_id` wymaga własnej sesji; anonimowo można przekazać
+zatwierdzone `constraints`.
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/routes/plan \
   -H 'Content-Type: application/json' \
-  -d '{"origin":{"place_id":"rynek"},"destination":{"place_id":"wawel"},"constraints":{"max_steps":0,"max_threshold_cm":null,"max_slope_percent":null,"min_entrance_width_cm":null,"max_distance_without_rest_m":null,"require_step_free_access":true,"require_accessible_toilet":null,"allowed_surfaces":null}}'
+  -d '{"origin":{"lat":50.0617,"lon":19.9373},"destination":{"lat":50.072,"lon":20.037},"constraints":{"max_steps":0,"max_threshold_cm":null,"max_slope_percent":null,"min_entrance_width_cm":null,"max_distance_without_rest_m":null,"require_step_free_access":true,"require_accessible_toilet":null,"allowed_surfaces":null}}'
 ```
 
-Wynik zawiera jedną najszybszą dopuszczalną trasę, odcinki, geometrię GeoJSON,
-długość i szacowany czas przejścia. Bez ograniczeń wybierane jest
-połączenie bezpośrednie; profil bez schodów wybiera odcinki przez Planty.
-Punkty można podać przez identyfikatory `rynek`, `planty`, `wawel` lub ich
-współrzędne z `demo_graph()` (tolerancja 1 m). Poza grafem wynik to pusta lista
-tras z wyjaśnieniem; prototyp nie tworzy niesprawdzonych dojść.
-
-Funkcja `plan_route(request, nodes, edges, profiles)` przyjmuje skierowane
-krawędzie `(id_początku, id_końca, RouteSegment)` i opcjonalny słownik modeli
-`Profile`. Endpoint pobiera zapisany profil z SQLite. Sama funkcja nie pobiera
-profili, więc `profile_id` bez przekazanego słownika zwraca pusty wynik.
-Nieznane identyfikatory również zwracają pusty wynik z ostrzeżeniem.
-
-Algorytm przegląda proste ścieżki w kolejności szacowanego czasu. Ograniczenia aktywne
-wymagają potwierdzonych, niewygasłych faktów. Limity wysokości i nachylenia,
-szerokość, oświetlenie, nawierzchnia oraz gładkość sprawdzane są na odcinkach;
-liczba stopni sumuje się na całej trasie. Dostępna toaleta, jeśli wymagana,
-musi być potwierdzona na każdym odcinku (konserwatywna reguła prototypu).
-Odległość bez odpoczynku jest liczona po geometrii i zerowana w punktach
-odpoczynku pokrywających się z wierzchołkami geometrii. Punkty odpoczynku
-przekazane w grafie muszą być sprawdzone przez jego autora.
-Bariery obowiązujące w `departure_at` (domyślnie teraz) wykluczają odcinek;
-prototyp nie przewiduje zmiany warunków podczas przejścia. Rampa ani winda
-nie znosi automatycznie zakazu schodów. Graf jest mały; przegląd prostych
-ścieżek nie jest przeznaczony do całej sieci miasta.
-
-### Szacowanie czasu przejścia
-
-Bazowy czas odcinka to `distance_m / 1.2`. Mnożymy go przez współczynniki
-nawierzchni (asfalt/utwardzona 1, żwir 1,25, bruk 1,3, grunt/inne 1,4),
-gładkości (od 1 dla excellent/good do 2,5 dla very_horrible) i nachylenia
-`1 + 0.06 * slope_percent`. Dodajemy 1,5 sekundy na stopień.
-Potwierdzone `impassable` wyklucza odcinek niezależnie od profilu.
-To założenia prototypu, wymagające kalibracji, a nie pomiary tempa użytkownika.
-Model nie rozróżnia podejścia i zejścia; ten sam procent nachylenia daje
-jednakową karę w obu kierunkach. Nie uwzględnia pogody, tłumu ani świateł.
-
-Przy braku potwierdzonych i aktualnych danych czasu stosujemy współczynniki
-1,4 dla nawierzchni, 1,35 dla gładkości, nachylenie 5% i 20 stopni oraz
-zwracamy ostrzeżenie. Przy kilku faktach wybieramy największy koszt.
-Wymagane przez profil dane nadal podlegają wcześniejszym regułom wykluczania.
-Jeśli profil ogranicza dystans bez odpoczynku, każdy punkt odpoczynku użyty
-po drodze dolicza 60 sekund; osiągnięcie celu nie dolicza odpoczynku.
-Długość pozostaje sumą metrów, a `estimated_duration_s` zawiera czas marszu
-oraz odpoczynków. Dłuższa, łatwiejsza trasa może wygrać z krótszą.
+Szczegóły importu, wag, ocen niepewności, testów i ograniczeń:
+[docs/city-routing.md](docs/city-routing.md).
+`routing.py` zachowuje mały graf wyłącznie jako wcześniejszy przykład i fixture testów.
 
 ## Jedna komenda aktualizacji SQLite
 
@@ -215,8 +189,9 @@ Dodatkowe publiczne metadane z podanych tam stron można pobrać i zaimportować
 bezpośrednio do SQLite:
 
 ```bash
-uv run python -m scripts.scrape_place_websites --limit 100
-uv run python -m scripts.import_place_web_data
+PYTHONPATH=src uv run python -m scripts.scrape_public_places
+PYTHONPATH=src uv run python -m scripts.scrape_place_websites
+PYTHONPATH=src uv run python -m scripts.scrape_place_photos
 ```
 
 Scraper czyta tytuł, opis i dane Schema.org JSON-LD. Ogranicza pobranie do
@@ -224,3 +199,10 @@ Scraper czyta tytuł, opis i dane Schema.org JSON-LD. Ogranicza pobranie do
 prywatne adresy sieciowe. Dane trafiają do `place_web_data` z adresem źródła
 i czasem pobrania. Opis strony jest informacją źródłową, nie potwierdzeniem
 dostępności. Szczegóły są dostępne w `GET /api/v1/places/{id}`.
+
+Scrapery automatycznie aktualizują SQLite. Import publicznych danych obejmuje
+MSIP, BIP Biblioteki Kraków i Wikidata; zdjęcia z Commons mają autora i licencję
+oraz są widoczne w szczegółach miejsca. `--snapshot-only` wyłącza import rekordów.
+Pełny proces `scripts.update_database` obejmuje także te źródła.
+Wyniki, komendy, zasady dopasowania i możliwości Google Places:
+[uzupełnianie miejsc i zdjęcia](docs/place-enrichment.md).

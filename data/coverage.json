@@ -1,0 +1,636 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "imported_at": "2026-10-03T14:55:51.575431+00:00",
+    "source": "OpenStreetMap",
+    "license": "ODbL",
+    "attribution": "© OpenStreetMap contributors",
+    "source_manifest": {
+      "malopolskie-latest.osm.pbf": {
+        "url": "https://download.geofabrik.de/europe/poland/malopolskie-latest.osm.pbf",
+        "retrieved_at": "2026-10-03T14:52:10.173982+00:00",
+        "last_modified": "Sat, 03 Oct 2026 04:25:33 GMT",
+        "sha256": "14c4f8561b99407442f31abf30a7c1c625ee01ab6e88c32d4c86b59923da7912",
+        "bytes": 202232967
+      },
+      "krakow-boundary.json": {
+        "url": "https://www.openstreetmap.org/api/0.6/relation/449696/full.json",
+        "retrieved_at": "2026-10-03T13:51:55.768273+00:00",
+        "last_modified": null,
+        "sha256": "5ab8eb1a015d005b3653180ad7f4af911e42839fdc03bcff069e3543eaf9c0de",
+        "bytes": 1105166
+      }
+    },
+    "extract_filename": "malopolskie-latest.osm.pbf",
+    "extract_sha256": "14c4f8561b99407442f31abf30a7c1c625ee01ab6e88c32d4c86b59923da7912",
+    "boundary_sha256": "5ab8eb1a015d005b3653180ad7f4af911e42839fdc03bcff069e3543eaf9c0de",
+    "boundary_relation": 449696,
+    "extract_stats": {
+      "snapshot_at": "2026-10-02T20:21:34Z",
+      "extract_bounds": [
+        18.87522,
+        49.02835,
+        21.43328,
+        50.53221
+      ],
+      "relations_without_area_geometry": 149
+    },
+    "place_count": 7314,
+    "location_rule": "OSM geometry representative point inside administrative boundary"
+  },
+  "total_places": 7314,
+  "all_five_primary_fields": 0,
+  "basic_fields": {
+    "named": 3122,
+    "with_street_and_number": 1160,
+    "with_website": 1066,
+    "with_phone": 335,
+    "with_opening_hours": 1288,
+    "explicitly_private_or_no_access": 88
+  },
+  "categories": [
+    {
+      "id": "hotel",
+      "label": "Hotele",
+      "total": 266,
+      "named": 261,
+      "with_accessibility": 44
+    },
+    {
+      "id": "museum",
+      "label": "Muzea",
+      "total": 90,
+      "named": 90,
+      "with_accessibility": 25
+    },
+    {
+      "id": "government",
+      "label": "Urzędy",
+      "total": 138,
+      "named": 135,
+      "with_accessibility": 22
+    },
+    {
+      "id": "grocery",
+      "label": "Sklepy spożywcze",
+      "total": 1303,
+      "named": 1099,
+      "with_accessibility": 322
+    },
+    {
+      "id": "post_office",
+      "label": "Poczty",
+      "total": 130,
+      "named": 127,
+      "with_accessibility": 40
+    },
+    {
+      "id": "bank",
+      "label": "Banki",
+      "total": 136,
+      "named": 136,
+      "with_accessibility": 37
+    },
+    {
+      "id": "garden",
+      "label": "Ogrody",
+      "total": 3032,
+      "named": 24,
+      "with_accessibility": 75
+    },
+    {
+      "id": "historic",
+      "label": "Zabytki",
+      "total": 1947,
+      "named": 1041,
+      "with_accessibility": 99
+    },
+    {
+      "id": "viewpoint",
+      "label": "Punkty widokowe",
+      "total": 63,
+      "named": 6,
+      "with_accessibility": 4
+    },
+    {
+      "id": "library",
+      "label": "Biblioteki",
+      "total": 87,
+      "named": 85,
+      "with_accessibility": 26
+    },
+    {
+      "id": "cinema",
+      "label": "Kina",
+      "total": 12,
+      "named": 12,
+      "with_accessibility": 5
+    },
+    {
+      "id": "theatre",
+      "label": "Teatry",
+      "total": 33,
+      "named": 28,
+      "with_accessibility": 12
+    },
+    {
+      "id": "community_centre",
+      "label": "Domy kultury",
+      "total": 94,
+      "named": 93,
+      "with_accessibility": 14
+    },
+    {
+      "id": "senior_club",
+      "label": "Kluby seniora",
+      "total": 2,
+      "named": 2,
+      "with_accessibility": 0
+    }
+  ],
+  "fields": [
+    {
+      "attribute": "steps_count",
+      "label": "Liczba stopni wejściowych",
+      "unit": "count",
+      "known": 1,
+      "missing": 7313,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 0,
+      "linked": 0,
+      "description": 1,
+      "coverage_percent": 0.01
+    },
+    {
+      "attribute": "threshold_height_cm",
+      "label": "Wysokość progu",
+      "unit": "cm",
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "elevator_available",
+      "label": "Winda",
+      "unit": null,
+      "known": 3,
+      "missing": 7311,
+      "conflicting": 0,
+      "yes": 3,
+      "no": 0,
+      "direct": 0,
+      "linked": 3,
+      "description": 0,
+      "coverage_percent": 0.04
+    },
+    {
+      "attribute": "entrance_width_cm",
+      "label": "Szerokość wejścia",
+      "unit": "cm",
+      "known": 2,
+      "missing": 7312,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 0,
+      "linked": 2,
+      "description": 0,
+      "coverage_percent": 0.03
+    },
+    {
+      "attribute": "accessible_toilet",
+      "label": "Toaleta dostosowana",
+      "unit": null,
+      "known": 30,
+      "missing": 7283,
+      "conflicting": 1,
+      "yes": 16,
+      "no": 14,
+      "direct": 16,
+      "linked": 14,
+      "description": 0,
+      "coverage_percent": 0.41
+    },
+    {
+      "attribute": "wheelchair",
+      "label": "Ogólna ocena wheelchair",
+      "unit": null,
+      "known": 585,
+      "missing": 6729,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 585,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 8.0
+    },
+    {
+      "attribute": "wheelchair_description",
+      "label": "Opis dostępności na wózku",
+      "unit": null,
+      "known": 6,
+      "missing": 7308,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 6,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.08
+    },
+    {
+      "attribute": "toilet_wheelchair",
+      "label": "Ocena dostępności toalety (także limited)",
+      "unit": null,
+      "known": 12,
+      "missing": 7302,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 12,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.16
+    },
+    {
+      "attribute": "toilets_available",
+      "label": "Obecność toalety",
+      "unit": null,
+      "known": 42,
+      "missing": 7272,
+      "conflicting": 0,
+      "yes": 36,
+      "no": 6,
+      "direct": 15,
+      "linked": 27,
+      "description": 0,
+      "coverage_percent": 0.57
+    },
+    {
+      "attribute": "stairs_present",
+      "label": "Obecność schodów",
+      "unit": null,
+      "known": 35,
+      "missing": 7279,
+      "conflicting": 0,
+      "yes": 35,
+      "no": 0,
+      "direct": 0,
+      "linked": 34,
+      "description": 1,
+      "coverage_percent": 0.48
+    },
+    {
+      "attribute": "entrance_step_height_cm",
+      "label": "Wysokość stopnia wejściowego (nie progu)",
+      "unit": "cm",
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "ramp_available",
+      "label": "Podjazd dla wózków",
+      "unit": null,
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "surface",
+      "label": "Nawierzchnia",
+      "unit": null,
+      "known": 13,
+      "missing": 7301,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 13,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.18
+    },
+    {
+      "attribute": "slope_percent",
+      "label": "Nachylenie",
+      "unit": "percent",
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "rest_area_available",
+      "label": "Miejsce odpoczynku",
+      "unit": null,
+      "known": 91,
+      "missing": 7223,
+      "conflicting": 0,
+      "yes": 91,
+      "no": 0,
+      "direct": 5,
+      "linked": 86,
+      "description": 0,
+      "coverage_percent": 1.24
+    },
+    {
+      "attribute": "distance_without_rest_m",
+      "label": "Odległość bez odpoczynku",
+      "unit": "m",
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "automatic_door",
+      "label": "Automatyczne drzwi wejściowe",
+      "unit": null,
+      "known": 3,
+      "missing": 7311,
+      "conflicting": 0,
+      "yes": 1,
+      "no": 2,
+      "direct": 0,
+      "linked": 3,
+      "description": 0,
+      "coverage_percent": 0.04
+    },
+    {
+      "attribute": "tactile_paving",
+      "label": "Nawierzchnia dotykowa",
+      "unit": null,
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "hearing_loop",
+      "label": "Pętla indukcyjna",
+      "unit": null,
+      "known": 0,
+      "missing": 7314,
+      "conflicting": 0,
+      "yes": null,
+      "no": null,
+      "direct": 0,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.0
+    },
+    {
+      "attribute": "blind_description",
+      "label": "Opis dla osób niewidomych",
+      "unit": null,
+      "known": 1,
+      "missing": 7313,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 1,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.01
+    },
+    {
+      "attribute": "deaf_description",
+      "label": "Opis dla osób niesłyszących",
+      "unit": null,
+      "known": 1,
+      "missing": 7313,
+      "conflicting": 0,
+      "yes": 0,
+      "no": 0,
+      "direct": 1,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.01
+    },
+    {
+      "attribute": "tactile_writing_braille",
+      "label": "Oznaczenia Braille'a",
+      "unit": null,
+      "known": 1,
+      "missing": 7313,
+      "conflicting": 0,
+      "yes": 1,
+      "no": 0,
+      "direct": 1,
+      "linked": 0,
+      "description": 0,
+      "coverage_percent": 0.01
+    }
+  ],
+  "feature_links": [
+    {
+      "link_method": "building_context",
+      "links": 2386,
+      "places": 725
+    },
+    {
+      "link_method": "entrance_on_outline",
+      "links": 424,
+      "places": 264
+    },
+    {
+      "link_method": "within_place",
+      "links": 3435,
+      "places": 120
+    }
+  ],
+  "examples": [
+    {
+      "id": "node/11984980238",
+      "name": "Scena Berlin",
+      "attribute": "accessible_toilet",
+      "value": 0,
+      "scope": "place",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/11984980238",
+      "tag_key": "toilets:wheelchair",
+      "raw_value": "no",
+      "ordinal": 1
+    },
+    {
+      "id": "node/12899261283",
+      "name": "Żabka",
+      "attribute": "accessible_toilet",
+      "value": 0,
+      "scope": "place",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/12899261283",
+      "tag_key": "toilets",
+      "raw_value": "no",
+      "ordinal": 2
+    },
+    {
+      "id": "node/13463951811",
+      "name": "Szubryt",
+      "attribute": "accessible_toilet",
+      "value": 0,
+      "scope": "place",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/13463951811",
+      "tag_key": "toilets",
+      "raw_value": "no",
+      "ordinal": 3
+    },
+    {
+      "id": "node/1535053386",
+      "name": "Biedronka",
+      "attribute": "accessible_toilet",
+      "value": 0,
+      "scope": "place",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/1535053386",
+      "tag_key": "toilets:wheelchair",
+      "raw_value": "no",
+      "ordinal": 4
+    },
+    {
+      "id": "node/1772724752",
+      "name": "Panorama",
+      "attribute": "accessible_toilet",
+      "value": 0,
+      "scope": "place",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/1772724752",
+      "tag_key": "toilets:wheelchair",
+      "raw_value": "no",
+      "ordinal": 5
+    },
+    {
+      "id": "relation/14348348",
+      "name": "Historyczne centrum Krakowa",
+      "attribute": "elevator_available",
+      "value": 1,
+      "scope": "within_place",
+      "method": "mapped_feature",
+      "source_url": "https://www.openstreetmap.org/node/12151407637",
+      "tag_key": "highway",
+      "raw_value": "elevator",
+      "ordinal": 1
+    },
+    {
+      "id": "relation/17027311",
+      "name": "Małopolskie Centrum Nauki Cogiteon",
+      "attribute": "elevator_available",
+      "value": 1,
+      "scope": "within_place",
+      "method": "mapped_feature",
+      "source_url": "https://www.openstreetmap.org/node/12000614637",
+      "tag_key": "highway",
+      "raw_value": "elevator",
+      "ordinal": 2
+    },
+    {
+      "id": "relation/17027311",
+      "name": "Małopolskie Centrum Nauki Cogiteon",
+      "attribute": "elevator_available",
+      "value": 1,
+      "scope": "within_place",
+      "method": "mapped_feature",
+      "source_url": "https://www.openstreetmap.org/node/12000614638",
+      "tag_key": "highway",
+      "raw_value": "elevator",
+      "ordinal": 3
+    },
+    {
+      "id": "relation/17027311",
+      "name": "Małopolskie Centrum Nauki Cogiteon",
+      "attribute": "elevator_available",
+      "value": 1,
+      "scope": "within_place",
+      "method": "mapped_feature",
+      "source_url": "https://www.openstreetmap.org/node/12000765075",
+      "tag_key": "highway",
+      "raw_value": "elevator",
+      "ordinal": 4
+    },
+    {
+      "id": "way/1326099938",
+      "name": "Fort 2 \"Kościuszko\"",
+      "attribute": "elevator_available",
+      "value": 1,
+      "scope": "within_place",
+      "method": "mapped_feature",
+      "source_url": "https://www.openstreetmap.org/node/12265865851",
+      "tag_key": "highway",
+      "raw_value": "elevator",
+      "ordinal": 5
+    },
+    {
+      "id": "way/201133718",
+      "name": "Rynek Główny",
+      "attribute": "entrance_width_cm",
+      "value": 153.0,
+      "scope": "entrance_on_outline",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/3090820032",
+      "tag_key": "width",
+      "raw_value": "1.53",
+      "ordinal": 1
+    },
+    {
+      "id": "way/263169972",
+      "name": "Pałac Biskupi",
+      "attribute": "entrance_width_cm",
+      "value": 300.0,
+      "scope": "entrance_on_outline",
+      "method": "tag",
+      "source_url": "https://www.openstreetmap.org/node/2511223457",
+      "tag_key": "width",
+      "raw_value": "3",
+      "ordinal": 2
+    },
+    {
+      "id": "node/2817951266",
+      "name": "Żabka",
+      "attribute": "steps_count",
+      "value": 1,
+      "scope": "place",
+      "method": "explicit_description",
+      "source_url": "https://www.openstreetmap.org/node/2817951266",
+      "tag_key": "wheelchair:description",
+      "raw_value": "1 step at entrance",
+      "ordinal": 1
+    }
+  ]
+}

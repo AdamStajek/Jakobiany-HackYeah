@@ -124,7 +124,7 @@ export const places: Place[] = [
     demo: {
       image: "museum",
       description:
-        "Miejsce spotkania ze sztuką. W demonstracji brakuje potwierdzonych danych o toalecie.",
+        "Miejsce spotkania ze sztuką. Brakuje potwierdzonych danych o toalecie.",
       map_position: [16, 50],
     },
   },
@@ -160,7 +160,7 @@ export const places: Place[] = [
     demo: {
       image: "museum",
       description:
-        "Przykładowy obiekt z potwierdzonymi informacjami o szerokości wejścia i braku stopni.",
+        "Obiekt z informacjami o szerokości wejścia i braku stopni.",
       map_position: [37, 58],
     },
   },
@@ -178,7 +178,7 @@ export const places: Place[] = [
     demo: {
       image: "museum",
       description:
-        "Przykładowa przychodnia z wejściem bez progu i miejscami do siedzenia.",
+        "Przychodnia z wejściem bez progu i miejscami do siedzenia.",
       map_position: [43, 37],
     },
   },
@@ -205,10 +205,19 @@ export function formatFact(f: Fact): string {
   if (f.status === "unconfirmed")
     return reasonLabels[f.unconfirmed_reason || "missing"];
   if (f.value === null) return reasonLabels.missing;
-  if (f.attribute === "steps_count")
-    return f.value === 0 ? "Brak stopni" : `${f.value} stopnie`;
-  if (f.attribute === "threshold_height_cm" && f.value === 0)
-    return "Wejście bez progu";
+  if (f.attribute === "steps_count" && typeof f.value === "number")
+    return f.value < 5 ? "Less than 5" : f.value < 10 ? "5–10" : "10 or more";
+  if (
+    ["threshold_height_cm", "kerb_height_cm"].includes(f.attribute) &&
+    typeof f.value === "number"
+  )
+    return f.value <= 2
+      ? "Accessible for wheelchairs"
+      : "Inaccessible for wheelchairs";
+  if (f.attribute === "entrance_width_cm" && typeof f.value === "number")
+    return f.value >= 90
+      ? "Accessible for wheelchairs"
+      : "Inaccessible for wheelchairs";
   if (typeof f.value === "boolean") return f.value ? "Tak" : "Nie";
   if (f.attribute === "surface")
     return (
@@ -218,7 +227,7 @@ export function formatFact(f: Fact): string {
     );
   return `${f.value} ${f.unit === "percent" ? "%" : f.unit || ""}`;
 }
-// Wyłącznie lokalna ocena demonstracyjna. W integracji używamy Assessment z API.
+// Lokalna ocena używana dla danych bez oceny z API.
 export function assess(place: Place, c: Constraints): Assessment {
   const checks: [Attribute, (value: NonNullable<Fact["value"]>) => boolean][] =
     [];

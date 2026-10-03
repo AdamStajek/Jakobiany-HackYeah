@@ -12,8 +12,43 @@ import {
 import { useDemo } from "../state/DemoContext";
 import { Status, FactRow } from "../components/Common";
 import { getPlace } from "../data/api";
-import type { Place } from "../data/types";
+import type { Place, PlacePhoto } from "../data/types";
 import { NotFound } from "./Info";
+function PhotoFigure({ photo, name }: { photo: PlacePhoto; name: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <figure className="place-photo">
+      {failed ? (
+        <p>Zdjęcie jest chwilowo niedostępne.</p>
+      ) : (
+        <a href={photo.source_url} target="_blank" rel="noreferrer">
+          <img
+            src={photo.url}
+            alt={`${name} — ${photo.title}`}
+            loading="lazy"
+            onError={() => setFailed(true)}
+          />
+        </a>
+      )}
+      <figcaption>
+        {photo.author} ·{" "}
+        {photo.license_url ? (
+          <a href={photo.license_url} target="_blank" rel="noreferrer">
+            {photo.license}
+          </a>
+        ) : (
+          photo.license
+        )}
+        {" · "}
+        <a href={photo.source_url} target="_blank" rel="noreferrer">
+          Wikimedia Commons
+        </a>
+        {photo.credit && <span> · {photo.credit}</span>}
+      </figcaption>
+    </figure>
+  );
+}
+
 export function PlacePage() {
   const { id } = useParams();
   const [p, setPlace] = useState<Place | null>(null);
@@ -30,7 +65,20 @@ export function PlacePage() {
         ),
       );
   }, [id]);
-  const { saved, toggleSave } = useDemo();
+  const { saved, toggleSave, location } = useDemo();
+  const distanceFromUser = p && location
+    ? (() => {
+        const earthRadiusM = 6_371_000;
+        const lat1 = (location.lat * Math.PI) / 180;
+        const lat2 = (p.location.lat * Math.PI) / 180;
+        const deltaLat = lat2 - lat1;
+        const deltaLon = ((p.location.lon - location.lon) * Math.PI) / 180;
+        const a =
+          Math.sin(deltaLat / 2) ** 2 +
+          Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+        return earthRadiusM * 2 * Math.asin(Math.sqrt(Math.min(1, a)));
+      })()
+    : null;
   const [tab, setTab] = useState("Dostępność");
   if (error)
     return (
@@ -52,17 +100,24 @@ export function PlacePage() {
       </Link>
       <div className="place-detail-grid">
         <aside>
-          <div className="detail-image place-placeholder" aria-hidden="true">
-            <MapPin size={42} />
-          </div>
+          {p.photos?.[0] ? (
+            <PhotoFigure
+              key={p.photos[0].url}
+              photo={p.photos[0]}
+              name={p.name}
+            />
+          ) : (
+            <div className="detail-image place-placeholder" aria-hidden="true">
+              <MapPin size={42} />
+            </div>
+          )}
           <div className="place-address">
             <MapPin />
             <span>
-              {p.address || "Adres nieznany"}
-              {p.distance_m !== null && (
+              {p.address && p.address_is_nearest ? `Najbliższy adres: ${p.address}` : p.address || "Adres nieznany"}
+              {distanceFromUser !== null && (
                 <small>
-                  {(p.distance_m / 1000).toLocaleString("pl-PL")} km od punktu
-                  wyszukiwania
+                  {(distanceFromUser / 1000).toLocaleString("pl-PL")} km od Ciebie
                 </small>
               )}
             </span>
@@ -161,7 +216,7 @@ export function PlacePage() {
                 {p.website_description && <p>{p.website_description}</p>}
                 {p.accessibility_summary && <p>{p.accessibility_summary}</p>}
                 <p>
-                  <strong>Adres:</strong> {p.address || "Adres nieznany"}
+                  <strong>{p.address_is_nearest ? "Najbliższy adres:" : "Adres:"}</strong> {p.address || "Adres nieznany"}
                 </p>
                 {p.operator && (
                   <p>
@@ -170,7 +225,7 @@ export function PlacePage() {
                 )}
                 {p.phone && (
                   <p>
-                    <strong>Telefon z OSM:</strong>{" "}
+                    <strong>Telefon:</strong>{" "}
                     <a href={`tel:${p.phone}`}>{p.phone}</a>
                   </p>
                 )}
@@ -195,7 +250,13 @@ export function PlacePage() {
               </div>
             ) : tab === "Zdjęcia" ? (
               <div className="info-panel">
-                <p>Brak zdjęć tego miejsca w bazie.</p>
+                {p.photos?.length ? (
+                  p.photos.map((photo) => (
+                    <PhotoFigure key={photo.url} photo={photo} name={p.name} />
+                  ))
+                ) : (
+                  <p>Brak zdjęć tego miejsca w bazie.</p>
+                )}
               </div>
             ) : (
               <div className="source-cards">

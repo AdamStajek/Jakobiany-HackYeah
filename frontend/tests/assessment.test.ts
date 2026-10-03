@@ -13,12 +13,40 @@ describe("Dopasowanie demonstracyjne", () => {
     expect(assess(places[2], c).status).toBe("meets_requirements");
     expect(
       formatFact(places[0].facts.find((f) => f.attribute === "steps_count")!),
-    ).toBe("Brak stopni");
+    ).toBe("Less than 5");
     expect(
       formatFact(
         places[0].facts.find((f) => f.attribute === "elevator_available")!,
       ),
     ).toBe("Nie");
+  });
+  it("ukrywa dokładne liczby stopni i wymiary za etykietami", () => {
+    const fact = (
+      attribute:
+        | "steps_count"
+        | "threshold_height_cm"
+        | "kerb_height_cm"
+        | "entrance_width_cm",
+      value: number,
+    ) => ({ ...places[0].facts[0], attribute, value });
+    expect(formatFact(fact("steps_count", 4))).toBe("Less than 5");
+    expect(formatFact(fact("steps_count", 5))).toBe("5–10");
+    expect(formatFact(fact("steps_count", 10))).toBe("10 or more");
+    expect(formatFact(fact("threshold_height_cm", 2))).toBe(
+      "Accessible for wheelchairs",
+    );
+    expect(formatFact(fact("threshold_height_cm", 2.1))).toBe(
+      "Inaccessible for wheelchairs",
+    );
+    expect(formatFact(fact("kerb_height_cm", 2))).toBe(
+      "Accessible for wheelchairs",
+    );
+    expect(formatFact(fact("entrance_width_cm", 90))).toBe(
+      "Accessible for wheelchairs",
+    );
+    expect(formatFact(fact("entrance_width_cm", 89))).toBe(
+      "Inaccessible for wheelchairs",
+    );
   });
   it.each(["cafe-lisboa", "muzeum", "park"])(
     "nie traktuje niepotwierdzonych danych jako dostępności: %s",

@@ -63,6 +63,7 @@ export type PlaceSummary = {
   name: string;
   category: string;
   address: string | null;
+  address_is_nearest?: boolean;
   location: { lat: number; lon: number };
   distance_m: number | null;
   assessment?: Assessment;
@@ -72,8 +73,21 @@ export type PlaceSummary = {
   opening_hours?: string | null;
   operator?: string | null;
   access?: string | null;
+  photos?: PlacePhoto[];
+};
+export type PlacePhoto = {
+  url: string;
+  original_url: string;
+  source_url: string;
+  title: string;
+  author: string;
+  credit: string;
+  license: string;
+  license_url: string | null;
+  description: string;
 };
 export type Place = PlaceSummary & {
+  photos?: PlacePhoto[];
   facts: Fact[];
   updated_at: string;
   attribution: Source[];
@@ -88,14 +102,18 @@ export type Place = PlaceSummary & {
 };
 export type Report = {
   id: string;
-  target: { type: "place"; id: string };
+  author_id: string;
+  target: { type: "place" | "segment"; id: string };
   kind: "correction" | "confirmation" | "missing_data";
   fact_id: string | null;
-  description: string;
+  description: string | null;
   observations: { attribute: Attribute; value: Fact["value"] }[];
-  status: "pending";
-  observed_at: string;
-  demo_photo_name: string | null;
+  status: "pending" | "accepted" | "rejected";
+  observed_at: string | null;
+  photo_ids: string[];
+  review_comment: string | null;
+  created_at: string;
+  updated_at: string;
 };
 export const emptyConstraints: Constraints = {
   max_steps: null,

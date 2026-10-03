@@ -1,12 +1,42 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { UserRound, MapPin, ArrowRight } from "lucide-react";
-import { useDemo } from "../state/DemoContext";
 import { PageHeading } from "../components/Common";
+import { useDemo } from "../state/DemoContext";
 export function Auth({ register = false }: { register?: boolean }) {
-  const { setUser } = useDemo();
+  const { authenticate } = useDemo();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await authenticate(
+        email.trim(),
+        password,
+        register ? name.trim() : undefined,
+      );
+      const target = params.get("next");
+      navigate(
+        target?.startsWith("/") && !target.startsWith("//")
+          ? target
+          : "/profile",
+        { replace: true },
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Nie udało się zalogować.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className="page auth-page">
       <div className="panel">
@@ -14,35 +44,75 @@ export function Auth({ register = false }: { register?: boolean }) {
           <UserRound />
         </span>
         <PageHeading
-          title={
-            register ? "Utwórz konto demonstracyjne" : "Wejdź na konto demo"
-          }
-          description="To lokalna symulacja konta. Nie podawaj prawdziwego hasła ani danych logowania."
+          title={register ? "Utwórz konto" : "Zaloguj się"}
+          description="Zapisuj swoje potrzeby, wysyłaj zgłoszenia i zdobywaj punkty za zweryfikowane misje."
         />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setUser(name.trim());
-            navigate("/profile");
-          }}
-        >
-          <label className="field">
-            Nazwa w demonstracji
-            <input
-              required
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Np. Anna"
-              autoComplete="off"
-            />
-          </label>
-          <button className="button primary full">
-            {register ? "Utwórz konto demo" : "Kontynuuj"}
-          </button>
+        <form onSubmit={submit}>
+          <fieldset disabled={busy} className="form-fields">
+            {register && (
+              <label className="field">
+                Imię
+                <input
+                  required
+                  maxLength={100}
+                  autoComplete="nickname"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+            )}
+            <label className="field">
+              E-mail
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                maxLength={254}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              Hasło
+              <input
+                type="password"
+                aria-label="Hasło"
+                aria-describedby={register ? "password-help" : undefined}
+                required
+                minLength={12}
+                maxLength={128}
+                autoComplete={register ? "new-password" : "current-password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              {register && (
+                <small id="password-help">Co najmniej 12 znaków.</small>
+              )}
+            </label>
+            {error && (
+              <p className="warning-box" role="alert">
+                {error}
+              </p>
+            )}
+            <button className="button primary full" disabled={busy}>
+              {busy
+                ? "Proszę czekać…"
+                : register
+                  ? "Utwórz konto"
+                  : "Zaloguj się"}
+            </button>
+          </fieldset>
         </form>
+        <Link
+          className="text-button"
+          to={`${register ? "/login" : "/register"}${params.size ? `?${params.toString()}` : ""}`}
+        >
+          {register
+            ? "Masz już konto? Zaloguj się"
+            : "Nie masz konta? Zarejestruj się"}
+        </Link>
         <Link className="text-button" to="/search">
-          Korzystaj bez konta
+          Korzystaj bez logowania
         </Link>
       </div>
     </div>
@@ -69,16 +139,18 @@ export function About() {
           Procent wiarygodności nie zastępuje potwierdzenia. Dopasowanie zależy
           od wskazanych przez Ciebie potrzeb.
         </p>
-        <h2>O tej demonstracji</h2>
+        <h2>Zakres działania</h2>
         <p>
-          Wszystkie dane są przykładowe. Ilustracje i schemat mapy nie
-          odzwierciedlają rzeczywistych warunków. Trasa jest stałym scenariuszem
-          prezentacyjnym, a nawigacja nie śledzi pozycji.
+          Mapa i informacje o miejscach pochodzą z dostępnych danych, ale mogą
+          być niepełne lub nieaktualne. Planowanie tras wykorzystuje sieć pieszą
+          Krakowa z OSM. Nawigacja nie śledzi pozycji.
         </p>
         <p>
-          Profil, zapisane miejsca, konto demo, zgłoszenia i postępy misji
-          pozostają w pamięci bieżącej karty. Odświeżenie strony je usuwa. Nie
-          wysyłamy opisu potrzeb ani zdjęć do serwera.
+          Po zalogowaniu profil potrzeb, zapisane miejsca, zgłoszenia i postępy
+          misji są zapisywane na Twoim koncie. Analiza opisu proponuje
+          ustawienia, które możesz poprawić przed zatwierdzeniem. Zdjęcia są
+          dostępne tylko Tobie i moderatorom, a punkty przyznajemy po
+          weryfikacji misji.
         </p>
         <h2>Dostępność</h2>
         <p>
@@ -98,7 +170,7 @@ export function NotFound() {
     <div className="page empty-state">
       <MapPin size={40} />
       <h1>Nie znaleziono tej strony</h1>
-      <p>Wróć do wyszukiwania i wybierz przykładowe miejsce.</p>
+      <p>Wróć do wyszukiwania i wybierz miejsce.</p>
       <Link className="button primary" to="/search">
         Szukaj miejsc
       </Link>

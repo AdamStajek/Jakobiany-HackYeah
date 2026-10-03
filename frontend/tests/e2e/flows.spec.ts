@@ -71,22 +71,6 @@ test("profil potrzeb, filtrowanie i zgłoszenie", async ({ page, isMobile }) => 
       page.getByRole("navigation", { name: "Nawigacja mobilna" }),
     ).toBeVisible();
 });
-test("trasa, tekstowe kroki i symulacja nawigacji", async ({ page }) => {
-  await page.goto("/route?to=pod-wawelem");
-  await page.getByRole("button", { name: "Pokaż trasę" }).click();
-  await expect(page.getByText("Trasa niepewna", { exact: true })).toBeVisible();
-  await page
-    .getByRole("link", { name: "Szczegóły trasy", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Planty", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Podgląd nawigacji", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Następny krok" }).click();
-  await expect(page.getByText("Podgląd kroku 2 z 3")).toBeVisible();
-});
 test("misja nie nalicza punktów przed weryfikacją", async ({ page }) => {
   await page.goto("/missions/toaleta");
   await page

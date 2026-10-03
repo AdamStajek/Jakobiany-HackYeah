@@ -1,21 +1,66 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  ArrowRight,
-  Star,
-  Flag,
-  MapPin,
-  TriangleAlert,
-  ChevronLeft,
-} from "lucide-react";
+import { ArrowRight, Star, Flag, MapPin, ChevronLeft } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { PageHeading } from "../components/Common";
-import { places, missions } from "../data/mock";
-import { NotFound } from "./Info";
+import {
+  getMission,
+  getMissions,
+  startMission,
+  submitMission,
+  withPhoto,
+  type Mission,
+  type MissionProgress,
+} from "../data/api";
+import { labels } from "../data/mock";
+
+export const missionStatus = {
+  in_progress: "W trakcie",
+  pending: "Oczekuje na weryfikację",
+  accepted: "Zaakceptowano",
+  rejected: "Odrzucono",
+};
 export function MissionsPage() {
-  const { progress } = useDemo();
+  const { activity, session, refreshActivity } = useDemo();
   const [tab, setTab] = useState("available");
-  const shown = missions.filter((m) => tab === "available" || progress[m.id]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    getMissions()
+      .then((items) => {
+        if (active) setMissions(items);
+      })
+      .catch((reason: unknown) => {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Nie udało się pobrać misji.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    if (session)
+      refreshActivity().catch((reason: unknown) => {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Nie udało się pobrać postępów.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [session?.user.id]);
+  const shown = missions.filter(
+    (mission) =>
+      tab === "available" ||
+      activity.items.some((item) => item.mission_id === mission.id),
+  );
   return (
     <div className="page narrow">
       <PageHeading
@@ -29,7 +74,7 @@ export function MissionsPage() {
           <h2>Małe zadania. Wielka różnica.</h2>
           <p>Sprawdź informacje w okolicy i pomóż uzupełnić mapę.</p>
         </div>
-        <span>DEMO</span>
+        <span>{activity.points} pkt</span>
       </div>
       <div className="tabs">
         <button
@@ -45,46 +90,152 @@ export function MissionsPage() {
           Moje postępy
         </button>
       </div>
-      {shown.map((m) => (
-        <Link
-          className="panel mission-card"
-          key={m.id}
-          to={`/missions/${m.id}`}
-        >
-          <img
-            src={`/illustrations/${places.find((p) => p.id === m.place)?.demo?.image || "museum"}.svg`}
-            alt=""
-          />
-          <div>
-            <h2>{m.title}</h2>
-            <p className="muted">
-              Około {m.time} minut · {progress[m.id] || "Dostępna"}
-            </p>
-            <strong className="points">+{m.points} pkt po zatwierdzeniu</strong>
-          </div>
-          <ArrowRight />
-        </Link>
-      ))}
-      {!shown.length && (
+      {error && (
+        <p className="warning-box" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && <p role="status">Pobieranie misji…</p>}
+      {shown.map((mission) => {
+        const progress = activity.items.find(
+          (item) => item.mission_id === mission.id,
+        );
+        return (
+          <Link
+            className="panel mission-card"
+            key={mission.id}
+            to={`/missions/${encodeURIComponent(mission.id)}`}
+          >
+            <span className="option-icon">
+              <MapPin />
+            </span>
+            <div>
+              <h2>{mission.title}</h2>
+              <p className="muted">
+                Około {mission.time_minutes} minut ·{" "}
+                {progress ? missionStatus[progress.status] : "Dostępna"}
+              </p>
+              <strong className="points">
+                {progress?.status === "accepted"
+                  ? `${progress.awarded_points} pkt przyznano`
+                  : `+${mission.points} pkt po zatwierdzeniu`}
+              </strong>
+            </div>
+            <ArrowRight />
+          </Link>
+        );
+      })}
+      {!loading && !shown.length && (
         <div className="empty-state">
           <Flag />
-          <h2>Tu pojawią się Twoje misje</h2>
+          <h2>
+            {tab === "available"
+              ? "Brak dostępnych misji"
+              : "Tu pojawią się Twoje misje"}
+          </h2>
           <p>Wybierz zadanie z zakładki „Dostępne misje”.</p>
         </div>
       )}
       <p className="muted">
-        Misje i punkty są podglądem funkcji planowanej. W demonstracji nie
-        naliczamy nagród.
+        Punkty są przyznawane po akceptacji odpowiedzi przez moderatora. Postępy
+        i nagrody są zapisywane na Twoim koncie.
       </p>
+      {!session && (
+        <Link className="button primary" to="/login?next=%2Fmissions">
+          Zaloguj się, aby rozpocząć misję
+        </Link>
+      )}
     </div>
   );
 }
+
 export function MissionPage() {
   const { id } = useParams();
-  const m = missions.find((m) => m.id === id);
-  const { progress, setProgress, notify } = useDemo();
+  const { activity, session, refreshActivity } = useDemo();
+  const [mission, setMission] = useState<Mission | null>(null);
+  const [current, setCurrent] = useState<MissionProgress | null>(null);
   const [answer, setAnswer] = useState("");
-  if (!m) return <NotFound />;
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    if (id)
+      getMission(id)
+        .then((item) => {
+          if (active) setMission(item);
+        })
+        .catch((reason: unknown) => {
+          if (active)
+            setError(
+              reason instanceof Error
+                ? reason.message
+                : "Nie udało się pobrać misji.",
+            );
+        });
+    if (session)
+      refreshActivity().catch((reason: unknown) => {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Nie udało się pobrać postępu misji.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, session?.user.id]);
+  useEffect(() => {
+    const progress =
+      activity.items.find((item) => item.mission_id === id) || null;
+    setCurrent(progress);
+  }, [id, activity.items]);
+  useEffect(() => {
+    setAnswer(
+      activity.items.find((item) => item.mission_id === id)?.answer || "",
+    );
+  }, [id]);
+  async function start() {
+    if (!mission || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      setCurrent(await startMission(mission.id));
+      await refreshActivity();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Nie udało się rozpocząć misji.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!mission || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      setCurrent(
+        await withPhoto(photo, (ids) =>
+          submitMission(mission.id, answer.trim(), ids),
+        ),
+      );
+      setPhoto(null);
+      await refreshActivity();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Nie udało się wysłać odpowiedzi.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className="page narrow">
       <Link className="back-link" to="/missions">
@@ -92,56 +243,127 @@ export function MissionPage() {
         Wszystkie misje
       </Link>
       <PageHeading
-        title={m.title}
-        description={`Przykładowa misja · ${m.time} minut · ${m.points} punktów po zatwierdzeniu`}
+        title={
+          mission?.title ||
+          (error ? "Nie udało się pobrać misji" : "Pobieranie misji…")
+        }
+        description={
+          mission
+            ? `${mission.time_minutes} minut · ${mission.points} punktów po zatwierdzeniu`
+            : ""
+        }
       />
-      <div className="panel">
-        <p>
-          Sprawdź wskazane miejsce i opisz zaobserwowane warunki. Nie zakładaj
-          dostępności, jeśli nie możesz jej potwierdzić.
+      {error && (
+        <p className="warning-box" role="alert">
+          {error}
         </p>
-        <Link className="button subtle" to={`/place/${m.place}`}>
-          Zobacz miejsce <MapPin size={18} />
-        </Link>
-        {!progress[m.id] ? (
-          <button
-            className="button primary"
-            onClick={() => setProgress(m.id, "W trakcie")}
-          >
-            Rozpocznij przykładową misję
-          </button>
-        ) : progress[m.id] === "W trakcie" ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setProgress(m.id, "Oczekuje na weryfikację");
-              notify(
-                "Przykładowa odpowiedź została zapisana. Punkty wymagają zatwierdzenia.",
-              );
-            }}
-          >
-            <label className="field">
-              Co udało Ci się sprawdzić?
-              <textarea
-                required
-                minLength={10}
-                maxLength={4000}
-                rows={4}
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-              />
-            </label>
-            <button className="button primary">
-              Zapisz odpowiedź do weryfikacji
-            </button>
-          </form>
-        ) : (
-          <p className="status warning">
-            <TriangleAlert size={18} />
-            Oczekuje na weryfikację · 0 naliczonych punktów
+      )}
+      {mission && (
+        <div className="panel">
+          <p>
+            Sprawdź wskazane miejsce i opisz zaobserwowane warunki. Nie zakładaj
+            dostępności, jeśli nie możesz jej potwierdzić.
           </p>
-        )}
-      </div>
+          <p>
+            <strong>
+              Do sprawdzenia: {labels[mission.attribute] || mission.attribute}
+            </strong>
+          </p>
+          <Link
+            className="button subtle"
+            to={`/place/${encodeURIComponent(mission.place_id)}`}
+          >
+            Zobacz miejsce <MapPin size={18} />
+          </Link>
+          {!session ? (
+            <Link
+              className="button primary"
+              to={`/login?next=${encodeURIComponent(`/missions/${mission.id}`)}`}
+            >
+              Zaloguj się, aby rozpocząć misję
+            </Link>
+          ) : !current ? (
+            <button className="button primary" disabled={busy} onClick={start}>
+              {busy ? "Rozpoczynanie…" : "Rozpocznij misję"}
+            </button>
+          ) : (
+            <>
+              <p
+                className={`status ${current.status === "accepted" ? "good" : "warning"}`}
+              >
+                {missionStatus[current.status]} · {current.awarded_points}{" "}
+                naliczonych punktów
+              </p>
+              {current.review_comment && (
+                <p>Komentarz moderatora: {current.review_comment}</p>
+              )}
+              {current.status === "pending" && (
+                <p>
+                  Odpowiedź wysłano do weryfikacji. Po akceptacji otrzymasz{" "}
+                  {mission.points} punktów.
+                </p>
+              )}
+              {(current.status === "in_progress" ||
+                current.status === "rejected") && (
+                <form onSubmit={submit}>
+                  <fieldset disabled={busy} className="form-fields">
+                    <label className="field">
+                      Co udało Ci się sprawdzić?
+                      <textarea
+                        required
+                        minLength={10}
+                        maxLength={4000}
+                        rows={4}
+                        value={answer}
+                        onChange={(event) => setAnswer(event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      Zdjęcie (opcjonalnie)
+                      <input
+                        type="file"
+                        aria-label="Zdjęcie (opcjonalnie)"
+                        aria-describedby="mission-photo-help"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) =>
+                          setPhoto(event.target.files?.[0] || null)
+                        }
+                      />
+                      <small id="mission-photo-help">
+                        JPEG, PNG lub WebP, do 10 MiB.
+                      </small>
+                    </label>
+                    <button className="button primary" disabled={busy}>
+                      {busy
+                        ? "Wysyłanie…"
+                        : current.status === "rejected"
+                          ? "Wyślij poprawioną odpowiedź"
+                          : "Wyślij odpowiedź do weryfikacji"}
+                    </button>
+                  </fieldset>
+                </form>
+              )}
+              <button
+                type="button"
+                className="text-button"
+                disabled={busy}
+                onClick={() => {
+                  setError("");
+                  refreshActivity().catch((reason: unknown) =>
+                    setError(
+                      reason instanceof Error
+                        ? reason.message
+                        : "Nie udało się odświeżyć postępu.",
+                    ),
+                  );
+                }}
+              >
+                Odśwież status
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

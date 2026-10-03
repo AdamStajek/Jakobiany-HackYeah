@@ -79,7 +79,11 @@ export function PlaceCard({
         to={`/place/${encodeURIComponent(place.id)}`}
         className="place-image"
       >
-        <MapPin size={34} aria-hidden="true" />
+        {place.photos?.[0] ? (
+          <img src={place.photos[0].url} alt={`${place.name} — ${place.photos[0].title}`} loading="lazy" />
+        ) : (
+          <MapPin size={34} aria-hidden="true" />
+        )}
       </Link>
       <div className="place-card-body">
         <p className="eyebrow">{place.category}</p>
@@ -90,9 +94,9 @@ export function PlaceCard({
         </h3>
         <p className="muted location">
           <MapPin size={15} />
-          {place.address || "Adres nieznany"}
+          {place.address && place.address_is_nearest ? `Najbliższy adres: ${place.address}` : place.address || "Adres nieznany"}
           {place.distance_m !== null &&
-            ` · ${(place.distance_m / 1000).toLocaleString("pl-PL")} km od Rynku`}
+            ` · ${(place.distance_m / 1000).toLocaleString("pl-PL")} km od Ciebie`}
         </p>
         <Status assessment={assessment} />
         <div className="feature-chips">

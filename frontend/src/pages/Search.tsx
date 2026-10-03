@@ -20,7 +20,7 @@ const filterOptions = [
 ] as const;
 export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [params, setParams] = useSearchParams();
-  const { constraints, setConstraints, saved, toggleSave } = useDemo();
+  const { constraints, setConstraints, saved, toggleSave, location } = useDemo();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [view, setView] = useState(mapOnly ? "map" : "list");
@@ -38,7 +38,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
     setError("");
     setResults([]);
     setNextCursor(null);
-    searchPlaces(query || category, constraints)
+    searchPlaces(query || category, constraints, null, location)
       .then((page) => {
         if (active) {
           setResults(page.items);
@@ -59,7 +59,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
     return () => {
       active = false;
     };
-  }, [query, category, constraints]);
+  }, [query, category, constraints, location]);
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -69,6 +69,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
         query || category,
         constraints,
         nextCursor,
+        location,
       );
       setResults((current) => [...current, ...page.items]);
       setNextCursor(page.next_cursor);

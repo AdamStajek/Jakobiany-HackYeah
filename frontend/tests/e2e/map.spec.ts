@@ -23,12 +23,12 @@ test("map tab stays responsive: zoom, markers, details and navigation", async ({
     await page.getByRole("button", { name: "Przełącz na polski", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Mapa Krakowa" })).toBeVisible();
   }
-  const drawing = map.locator(".map-drawing > g");
-  const original = await drawing.getAttribute("transform");
+  const drawing = map.locator(".map-canvas");
+  const original = await drawing.getAttribute("data-zoom");
   await map.getByRole("button", { name: "Powiększ mapę" }).click();
-  await expect(drawing).not.toHaveAttribute("transform", original!);
+  await expect(drawing).not.toHaveAttribute("data-zoom", original!);
   await map.getByRole("button", { name: "Pomniejsz mapę" }).click();
-  await expect(drawing).toHaveAttribute("transform", original!);
+  await expect(drawing).toHaveAttribute("data-zoom", original!);
   await marker.click();
   await expect(map.locator(".map-popup")).toContainText("Kawiarnia Pod Wawelem");
   await map.getByRole("button", { name: "Zamknij szczegóły znacznika" }).click();

@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  Link,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   ArrowRight,
   Route as RouteIcon,
-  Check,
-  Trees,
-  TriangleAlert,
   ChevronLeft,
   ArrowUp,
   Plus,
@@ -14,19 +16,300 @@ import {
 import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
 import Numeric from "../components/Numeric";
-import { PageHeading } from "../components/Common";
-import { places, routeSteps } from "../data/mock";
-import { NotFound } from "./Info";
+import { FactRow, PageHeading, Status } from "../components/Common";
+import {
+  getPlace,
+  planRoute,
+  searchRoutePoints,
+  type PlannedRoute,
+} from "../data/api";
+
+// Quick choices; any catalogue place or point selected on the map is supported.
+const points = [
+  { id: "rynek", name: "Rynek Główny" },
+  { id: "planty", name: "Planty" },
+  { id: "wawel", name: "Wawel" },
+];
+const noPlaces: [] = [];
+type Coordinates = { lat: number; lon: number };
+function PointSearch({
+  label,
+  onSelect,
+}: {
+  label: string;
+  onSelect: (point: {
+    id: string;
+    name: string;
+    location: Coordinates;
+  }) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<
+    {
+      id: string;
+      name: string;
+      address: string | null;
+      location: Coordinates;
+    }[]
+  >([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    setResults([]);
+    setError("");
+    if (query.trim().length < 2) return;
+    const timer = setTimeout(
+      () =>
+        searchRoutePoints(query.trim(), controller.signal)
+          .then((page) => {
+            if (!controller.signal.aborted) setResults(page.items);
+          })
+          .catch(() => {
+            if (!controller.signal.aborted)
+              setError(
+                "Nie udało się wyszukać miejsc. Możesz wskazać punkt na mapie.",
+              );
+          }),
+      250,
+    );
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+  return (
+    <div className="route-point-search">
+      <label className="field">
+        {label}
+        <input
+          value={query}
+          placeholder="Nazwa miejsca lub adres"
+          onChange={(event) => setQuery(event.target.value)}
+          autoComplete="off"
+        />
+      </label>
+      {error && (
+        <p role="status" className="small">
+          {error}
+        </p>
+      )}
+      {results.length > 0 && (
+        <ul className="route-point-results" aria-label={`Wyniki: ${label}`}>
+          {results.map((point) => (
+            <li key={point.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(point);
+                  setQuery("");
+                  setResults([]);
+                }}
+              >
+                <strong>{point.name}</strong>
+                <small>{point.address}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+type SavedPlan = {
+  route: PlannedRoute;
+  warnings: string[];
+  origin: string;
+  destination: string;
+};
+const storageKey = "swoja-droga-route";
+function readPlan(): SavedPlan | null {
+  try {
+    const plan = JSON.parse(
+      sessionStorage.getItem(storageKey) || "null",
+    ) as SavedPlan | null;
+    return plan &&
+      typeof plan.route?.id === "string" &&
+      plan.route.geometry?.type === "LineString" &&
+      Array.isArray(plan.route.segments) &&
+      Array.isArray(plan.warnings)
+      ? plan
+      : null;
+  } catch {
+    return null;
+  }
+}
+function distanceLabel(meters: number) {
+  return meters < 1000
+    ? `${Math.round(meters)} m`
+    : `${(meters / 1000).toLocaleString("pl-PL", { maximumFractionDigits: 2 })} km`;
+}
+function durationLabel(seconds: number | null) {
+  return seconds === null ? "Czas nieznany" : `${Math.ceil(seconds / 60)} min`;
+}
+function Warnings({ warnings }: { warnings: string[] }) {
+  return (
+    <>
+      {warnings.map((warning, i) => (
+        <p className="warning-box" key={i}>
+          {warning}
+        </p>
+      ))}
+    </>
+  );
+}
+function MissingRoute() {
+  return (
+    <div className="page narrow">
+      <PageHeading
+        title="Brak zaplanowanej trasy"
+        description="Zaplanuj trasę, aby zobaczyć jej szczegóły i instrukcje."
+      />
+      <Link className="button primary" to="/route">
+        Planowanie trasy
+      </Link>
+    </div>
+  );
+}
+
 export function RoutePage() {
   const [params] = useSearchParams();
-  const [origin, setOrigin] = useState("Dworzec Główny");
-  const [destination, setDestination] = useState(
-    params.get("to") || places[0].id,
+  const [origin, setOrigin] = useState("rynek");
+  const [destination, setDestination] = useState(params.get("to") || "wawel");
+  const [originName, setOriginName] = useState("Wybrany punkt");
+  const [originCoordinates, setOriginCoordinates] =
+    useState<Coordinates | null>(null);
+  const [destinationCoordinates, setDestinationCoordinates] =
+    useState<Coordinates | null>(null);
+  const [picking, setPicking] = useState<"origin" | "destination" | null>(null);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const [destinationName, setDestinationName] = useState("Wybrane miejsce");
+  const [plan, setPlan] = useState<SavedPlan | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const request = useRef<AbortController | null>(null);
+  const { constraints, setConstraints, notify } = useDemo();
+  const knownOrigin = points.some((point) => point.id === origin);
+  const endpoints = useMemo(
+    () => [
+      ...(originCoordinates
+        ? [{ ...originCoordinates, label: "Początek trasy" }]
+        : []),
+      ...(destinationCoordinates
+        ? [{ ...destinationCoordinates, label: "Cel trasy" }]
+        : []),
+    ],
+    [originCoordinates, destinationCoordinates],
   );
-  const [shown, setShown] = useState(false);
-  const [planned, setPlanned] = useState({ origin, destination });
-  const { constraints, setConstraints } = useDemo();
-  const place = places.find((p) => p.id === planned.destination)!;
+  const knownDestination = points.some((point) => point.id === destination);
+
+  useEffect(() => {
+    setPlan(null);
+    setWarnings([]);
+    setError(null);
+    setLoading(false);
+    request.current?.abort();
+    return () => request.current?.abort();
+  }, [
+    origin,
+    destination,
+    originCoordinates,
+    destinationCoordinates,
+    constraints,
+  ]);
+
+  useEffect(() => {
+    const target = params.get("to");
+    setDestination(target || "wawel");
+    setDestinationCoordinates(null);
+  }, [params]);
+
+  useEffect(() => {
+    if (knownDestination || destinationCoordinates) return;
+    let cancelled = false;
+    setDestinationName("Wybrane miejsce");
+    getPlace(destination)
+      .then((place) => {
+        if (!cancelled) setDestinationName(place.name);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [destination, knownDestination, destinationCoordinates]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    setLoading(true);
+    setPlan(null);
+    setWarnings([]);
+    setError(null);
+    try {
+      const response = await planRoute(
+        originCoordinates || origin,
+        destinationCoordinates || destination,
+        constraints,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      setWarnings(response.warnings);
+      const route = response.routes[0];
+      if (!route) {
+        setError("Nie znaleziono trasy spełniającej Twoje wymagania.");
+        return;
+      }
+      const result = {
+        route,
+        warnings: response.warnings,
+        origin: points.find((point) => point.id === origin)?.name || originName,
+        destination:
+          points.find((point) => point.id === destination)?.name ||
+          destinationName,
+      };
+      setPlan(result);
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(result));
+      } catch {
+        notify(
+          "Trasa jest dostępna do zamknięcia tego widoku; przeglądarka nie pozwala jej zachować po odświeżeniu.",
+        );
+      }
+    } catch (failure) {
+      if (!controller.signal.aborted)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Nie udało się zaplanować trasy.",
+        );
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }
+
+  function chooseOnMap(which: "origin" | "destination") {
+    setPicking(which);
+    mapContainer.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }
+  function selectMapPoint(point: Coordinates) {
+    const name = `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`;
+    if (picking === "origin") {
+      setOrigin("map-origin");
+      setOriginName(name);
+      setOriginCoordinates(point);
+    } else {
+      setDestination("map-destination");
+      setDestinationName(name);
+      setDestinationCoordinates(point);
+    }
+    setPicking(null);
+  }
+
   return (
     <div className="page">
       <PageHeading
@@ -35,55 +318,98 @@ export function RoutePage() {
         description="Wybierz cel i ustaw to, co ma znaczenie po drodze."
       />
       <div className="route-grid">
-        <form
-          className="panel route-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPlanned({ origin, destination });
-            setShown(true);
-          }}
-        >
+        <form className="panel route-form" onSubmit={submit}>
           <h2>Dokąd się wybierasz?</h2>
           <label className="field">
             Skąd
             <select
               value={origin}
-              onChange={(e) => {
-                setOrigin(e.target.value);
-                setShown(false);
+              onChange={(event) => {
+                setOrigin(event.target.value);
+                setOriginCoordinates(null);
               }}
             >
-              <option>Dworzec Główny</option>
-              <option>Rynek Główny</option>
-            </select>
-          </label>
-          <label className="field">
-            Dokąd
-            <select
-              value={destination}
-              onChange={(e) => {
-                setDestination(e.target.value);
-                setShown(false);
-              }}
-            >
-              {places.map((p) => (
-                <option value={p.id} key={p.id}>
-                  {p.name}
+              {!knownOrigin && <option value={origin}>{originName}</option>}
+              {points.map((point) => (
+                <option key={point.id} value={point.id}>
+                  {point.name}
                 </option>
               ))}
             </select>
           </label>
+          <PointSearch
+            label="Wyszukaj początek"
+            onSelect={(point) => {
+              setOrigin(point.id);
+              setOriginName(point.name);
+              setOriginCoordinates(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button subtle full"
+            onClick={() => chooseOnMap("origin")}
+          >
+            Wskaż początek na mapie
+          </button>
+          <label className="field">
+            Dokąd
+            <select
+              value={destination}
+              onChange={(event) => {
+                setDestination(event.target.value);
+                setDestinationCoordinates(null);
+              }}
+            >
+              {!knownDestination && (
+                <option value={destination}>{destinationName}</option>
+              )}
+              {points.map((point) => (
+                <option key={point.id} value={point.id}>
+                  {point.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <PointSearch
+            label="Wyszukaj cel"
+            onSelect={(point) => {
+              setDestination(point.id);
+              setDestinationName(point.name);
+              setDestinationCoordinates(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button subtle full"
+            onClick={() => chooseOnMap("destination")}
+          >
+            Wskaż cel na mapie
+          </button>
+          {picking && (
+            <p role="status">
+              Kliknij na mapie {picking === "origin" ? "początek" : "cel"}{" "}
+              trasy.{" "}
+              <button
+                type="button"
+                className="button subtle"
+                onClick={() => setPicking(null)}
+              >
+                Anuluj wybór
+              </button>
+            </p>
+          )}
           <hr />
           <h3>Twoje potrzeby na trasie</h3>
           <label className="check-field">
             <input
               type="checkbox"
               checked={constraints.require_step_free_access === true}
-              onChange={(e) =>
+              onChange={(event) =>
                 setConstraints({
                   ...constraints,
-                  require_step_free_access: e.target.checked ? true : null,
-                  max_steps: e.target.checked ? 0 : null,
+                  require_step_free_access: event.target.checked ? true : null,
+                  max_steps: event.target.checked ? 0 : null,
                 })
               }
             />
@@ -92,87 +418,98 @@ export function RoutePage() {
           <Numeric
             label="Maksymalne nachylenie (%)"
             value={constraints.max_slope_percent}
-            onChange={(v) =>
-              setConstraints({ ...constraints, max_slope_percent: v })
+            onChange={(value) =>
+              setConstraints({ ...constraints, max_slope_percent: value })
             }
           />
           <Numeric
             label="Odpoczynek co (m)"
             min={1}
             value={constraints.max_distance_without_rest_m}
-            onChange={(v) =>
-              setConstraints({ ...constraints, max_distance_without_rest_m: v })
+            onChange={(value) =>
+              setConstraints({
+                ...constraints,
+                max_distance_without_rest_m: value,
+              })
             }
           />
-          <button className="button primary full">
-            Pokaż trasę <ArrowRight size={18} />
+          <button className="button primary full" disabled={loading}>
+            {loading ? "Planowanie…" : "Pokaż trasę"}
+            <ArrowRight size={18} />
           </button>
           <p className="muted small">
-            Przykładowy wariant, bez pobierania lokalizacji.
+            Planowanie obejmuje sieć pieszą całego Krakowa. Potrzeby z profilu
+            wpływają na wybór trasy; pozostałe niedogodności i braki danych
+            pokażemy w wyniku.
           </p>
         </form>
-        <div className="route-map">
-          <MapView places={[]} route={shown} />
+        <div className="route-map" ref={mapContainer}>
+          <MapView
+            places={noPlaces}
+            route={plan?.route.geometry}
+            endpoints={endpoints}
+            onSelectPoint={picking ? selectMapPoint : undefined}
+          />
         </div>
-        {shown ? (
-          <aside className="panel route-summary" aria-live="polite">
-            <p className="eyebrow">PRZYKŁADOWA TRASA</p>
-            <h2>
-              18 <span>minut</span>
-            </h2>
-            <p>
-              1,2 km · {planned.origin} → {place.name}
-            </p>
-            <span className="status warning">
-              <TriangleAlert size={17} />
-              Trasa niepewna
-            </span>
-            <p className="muted">
-              Podgląd stałego scenariusza — wybór celu i potrzeb nie oblicza
-              nowej trasy.
-            </p>
-            <ul className="route-facts">
-              <li>
-                <Check />
-                Brak stopni na potwierdzonych odcinkach
-              </li>
-              <li>
-                <Check />
-                Nachylenie do 4% na znanych odcinkach
-              </li>
-              <li>
-                <Trees />
-                Miejsca odpoczynku przy Plantach
-              </li>
-            </ul>
-            <div className="warning-box">
-              Na 150 m nie potwierdzono nawierzchni. Dopasowanie do Twoich
-              potrzeb wymaga weryfikacji.
-            </div>
-            <Link className="button subtle full" to="/route/demo/details">
-              Szczegóły trasy
-            </Link>
-            <Link className="button primary full" to="/navigation?route=demo">
-              Uruchom podgląd nawigacji
-            </Link>
-          </aside>
-        ) : (
-          <aside className="panel route-summary">
-            <RouteIcon size={38} />
-            <h2>Droga dopasowana do Ciebie</h2>
-            <p>
-              Wypełnij pola i zobacz przykładowy wariant trasy oraz informacje o
-              odcinkach.
-            </p>
-          </aside>
-        )}
+        <aside
+          className="panel route-summary"
+          aria-live="polite"
+          aria-busy={loading}
+        >
+          {loading ? (
+            <p>Obliczamy trasę z uwzględnieniem Twoich potrzeb…</p>
+          ) : plan ? (
+            <>
+              <p className="eyebrow">ZAPLANOWANA TRASA</p>
+              <h2>{durationLabel(plan.route.estimated_duration_s)}</h2>
+              <p>
+                {distanceLabel(plan.route.distance_m)} · {plan.origin} →{" "}
+                {plan.destination}
+              </p>
+              <Status assessment={plan.route.assessment} />
+              <Warnings warnings={plan.warnings} />
+              <Link
+                className="button subtle full"
+                to={`/route/${encodeURIComponent(plan.route.id)}/details`}
+                state={plan}
+              >
+                Szczegóły trasy
+              </Link>
+              <Link
+                className="button primary full"
+                to={`/navigation?route=${encodeURIComponent(plan.route.id)}`}
+                state={plan}
+              >
+                Uruchom podgląd nawigacji
+              </Link>
+            </>
+          ) : (
+            <>
+              <RouteIcon size={38} />
+              <h2>
+                {error
+                  ? "Nie udało się wyznaczyć trasy"
+                  : "Droga dopasowana do Ciebie"}
+              </h2>
+              {error ? (
+                <p role="alert">{error}</p>
+              ) : (
+                <p>Wybierz początek, cel i potrzeby, aby obliczyć trasę.</p>
+              )}
+              <Warnings warnings={warnings} />
+            </>
+          )}
+        </aside>
       </div>
     </div>
   );
 }
+
 export function RouteDetails() {
   const { id } = useParams();
-  if (id !== "demo") return <NotFound />;
+  const location = useLocation();
+  const plan = (location.state as SavedPlan | null) || readPlan();
+  if (!plan || plan.route.id !== id) return <MissingRoute />;
   return (
     <div className="page narrow">
       <Link className="back-link" to="/route">
@@ -180,43 +517,55 @@ export function RouteDetails() {
         Planowanie trasy
       </Link>
       <PageHeading
-        title="Szczegóły przykładowej trasy"
-        description="1,2 km · około 18 minut · dane demonstracyjne"
+        title="Szczegóły trasy"
+        description={`${plan.origin} → ${plan.destination} · ${distanceLabel(plan.route.distance_m)} · ${durationLabel(plan.route.estimated_duration_s)}`}
       />
-      <div className="warning-box">
-        Trasa niepewna: brak potwierdzonej nawierzchni na części Plant.
-      </div>
-      {routeSteps.map((s, i) => (
-        <article className="panel segment" key={s.street}>
-          <span className="step-number">{i + 1}</span>
+      <Warnings warnings={plan.warnings} />
+      <MapView places={noPlaces} route={plan.route.geometry} />
+      {plan.route.segments.length === 0 && (
+        <p>Jesteś już w punkcie docelowym. Trasa nie zawiera odcinków.</p>
+      )}
+      {plan.route.segments.map((segment, index) => (
+        <article className="panel segment" key={segment.id}>
+          <span className="step-number">{index + 1}</span>
           <div>
-            <h2>{s.street}</h2>
-            <p>{s.instruction}</p>
-            <p>
-              {s.distance} m · {s.surface} · nachylenie {s.slope}%
-            </p>
-            <p>
-              <Trees size={17} /> {s.rest}
-            </p>
-            <small>
-              Przykładowe potwierdzenie użytkownika · 02.10.2026 · wiarygodność
-              88%
-            </small>
-            {s.warning && (
-              <p className="warning-box">
-                {s.warning} Brak źródła i oceny wiarygodności.
+            <h2>{segment.instruction}</h2>
+            <p>{distanceLabel(segment.distance_m)}</p>
+            <Status assessment={segment.assessment} />
+            {segment.facts.map((fact) => (
+              <FactRow key={fact.id} fact={fact} />
+            ))}
+            {segment.rest_points.map((rest) => (
+              <p key={rest.id}>{rest.description}</p>
+            ))}
+            {segment.barriers.map((barrier) => (
+              <p className="warning-box" key={barrier.id}>
+                {barrier.description}
               </p>
-            )}
+            ))}
+            {(segment.temporary_difficulties || []).map((difficulty) => (
+              <p className="warning-box" key={difficulty.id}>
+                {difficulty.description}
+              </p>
+            ))}
           </div>
         </article>
       ))}
-      <Link className="button primary" to="/navigation?route=demo">
+      <Link
+        className="button primary"
+        to={`/navigation?route=${encodeURIComponent(plan.route.id)}`}
+        state={plan}
+      >
         Podgląd nawigacji
       </Link>
     </div>
   );
 }
+
 export function Navigation() {
+  const [params] = useSearchParams();
+  const location = useLocation();
+  const plan = (location.state as SavedPlan | null) || readPlan();
   const [step, setStep] = useState(0);
   const [large, setLarge] = useState(false);
   const { notify } = useDemo();
@@ -226,22 +575,42 @@ export function Navigation() {
     },
     [],
   );
+  if (!plan || plan.route.id !== params.get("route")) return <MissingRoute />;
+  const segments = plan.route.segments;
+  const current = segments[step];
   function speak() {
     if (!("speechSynthesis" in window)) {
       notify("Odczyt głosowy jest niedostępny w tej przeglądarce.");
       return;
     }
-    const u = new SpeechSynthesisUtterance(routeSteps[step].instruction);
-    u.lang = "pl-PL";
-    window.speechSynthesis.speak(u);
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(
+      current?.instruction || "Jesteś w punkcie docelowym.",
+    );
+    utterance.lang = "pl-PL";
+    window.speechSynthesis.speak(utterance);
   }
+  const remainingDistance = segments
+    .slice(step)
+    .reduce((sum, segment) => sum + segment.distance_m, 0);
+  const remainingSeconds =
+    plan.route.estimated_duration_s === null
+      ? null
+      : plan.route.distance_m > 0
+        ? (plan.route.estimated_duration_s * remainingDistance) /
+          plan.route.distance_m
+        : 0;
   return (
     <div className="page navigation-page">
       <div className={`navigation-instruction ${large ? "large" : ""}`}>
         <ArrowUp size={54} />
         <div>
-          <p>Podgląd kroku {step + 1} z 3</p>
-          <h1>{routeSteps[step].instruction}</h1>
+          <p>
+            {current
+              ? `Podgląd kroku ${step + 1} z ${segments.length}`
+              : "Cel osiągnięty"}
+          </p>
+          <h1>{current?.instruction || "Jesteś w punkcie docelowym."}</h1>
         </div>
         <button
           className="icon-button"
@@ -259,32 +628,41 @@ export function Navigation() {
           <Plus />
         </button>
       </div>
-      <MapView places={[]} route />
-      <div className="warning-box">
-        Symulacja — bez śledzenia pozycji.{" "}
-        {routeSteps[step].warning ||
-          "Sprawdź warunki w terenie przed przejściem."}
-      </div>
+      <MapView places={noPlaces} route={plan.route.geometry} />
+      <p className="warning-box">
+        Podgląd zaplanowanej trasy — bez śledzenia pozycji. Sprawdź warunki w
+        terenie przed przejściem.
+      </p>
+      <Warnings warnings={plan.warnings} />
+      {(current?.temporary_difficulties || []).map((difficulty) => (
+        <p className="warning-box" key={difficulty.id}>
+          {difficulty.description}
+        </p>
+      ))}
       <div className="navigation-footer">
         <strong>
-          {Math.ceil(
-            (routeSteps.slice(step).reduce((sum, s) => sum + s.distance, 0) /
-              1200) *
-              18,
-          )}{" "}
-          min <small>do końca przykładowej trasy</small>
+          {durationLabel(remainingSeconds)}{" "}
+          <small>
+            szacunkowo do końca trasy · {distanceLabel(remainingDistance)}
+          </small>
         </strong>
         <button
           className="button subtle"
           disabled={step === 0}
-          onClick={() => setStep((s) => s - 1)}
+          onClick={() => {
+            window.speechSynthesis?.cancel();
+            setStep(step - 1);
+          }}
         >
           Poprzedni krok
         </button>
-        {step < 2 ? (
+        {step < segments.length - 1 ? (
           <button
             className="button primary"
-            onClick={() => setStep((s) => s + 1)}
+            onClick={() => {
+              window.speechSynthesis?.cancel();
+              setStep(step + 1);
+            }}
           >
             Następny krok
           </button>

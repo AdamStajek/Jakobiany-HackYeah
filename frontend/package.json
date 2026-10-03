@@ -9,23 +9,26 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:account": "playwright test --config=playwright.account.config.ts",
     "format": "prettier --write src tests *.ts *.json index.html"
   },
   "dependencies": {
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.2",
-    "lucide-react": "^0.511.0"
+    "react-router-dom": "^7.6.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/leaflet": "^1.9.22",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",
+    "prettier": "^3.5.3",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vitest": "^3.2.0",
-    "@playwright/test": "^1.52.0",
-    "prettier": "^3.5.3"
+    "vitest": "^3.2.0"
   },
   "engines": {
     "node": ">=22.12.0"

@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ShieldCheck,
   UserRound,
   ArrowRight,
   Coffee,
-  Trees,
   Landmark,
   Settings2,
-  Heart,
 } from "lucide-react";
 import { SearchBox } from "../components/Common";
 const categories = [
@@ -16,7 +13,6 @@ const categories = [
   { name: "Muzea", icon: Landmark, key: "Muzea" },
   { name: "Urzędy", icon: Landmark, key: "Urzędy" },
   { name: "Sklepy spożywcze", icon: Coffee, key: "Sklepy spożywcze" },
-  { name: "Ogrody", icon: Trees, key: "Ogrody" },
   { name: "Biblioteki", icon: Landmark, key: "Biblioteki" },
   { name: "Kluby seniora", icon: UserRound, key: "Kluby seniora" },
 ];
@@ -39,28 +35,12 @@ export function Home() {
             <br className="desktop-break" /> dopasowanych do Twoich potrzeb.
           </p>
           <SearchBox />
-          <div className="popular">
-            <span>Popularne:</span>
-            {["muzeum", "hotel", "ogród", "biblioteka"].map((q) => (
-              <Link key={q} to={`/search?q=${q}`}>
-                {q}
-              </Link>
-            ))}
-          </div>
         </div>
         <img
           className="hero-art"
           src="/illustrations/krakow.svg"
           alt="Ilustracja Krakowa: Wawel, zieleń i ławka przy spacerowej alejce"
         />
-        <div className="hero-note">
-          <Heart size={19} />
-          <span>
-            Twoje tempo.
-            <br />
-            <strong>Twoja droga.</strong>
-          </span>
-        </div>
       </section>
       <section className="category-section">
         <div className="section-heading">
@@ -114,29 +94,6 @@ export function Home() {
           </div>
         </section>
       )}
-      <section className="trust-strip">
-        <div>
-          <ShieldCheck />
-          <span>
-            <strong>Konkretne informacje</strong>
-            <small>Schody, podjazdy, ławki i więcej</small>
-          </span>
-        </div>
-        <div>
-          <UserRound />
-          <span>
-            <strong>Bez obowiązku logowania</strong>
-            <small>Po prostu znajdź swoją drogę</small>
-          </span>
-        </div>
-        <div>
-          <Heart />
-          <span>
-            <strong>Wspólnie bez barier</strong>
-            <small>Twoje informacje pomagają innym</small>
-          </span>
-        </div>
-      </section>
     </div>
   );
 }

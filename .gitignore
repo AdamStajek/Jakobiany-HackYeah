@@ -230,3 +230,10 @@ data/temporary/
 
 /data/*.sqlite3.update.lock
 /data/.database-update-*/
+
+# Reproducible public place and photo snapshots (coverage reports remain tracked)
+/data/place-web*.json
+/data/public-places*.json
+/data/msip-places*.json
+/data/place-photos*.json
+/data/toilet-accessibility*.json

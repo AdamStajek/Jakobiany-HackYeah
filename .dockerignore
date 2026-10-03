@@ -7,3 +7,6 @@ src/**/__pycache__/
 src/**/*.pyc
 !data/
 !data/krakow.sqlite3
+
+!data/routes/
+!data/routes/city.sqlite3

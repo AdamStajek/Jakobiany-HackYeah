@@ -15,6 +15,8 @@ RUN uv sync --locked --no-dev --no-install-project --no-cache
 
 COPY src ./src
 COPY data/krakow.sqlite3 ./data/krakow.sqlite3
+COPY data/routes/city.sqlite3 ./routes/city.sqlite3
+ENV ROUTE_GRAPH_PATH=/app/routes/city.sqlite3
 
 RUN useradd --uid 10001 --create-home app
 RUN chown -R app:app /app/data

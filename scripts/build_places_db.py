@@ -1,4 +1,4 @@
-"""Build a standalone SQLite database of Krakow places from an OSM extract."""
+"""Rebuild OSM places in SQLite, preserving temporary and backend data."""
 
 import argparse
 import json

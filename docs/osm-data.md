@@ -1,6 +1,8 @@
 # Baza miejsc Krakowa z OpenStreetMap
 
-Gotowa lokalna baza: `data/krakow.sqlite3`. Nie jest podłączona do FastAPI.
+Gotowa lokalna baza: `data/krakow.sqlite3`. FastAPI zapisuje w tym samym pliku
+stan zaimplementowanych endpointów w dodatkowej tabeli `backend_records`.
+Endpointy wyszukiwania i szczegółów miejsc nadal nie udostępniają danych OSM.
 Wynik rzeczywistego importu: [raport pokrycia](osm-coverage.md) oraz
 [raport JSON](../data/coverage.json).
 

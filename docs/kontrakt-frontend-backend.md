@@ -6,7 +6,9 @@ Wersja: **0.1 — kontrakt prototypu**. Podstawa: [opis projektu](opis.md) i [te
 
 **Prototyp:** Kraków, anonimowe wyszukiwanie miejsc i tras, opis potrzeb zamieniany na edytowalny profil, konta i zapisane profile, szczegóły dostępności, zgłoszenia ze zdjęciami, deklaracje właścicieli i weryfikacja moderatora. Źródła: OSM, właściciele i użytkownicy; AI przygotowuje propozycje wymagające weryfikacji.
 
-**Rozszerzenia:** misje i punkty, wymiana punktów na zniżki, powiadomienia dla osób w okolicy, pogoda i remonty, panel samorządu. Sekcja 10 wyznacza ich granice; nie należą do obowiązkowego API prototypu.
+**Dane czasowe tras:** upał, ryzyko oblodzenia, śnieg i remonty mają modele i skrypty; remonty są importowane do SQLite, pogoda jest pobierana w locie przy planowaniu tras; szczegóły w sekcji 7.1.
+
+**Rozszerzenia:** misje i punkty, wymiana punktów na zniżki, powiadomienia dla osób w okolicy, panel samorządu. Sekcja 10 wyznacza ich granice; nie należą do obowiązkowego API prototypu.
 
 ## 2. Zasady komunikacji
 
@@ -107,6 +109,7 @@ Email musi mieć poprawny format; hasło: 12–128 znaków; nazwa: 1–100 znak�
 | `surface` | enum nawierzchni jak w profilu / `null` |
 | `smoothness` | enum stanu nawierzchni jak w profilu / `null` |
 | `distance_without_rest_m` | number ≥ 0 / `m` |
+| `heat_risk`, `icing_risk`, `snow_risk`, `construction_present` | boolean lub `null` / `null` |
 
 Każdy typ `value` dopuszcza też `null`. `status`: `confirmed | unconfirmed`. `unconfirmed_reason`: `missing | conflicting | stale | pending_verification` lub `null`; dla `unconfirmed` powód jest wymagany. `confidence_percent`: liczba 0–100 lub `null`, gdy brak podstaw do oceny. `observed_at` i `valid_until` mogą być `null`; `updated_at` jest wymagane. `sources` może być puste tylko przy braku danych.
 
@@ -122,7 +125,7 @@ Każdy typ `value` dopuszcza też `null`. `status`: `confirmed | unconfirmed`. `
 
 Wysoki procent wiarygodności nie zmienia niepotwierdzonego faktu w potwierdzony. Dostępny podjazd lub winda może zapewniać alternatywne wejście; backend ocenia konkretną ścieżkę dostępu, a nie tylko liczbę schodów w obiekcie. Ocena oznacza dopasowanie do podanych wymagań, nie gwarancję bezpiecznego przejścia.
 
-`Barrier = { id, kind, description, location, fact_ids, starts_at, ends_at, status }`. `kind`: `permanent | temporary`; daty mogą być `null`; `status`: `confirmed | unconfirmed`. Lokalizacja to obiekt współrzędnych. Backend uwzględnia okres obowiązywania; nieznany koniec utrudnienia nie oznacza, że ono zniknęło.
+`Barrier = { id, kind, description, location, fact_ids, starts_at, ends_at, status }`. Opcjonalne `category` (domyślnie `null`): `heat | icing | snow | construction`. `kind`: `permanent | temporary`; daty mogą być `null`; `status`: `confirmed | unconfirmed`. Lokalizacja to obiekt współrzędnych. Backend uwzględnia okres obowiązywania; nieznany koniec utrudnienia nie oznacza, że ono zniknęło.
 
 ## 5. Interpretacja potrzeb i profile
 
@@ -301,6 +304,58 @@ Backend zwraca maksymalnie trzy warianty, najpierw spełniające wymagania, nast
 
 Frontend wyświetla `segments` w kolejności jako tekstowe kroki, wraz z barierami, odpoczynkiem i powodami oceny. Backend dostarcza zarówno geometrię, jak i tekst; frontend nie musi odczytywać kroków z mapy.
 
+### 7.1. Czasowe utrudnienia: pogoda i remonty
+
+`RouteSegment` ma nowe opcjonalne pole `temporary_difficulties: TemporaryDifficulty[]`,
+domyślnie `[]`. Opcjonalne `RoutePlanResponse.weather` ma typ `TemporaryDataSnapshot | null`, domyślnie `null`. Jest pobierane w locie dla początku niepustej trasy bez zapisu do bazy lub pliku. Kategorie: `heat` (upał), `icing` (ryzyko oblodzenia), `snow`
+(śnieg), `construction` (remonty i prace drogowe). Pusta lista nie jest
+potwierdzeniem pokrycia źródeł czasowych. Geometria pozostaje syntetyczna; do trasy dołączana jest rzeczywista prognoza.
+Remonty w SQLite nie są jeszcze powiązane z grafem.
+
+`TemporaryDifficulty = { id, kind: "temporary", category, description, geometry,
+location_text, starts_at, ends_at, updated_at, valid_until, status,
+unconfirmed_reason, confidence_percent, sources, pedestrian_access, weather,
+source_fields }`. `geometry` to GeoJSON `Point | LineString | null`; lokalizacja
+tekstowa może być `null`. Daty UTC `starts_at`/`ends_at` mogą być `null`;
+`updated_at` i `valid_until` są wymagane. Koniec znanego okresu jest późniejszy
+niż początek. Zakres `[starts_at, ends_at)` obejmuje momenty obowiązywania,
+a `valid_until` określa osobno świeżość danych. Nieznany koniec nie oznacza
+zakończenia prac. `sources` jest niepuste. `confidence_percent` może być `null`.
+
+`status`: `confirmed | unconfirmed`; `unconfirmed_reason`:
+`forecast | pending_verification | stale | null`. Niepotwierdzony rekord wymaga
+powodu, potwierdzony ma powód `null`. Prognozy są zawsze niepotwierdzone.
+`pedestrian_access`: `unknown | restricted | closed | open`, domyślnie `unknown`;
+sam remont jezdni nie potwierdza zamknięcia dla pieszych. `source_fields`
+(domyślnie `{}`) zachowuje oryginalne pola źródła, a `weather` (domyślnie `null`)
+jest obiektem `WeatherHour`.
+
+`WeatherHour = { location, starts_at, ends_at, temperature_c,
+apparent_temperature_c, precipitation_starts_at, precipitation_ends_at,
+precipitation_mm, snowfall_cm, snow_depth_cm, weather_code, heat_risk,
+icing_risk, snow_risk }`. Wartości pomiarowe i ryzyka dopuszczają `null`.
+Temperatury są skończonymi liczbami i mogą być ujemne; opady i pokrywa są
+nieujemne, kod WMO jest nieujemną liczbą całkowitą. Opad dotyczy wskazanej
+poprzedniej godziny, a wartości chwilowe początku godziny prognozy.
+Boolean `false` oznacza brak sygnału w modelu, nie gwarancję stanu chodnika.
+
+Prognoza i plik remontów mają format `TemporaryDataSnapshot = { generated_at, valid_until,
+source: "weather" | "construction", heat_threshold_c: number | null, items: TemporaryDifficulty[],
+weather_hours: WeatherHour[], attribution: Source[], warnings: string[] }`.
+Pogoda pochodzi z Open-Meteo (CC-BY-4.0), remonty z publicznej mapy ZDMK
+(licencja zbioru nieokreślona, `license=null`). Świeżość: pogoda 3 godziny,
+remonty 24 godziny. Awaria remontów zachowuje ostatnią kopię bez przedłużania ważności;
+konsument wygasłych danych oznacza `stale`. Awaria pogody daje `weather=null`
+i ostrzeżenie; backend nie zapisuje prognozy w bazie ani na dysku.
+
+Reguły ryzyk, aktualizacja, źródła, licencje oraz ograniczenia geometrii:
+[dokumentacja danych czasowych](dane-czasowe.md). Remonty zapisuje importer SQLite i wspólny orkiestrator. Pogoda jest pobierana
+ponownie przy każdym zapytaniu zwracającym trasę; sygnały z okresu przejścia
+są dołączane do odcinków bez automatycznego wykluczania tras. Nie dodajemy
+endpointu synchronizacji. Fakty `heat_risk`, `icing_risk`, `snow_risk`,
+`construction_present` mogą trafić do `Fact`, ale nie należą do obowiązkowych
+kategorii stałych każdego odcinka.
+
 ## 8. Zgłoszenia, zdjęcia i deklaracje
 
 ### 8.1. Zdjęcia
@@ -391,7 +446,7 @@ Poniższe interfejsy są kierunkiem rozwoju, **nie gotowym kontraktem v0.1**. Fr
 | Misje | `GET /missions`, `POST /missions/{id}/claim`, `POST /missions/{id}/submit` | Stany misji, termin i przydział, zgłoszenie jako dowód, naliczanie punktów dopiero po zatwierdzeniu |
 | Punkty i zniżki | `GET /points`, `GET /rewards`, `POST /rewards/{id}/redeem` | Historia naliczeń, mniejsza nagroda bez misji, atomowe rozliczenie i ochrona przed podwójnym użyciem |
 | Powiadomienia | `GET /notifications`, `PATCH /notifications/{id}` | Zgoda na lokalizację, zasięg, retencja i status przeczytania; polling jako początkowy transport |
-| Pogoda i remonty | Rozszerzenie `Fact`, `Barrier` i oceny trasy | Licencja, częstotliwość aktualizacji, czas ważności i zachowanie przy awarii źródła |
+| Integracja pogody i remontów z routingiem | Modele i skrypty już opisane w sekcji 7.1 | Powiązanie z odcinkami i czasem przejścia; propagowanie świeżości i niepewności |
 | Panel samorządu | `GET /municipality/barriers`, `POST /municipality/impact` | Osobna rola, agregacja bez danych osób, metodologia priorytetów i symulacji wpływu naprawy |
 
 ## 11. Podział odpowiedzialności i odbiór

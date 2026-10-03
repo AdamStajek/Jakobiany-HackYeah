@@ -12,9 +12,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from hackyeah import auth, database, owner
+from hackyeah import auth, database, owner, photos, reports
 from hackyeah import models as m
 from hackyeah.main import app
 
@@ -203,6 +204,35 @@ with TestClient(app, base_url="https://testserver") as client:
             database.preserve_backend_data(self.path, target)
         with patch.dict(os.environ, {"DATABASE_PATH": str(rebuilt)}):
             self.assertEqual(records["image"], bytes(range(256)))
+
+    def test_report_and_photo_links_roll_back_together(self):
+        user = m.User(id="test-user", display_name="User", roles=["user"])
+        photos._photos["ready-photo"] = (
+            user.id,
+            m.Photo(
+                id="ready-photo", status="ready", preview_url=None, error_code=None
+            ),
+        )
+        photos._files["ready-photo"] = b"private image"
+        report = reports.create(
+            user,
+            m.ReportCreate(
+                target=m.ReportTarget(type="place", id="rynek"),
+                kind="missing_data",
+                photo_ids=["ready-photo"],
+            ),
+        )
+        with self.assertRaises(RuntimeError), database.atomic:
+            reports.update(
+                user, report.id, m.ReportPatch(photo_ids=[], description="Replacement")
+            )
+            raise RuntimeError("cancel")
+        self.assertEqual(reports.get(user, report.id).photo_ids, ["ready-photo"])
+        self.assertEqual(photos._links["ready-photo"], {report.id})
+        self.assertEqual(reports._history[report.id], [])
+        with self.assertRaises(HTTPException) as caught:
+            photos.delete(user, "ready-photo")
+        self.assertEqual(caught.exception.detail, "PHOTO_IN_USE")
 
 
 if __name__ == "__main__":

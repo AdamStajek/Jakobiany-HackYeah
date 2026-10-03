@@ -91,9 +91,9 @@ def declare(
             item.attribute: item for item in body.observations
         }
         previous = _declarations.get(place_id)
-        attributes: set[m.Attribute] = (
-            _required | set(observations) | {fact.attribute for fact in baseline}
-        )
+        attributes = _required.copy()
+        attributes.update(observations)
+        attributes.update(fact.attribute for fact in baseline)
         if previous is not None:
             attributes.update(item.attribute for item in previous.observations)
         source = m.Source(

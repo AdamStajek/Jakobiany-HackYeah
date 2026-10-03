@@ -158,7 +158,12 @@ class RoutingTests(unittest.TestCase):
             2,
         )
         self.assertEqual(plan_route(request, self.nodes, self.edges).routes, [])
-        with TestClient(app) as client:
+        # The old tiny graph remains a unit fixture; the public endpoint now delegates to the city planner.
+        fixture = self.plan(max_steps=0)
+        with (
+            patch("hackyeah.api.plan_city_route", return_value=fixture),
+            TestClient(app) as client,
+        ):
             response = client.post(
                 "/api/v1/routes/plan",
                 json={

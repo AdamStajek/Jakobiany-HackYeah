@@ -2,6 +2,13 @@
 
 React + TypeScript + Vite + React Router + Lucide. Samodzielna aplikacja SPA w języku polskim, inspirowana projektami w `docs/UI`. Nie uruchamia ani nie wywołuje backendu.
 
+## Docker Compose
+
+Z katalogu głównego: `docker compose up --build -d --wait`.
+Frontend: http://localhost:5173; backend: http://localhost:8000/docs.
+Kontener serwuje produkcyjną kompilację SPA i przekazuje `/api/` do backendu.
+Aplikacja demonstracyjna nadal używa przykładowych danych.
+
 ## Uruchomienie
 
 Wymagane Node.js >=22.12 i npm.

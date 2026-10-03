@@ -18,6 +18,9 @@ uv run uvicorn hackyeah.main:app --app-dir src --reload
 docker compose up --build -d --wait
 ```
 
+Frontend demonstracyjny: http://localhost:5173. Compose buduje obie aplikacje;
+frontend nadal używa przykładowych danych. Ścieżka `/api/` na porcie frontendu
+przekazuje żądania do backendu.
 Dokumentacja Swagger: http://localhost:8000/docs.
 ReDoc: http://localhost:8000/redoc. Schemat: http://localhost:8000/openapi.json.
 `POST /api/v1/routes/plan` planuje trasę na grafie demonstracyjnym w pamięci.

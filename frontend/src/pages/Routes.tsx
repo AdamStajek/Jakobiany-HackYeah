@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import {
   ArrowRight,
-  Route as RouteIcon,
   ChevronLeft,
   ArrowUp,
   Plus,
@@ -173,11 +172,13 @@ function MissingRoute() {
 
 export function RoutePage() {
   const [params] = useSearchParams();
-  const [origin, setOrigin] = useState("rynek");
+  const { constraints, setConstraints, notify, location: userLocation } = useDemo();
+  const [origin, setOrigin] = useState(params.get("from") === "empty" ? "" : "rynek");
   const [destination, setDestination] = useState(params.get("to") || "wawel");
   const [originName, setOriginName] = useState("Wybrany punkt");
-  const [originCoordinates, setOriginCoordinates] =
-    useState<Coordinates | null>(null);
+  const [originCoordinates, setOriginCoordinates] = useState<Coordinates | null>(
+    params.get("from") === "location" ? userLocation : null,
+  );
   const [destinationCoordinates, setDestinationCoordinates] =
     useState<Coordinates | null>(null);
   const [picking, setPicking] = useState<"origin" | "destination" | null>(null);
@@ -188,7 +189,6 @@ export function RoutePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const request = useRef<AbortController | null>(null);
-  const { constraints, setConstraints, notify } = useDemo();
   const knownOrigin = points.some((point) => point.id === origin);
   const endpoints = useMemo(
     () => [
@@ -220,8 +220,22 @@ export function RoutePage() {
 
   useEffect(() => {
     const target = params.get("to");
+    const from = params.get("from");
     setDestination(target || "wawel");
     setDestinationCoordinates(null);
+    if (from === "location" && userLocation) {
+      setOrigin("current-location");
+      setOriginName("Twoja lokalizacja");
+      setOriginCoordinates(userLocation);
+    } else if (from === "location") {
+      setOrigin("");
+      setOriginName("Wybierz początek");
+      setOriginCoordinates(null);
+    } else if (from === "empty") {
+      setOrigin("");
+      setOriginName("Wybierz początek");
+      setOriginCoordinates(null);
+    }
   }, [params]);
 
   useEffect(() => {
@@ -318,6 +332,7 @@ export function RoutePage() {
         description="Wybierz cel i ustaw to, co ma znaczenie po drodze."
       />
       <div className="route-grid">
+        <div className="route-controls">
         <form className="panel route-form" onSubmit={submit}>
           <h2>Dokąd się wybierasz?</h2>
           <label className="field">
@@ -326,10 +341,18 @@ export function RoutePage() {
               value={origin}
               onChange={(event) => {
                 setOrigin(event.target.value);
-                setOriginCoordinates(null);
+                setOriginCoordinates(
+                  event.target.value === "current-location" ? userLocation : null,
+                );
               }}
             >
-              {!knownOrigin && <option value={origin}>{originName}</option>}
+              {origin === "" && <option value="">Wybierz początek</option>}
+              {origin === "current-location" && (
+                <option value="current-location">Twoja lokalizacja</option>
+              )}
+              {!knownOrigin && origin !== "" && origin !== "current-location" && (
+                <option value={origin}>{originName}</option>
+              )}
               {points.map((point) => (
                 <option key={point.id} value={point.id}>
                   {point.name}
@@ -338,7 +361,7 @@ export function RoutePage() {
             </select>
           </label>
           <PointSearch
-            label="Wyszukaj początek"
+            label="Wyszukaj miejsce"
             onSelect={(point) => {
               setOrigin(point.id);
               setOriginName(point.name);
@@ -372,7 +395,7 @@ export function RoutePage() {
             </select>
           </label>
           <PointSearch
-            label="Wyszukaj cel"
+            label="Wyszukaj miejsce"
             onSelect={(point) => {
               setDestination(point.id);
               setDestinationName(point.name);
@@ -399,8 +422,13 @@ export function RoutePage() {
               </button>
             </p>
           )}
-          <hr />
-          <h3>Twoje potrzeby na trasie</h3>
+          <button className="button primary full" disabled={loading}>
+            {loading ? "Planowanie…" : "Pokaż trasę"}
+            <ArrowRight size={18} />
+          </button>
+        </form>
+        <section className="panel route-needs">
+          <h2>Twoje potrzeby na trasie</h2>
           <label className="check-field">
             <input
               type="checkbox"
@@ -433,16 +461,13 @@ export function RoutePage() {
               })
             }
           />
-          <button className="button primary full" disabled={loading}>
-            {loading ? "Planowanie…" : "Pokaż trasę"}
-            <ArrowRight size={18} />
-          </button>
           <p className="muted small">
             Planowanie obejmuje sieć pieszą całego Krakowa. Potrzeby z profilu
             wpływają na wybór trasy; pozostałe niedogodności i braki danych
             pokażemy w wyniku.
           </p>
-        </form>
+        </section>
+        </div>
         <div className="route-map" ref={mapContainer}>
           <MapView
             places={noPlaces}
@@ -451,55 +476,48 @@ export function RoutePage() {
             onSelectPoint={picking ? selectMapPoint : undefined}
           />
         </div>
-        <aside
-          className="panel route-summary"
-          aria-live="polite"
-          aria-busy={loading}
-        >
-          {loading ? (
-            <p>Obliczamy trasę z uwzględnieniem Twoich potrzeb…</p>
-          ) : plan ? (
-            <>
-              <p className="eyebrow">ZAPLANOWANA TRASA</p>
-              <h2>{durationLabel(plan.route.estimated_duration_s)}</h2>
-              <p>
-                {distanceLabel(plan.route.distance_m)} · {plan.origin} →{" "}
-                {plan.destination}
-              </p>
-              <Status assessment={plan.route.assessment} />
-              <Warnings warnings={plan.warnings} />
-              <Link
-                className="button subtle full"
-                to={`/route/${encodeURIComponent(plan.route.id)}/details`}
-                state={plan}
-              >
-                Szczegóły trasy
-              </Link>
-              <Link
-                className="button primary full"
-                to={`/navigation?route=${encodeURIComponent(plan.route.id)}`}
-                state={plan}
-              >
-                Uruchom podgląd nawigacji
-              </Link>
-            </>
-          ) : (
-            <>
-              <RouteIcon size={38} />
-              <h2>
-                {error
-                  ? "Nie udało się wyznaczyć trasy"
-                  : "Droga dopasowana do Ciebie"}
-              </h2>
-              {error ? (
+        {loading || plan || error ? (
+          <aside
+            className="panel route-summary"
+            aria-live="polite"
+            aria-busy={loading}
+          >
+            {loading ? (
+              <p>Obliczamy trasę z uwzględnieniem Twoich potrzeb…</p>
+            ) : plan ? (
+              <>
+                <p className="eyebrow">ZAPLANOWANA TRASA</p>
+                <h2>{durationLabel(plan.route.estimated_duration_s)}</h2>
+                <p>
+                  {distanceLabel(plan.route.distance_m)} · {plan.origin} →{" "}
+                  {plan.destination}
+                </p>
+                <Status assessment={plan.route.assessment} />
+                <Warnings warnings={plan.warnings} />
+                <Link
+                  className="button subtle full"
+                  to={`/route/${encodeURIComponent(plan.route.id)}/details`}
+                  state={plan}
+                >
+                  Szczegóły trasy
+                </Link>
+                <Link
+                  className="button primary full"
+                  to={`/navigation?route=${encodeURIComponent(plan.route.id)}`}
+                  state={plan}
+                >
+                  Uruchom podgląd nawigacji
+                </Link>
+              </>
+            ) : (
+              <>
+                <h2>Nie udało się wyznaczyć trasy</h2>
                 <p role="alert">{error}</p>
-              ) : (
-                <p>Wybierz początek, cel i potrzeby, aby obliczyć trasę.</p>
-              )}
-              <Warnings warnings={warnings} />
-            </>
-          )}
-        </aside>
+                <Warnings warnings={warnings} />
+              </>
+            )}
+          </aside>
+        ) : null}
       </div>
     </div>
   );

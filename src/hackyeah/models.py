@@ -309,6 +309,7 @@ class PlaceSummary(Model):
 
 
 class PlaceSearchResponse(Page[PlaceSummary]):
+    total_count: int
     warnings: list[str]
     attribution: list[Source]
 

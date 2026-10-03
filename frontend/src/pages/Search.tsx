@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Settings2,
-  ShieldCheck,
   ArrowRight,
-  Route as RouteIcon,
   Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
@@ -20,29 +22,34 @@ const filterOptions = [
 ] as const;
 export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [params, setParams] = useSearchParams();
-  const { constraints, setConstraints, saved, toggleSave, location } = useDemo();
+  const { constraints, setConstraints, location } = useDemo();
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
   const [view, setView] = useState(mapOnly ? "map" : "list");
   const [sort, setSort] = useState("match");
   const query = params.get("q") || "";
   const category = params.get("category") || "";
   const [results, setResults] = useState<PlaceSummary[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<PlaceSummary | null>(null);
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
     setResults([]);
+    setTotalCount(0);
+    setCurrentPage(1);
     setNextCursor(null);
-    searchPlaces(query || category, constraints, null, location)
+    searchPlaces(query || category, constraints, null, location, 10)
       .then((page) => {
         if (active) {
           setResults(page.items);
           setNextCursor(page.next_cursor);
+          setTotalCount(page.total_count ?? page.items.length);
         }
       })
       .catch((reason: unknown) => {
@@ -60,29 +67,46 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       active = false;
     };
   }, [query, category, constraints, location]);
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setError("");
-    try {
-      const page = await searchPlaces(
-        query || category,
-        constraints,
-        nextCursor,
-        location,
-      );
-      setResults((current) => [...current, ...page.items]);
-      setNextCursor(page.next_cursor);
-    } catch (reason: unknown) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Nie udało się pobrać kolejnych miejsc.",
-      );
-    } finally {
-      setLoadingMore(false);
+  async function goToPage(pageNumber: number) {
+    if (pageNumber < 1 || pageNumber > Math.ceil(totalCount / 10)) return;
+    if (pageNumber * 10 > results.length && nextCursor && !loadingMore) {
+      setLoadingMore(true);
+      setError("");
+      try {
+        let cursor: string | null = nextCursor;
+        let loaded = results;
+        while (loaded.length < pageNumber * 10 && cursor) {
+          const page = await searchPlaces(
+            query || category,
+            constraints,
+            cursor,
+            location,
+            10,
+          );
+          loaded = [...loaded, ...page.items];
+          cursor = page.next_cursor;
+        }
+        setResults(loaded);
+        setNextCursor(cursor);
+      } catch (reason: unknown) {
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Nie udało się pobrać kolejnych miejsc.",
+        );
+        return;
+      } finally {
+        setLoadingMore(false);
+      }
     }
+    setCurrentPage(pageNumber);
   }
+  const totalPages = Math.ceil(totalCount / 10);
+  const pageWindowStart = Math.floor((currentPage - 1) / 5) * 5 + 1;
+  const visiblePages = Array.from(
+    { length: Math.min(5, totalPages - pageWindowStart + 1) },
+    (_, index) => pageWindowStart + index,
+  );
   const orderedResults = [...results].sort((a, b) =>
     sort === "distance"
       ? (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity)
@@ -98,13 +122,19 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <p className="eyebrow">ODKRYWAJ PO SWOJEMU</p>
           <h1>{mapOnly ? "Mapa Krakowa" : "Znajdź swoje miejsce"}</h1>
         </div>
-        <Link className="button subtle" to="/route">
-          <RouteIcon size={20} />
-          Wyznacz trasę
-        </Link>
+      </div>
+      <div className="search-controls">
+        <SearchBox key={query} initial={query} />
+        <label className="field search-sort">
+          Sortuj według
+          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="match">Najlepsze dopasowanie</option>
+            <option value="distance">Odległość</option>
+            <option value="name">Nazwa miejsca</option>
+          </select>
+        </label>
       </div>
       <div className="mobile-search">
-        <SearchBox key={query} initial={query} />
         <div className="toolbar">
           <button
             className="button subtle"
@@ -135,7 +165,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           className={`filters ${filtersOpen ? "show" : ""}`}
           aria-label="Filtry wyszukiwania"
         >
-          <SearchBox key={query} initial={query} compact />
           <h3>Dopasuj do swoich potrzeb</h3>
           {filterOptions.map((o) => (
             <label className="check-field" key={o.key}>
@@ -183,59 +212,41 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             />
             Utwardzona nawierzchnia
           </label>
-          <button
-            className="text-button filter-more"
-            onClick={() => setAdvanced(!advanced)}
-            aria-expanded={advanced}
-          >
-            <Settings2 size={16} />
-            {advanced ? "Mniej filtrów" : "Więcej filtrów"}
-          </button>
-          {advanced && (
-            <div className="advanced-filters">
-              <Numeric
-                label="Maks. liczba stopni"
-                value={constraints.max_steps}
-                onChange={(v) =>
-                  setConstraints({
-                    ...constraints,
-                    max_steps: v,
-                    require_step_free_access:
-                      v !== null && v > 0
-                        ? null
-                        : constraints.require_step_free_access,
-                  })
-                }
-              />
-              <Numeric
-                label="Maks. nachylenie (%)"
-                value={constraints.max_slope_percent}
-                onChange={(v) =>
-                  setConstraints({ ...constraints, max_slope_percent: v })
-                }
-              />
-              <Numeric
-                label="Odpoczynek co (m)"
-                min={1}
-                value={constraints.max_distance_without_rest_m}
-                onChange={(v) =>
-                  setConstraints({
-                    ...constraints,
-                    max_distance_without_rest_m: v,
-                  })
-                }
-              />
-            </div>
-          )}
+          <div className="advanced-filters">
+            <Numeric
+              label="Maks. liczba stopni"
+              value={constraints.max_steps}
+              onChange={(v) =>
+                setConstraints({
+                  ...constraints,
+                  max_steps: v,
+                  require_step_free_access:
+                    v !== null && v > 0
+                      ? null
+                      : constraints.require_step_free_access,
+                })
+              }
+            />
+            <Numeric
+              label="Maks. nachylenie (%)"
+              value={constraints.max_slope_percent}
+              onChange={(v) =>
+                setConstraints({ ...constraints, max_slope_percent: v })
+              }
+            />
+            <Numeric
+              label="Odpoczynek co (m)"
+              min={1}
+              value={constraints.max_distance_without_rest_m}
+              onChange={(v) =>
+                setConstraints({
+                  ...constraints,
+                  max_distance_without_rest_m: v,
+                })
+              }
+            />
+          </div>
           <hr />
-          <label className="field">
-            Sortuj według
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="match">Najlepsze dopasowanie</option>
-              <option value="distance">Odległość</option>
-              <option value="name">Nazwa miejsca</option>
-            </select>
-          </label>
           <button
             className="text-button"
             onClick={() => {
@@ -245,13 +256,6 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           >
             Wyczyść filtry
           </button>
-          <div className="filter-note">
-            <ShieldCheck size={21} />
-            <p>
-              Brak danych to ważna informacja. Zawsze pokazujemy, co wymaga
-              potwierdzenia.
-            </p>
-          </div>
         </aside>
         <section
           className={`results ${view === "map" ? "mobile-hidden" : ""}`}
@@ -260,7 +264,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <div className="results-heading">
             <h2>{category || query || "Miejsca w Krakowie"}</h2>
             <span aria-live="polite">
-              {loading ? "Pobieranie…" : `${results.length} wyników`}
+              {loading ? "Pobieranie…" : `${totalCount} wyników`}
             </span>
           </div>
           {error && (
@@ -270,30 +274,40 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           )}
           {results.length ? (
             <>
-              {orderedResults.map((p) => (
-                <PlaceCard
-                  key={p.id}
-                  place={p}
-                  assessment={
-                    p.assessment || {
-                      status: "uncertain",
-                      summary: "Dopasowanie nieznane.",
-                      reasons: [],
-                    }
-                  }
-                  saved={saved.includes(p.id)}
-                  toggle={() => toggleSave(p.id)}
-                />
-              ))}
-              {nextCursor && (
-                <button
-                  className="button subtle"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? "Pobieranie…" : "Pokaż kolejne miejsca"}
+              {orderedResults
+                .slice((currentPage - 1) * 10, currentPage * 10)
+                .map((p) => (
+                  <PlaceCard
+                    key={p.id}
+                    place={p}
+                    onShowOnMap={() => setSelectedPlace(p)}
+                  />
+                ))}
+              <nav className="results-pagination" aria-label="Strony wyników">
+                <button className="button subtle" aria-label="Pierwsza strona" title="Pierwsza strona" onClick={() => goToPage(1)} disabled={loadingMore || currentPage === 1}>
+                  <ChevronsLeft size={18} />
                 </button>
-              )}
+                <button className="button subtle" aria-label="Poprzednie 5 stron" title="Poprzednie 5 stron" onClick={() => goToPage(Math.max(1, pageWindowStart - 5))} disabled={loadingMore || pageWindowStart === 1}>
+                  <ChevronLeft size={18} />
+                </button>
+                {visiblePages.map((page) => (
+                  <button
+                    key={page}
+                    className={`button subtle ${page === currentPage ? "active" : ""}`}
+                    onClick={() => goToPage(page)}
+                    disabled={loadingMore}
+                    aria-current={page === currentPage ? "page" : undefined}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button className="button subtle" aria-label="Następne 5 stron" title="Następne 5 stron" onClick={() => goToPage(Math.min(totalPages, pageWindowStart + 5))} disabled={loadingMore || pageWindowStart + 5 > totalPages}>
+                  <ChevronRight size={18} />
+                </button>
+                <button className="button subtle" aria-label="Ostatnia strona" title="Ostatnia strona" onClick={() => goToPage(totalPages)} disabled={loadingMore || currentPage === totalPages}>
+                  <ChevronsRight size={18} />
+                </button>
+              </nav>
             </>
           ) : !error ? (
             <div className="empty-state">
@@ -316,11 +330,8 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           className={`search-map ${view === "list" ? "mobile-hidden" : ""}`}
           aria-label="Mapa wyników"
         >
-          <MapView places={orderedResults} />
-          <div className="map-legend">
-            <span>✓ Informacje potwierdzone</span>
-            <span>? Część danych niepotwierdzona</span>
-          </div>
+          <MapView places={selectedPlace ? [selectedPlace] : []} userLocation={location} />
+
           {mapOnly && (
             <Link className="button subtle map-list-link" to="/search">
               Zobacz listę miejsc <ArrowRight size={18} />

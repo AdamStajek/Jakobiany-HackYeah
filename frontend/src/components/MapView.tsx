@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { RouteGeometry } from "../data/api";
 import type { PlaceSummary } from "../data/types";
+import { translate, useLanguage } from "../i18n";
 
 const noEndpoints: { lat: number; lon: number; label: string }[] = [];
 const center: L.LatLngTuple = [50.061, 19.936];
@@ -13,12 +14,15 @@ export default function MapView({
   route,
   onSelectPoint,
   endpoints = noEndpoints,
+  userLocation,
 }: {
   places: PlaceSummary[];
   route?: RouteGeometry;
   onSelectPoint?: (point: { lat: number; lon: number }) => void;
   endpoints?: { lat: number; lon: number; label: string }[];
+  userLocation?: { lat: number; lon: number } | null;
 }) {
+  const language = useLanguage();
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const boundsRef = useRef<L.LatLngBounds | null>(null);
@@ -38,14 +42,6 @@ export default function MapView({
     };
     map.on("zoomend", updateZoom);
     updateZoom();
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    })
-      .on("tileerror", () => setTileError(true))
-      .on("tileload", () => setTileError(false))
-      .addTo(map);
     L.control
       .zoom({
         position: "bottomright",
@@ -62,6 +58,15 @@ export default function MapView({
       .querySelector(".leaflet-control-zoom-out")
       ?.setAttribute("aria-label", "Pomniejsz mapę");
     L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      maxNativeZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    })
+      .on("tileerror", () => setTileError(true))
+      .on("tileload", () => setTileError(false))
+      .addTo(map);
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
     return () => {
@@ -70,6 +75,19 @@ export default function MapView({
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker) {
+        const element = layer.getElement();
+        const label = `${translate("Pokaż na mapie:")} ${layer.options.alt}`;
+        element?.setAttribute("title", label);
+        element?.setAttribute("aria-label", label);
+      }
+    });
+  }, [language]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -95,23 +113,31 @@ export default function MapView({
         Math.abs(lon) > 180
       )
         continue;
-      const uncertain = place.assessment?.status !== "meets_requirements";
       const icon = L.divIcon({
         className: "place-marker",
-        html: `<span class="place-marker-pin ${uncertain ? "uncertain" : ""}"><span>${uncertain ? "?" : "✓"}</span></span>`,
+        html: '<span class="place-marker-pin" aria-hidden="true"></span>',
         iconSize: [36, 44],
         iconAnchor: [18, 44],
       });
       const marker = L.marker([lat, lon], {
         icon,
-        title: `Pokaż na mapie: ${place.name}`,
+        title: `${translate("Pokaż na mapie:")} ${place.name}`,
         alt: place.name,
       })
         .on("click", () => setSelected(place.id))
         .addTo(layers);
       marker
         .getElement()
-        ?.setAttribute("aria-label", `Pokaż na mapie: ${place.name}`);
+        ?.setAttribute("aria-label", `${translate("Pokaż na mapie:")} ${place.name}`);
+    }
+    if (userLocation && Number.isFinite(userLocation.lat) && Number.isFinite(userLocation.lon)) {
+      L.circleMarker([userLocation.lat, userLocation.lon], {
+        radius: 9,
+        color: "white",
+        weight: 3,
+        fillColor: "#1a73e8",
+        fillOpacity: 1,
+      }).bindTooltip("Twoja lokalizacja").addTo(layers);
     }
     for (const [index, point] of endpoints.entries()) {
       L.circleMarker([point.lat, point.lon], {
@@ -152,7 +178,7 @@ export default function MapView({
     return () => {
       layers.remove();
     };
-  }, [places, route, endpoints]);
+  }, [places, route, endpoints, userLocation]);
 
   function resetView() {
     const map = mapRef.current;
@@ -206,7 +232,7 @@ export default function MapView({
             </a>
           )}
           <strong>{active.name}</strong>
-          <p>{active.address && active.address_is_nearest ? `Najbliższy adres: ${active.address}` : active.address || "Adres nieznany"}</p>
+          <p>{active.address && active.address_is_nearest ? `${translate("Najbliższy adres:")} ${active.address}` : active.address || "Adres nieznany"}</p>
           <Link to={`/place/${encodeURIComponent(active.id)}`}>
             Zobacz szczegóły →
           </Link>

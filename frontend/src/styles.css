@@ -549,8 +549,16 @@ footer {
   color: var(--muted);
   font-size: 0.78rem;
 }
-footer > a:last-child {
+footer > .footer-links {
   margin-left: auto;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+footer {
+  flex-wrap: wrap;
 }
 .footer-brand {
   font-size: 0.94rem;
@@ -621,6 +629,19 @@ footer > a:last-child {
 .search-top .eyebrow {
   margin-bottom: 7px;
 }
+.search-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.search-controls .search-box {
+  flex: 1;
+}
+.search-sort {
+  width: 260px;
+  margin: 0;
+}
 .search-columns {
   display: grid;
   grid-template-columns: 250px minmax(350px, 1fr) minmax(340px, 0.95fr);
@@ -628,7 +649,7 @@ footer > a:last-child {
   align-items: start;
 }
 .filters {
-  padding: 20px 17px;
+  padding: 14px 17px;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: #fff;
@@ -720,7 +741,16 @@ footer > a:last-child {
   margin: 0;
 }
 .advanced-filters {
-  margin-top: 15px;
+  margin-top: 8px;
+}
+.advanced-filters .field {
+  margin-bottom: 10px;
+}
+.filters hr {
+  margin: 8px 0;
+}
+.filters .text-button {
+  padding: 4px 0;
 }
 .results-heading {
   display: flex;
@@ -738,20 +768,30 @@ footer > a:last-child {
   font-size: 0.82rem;
   white-space: nowrap;
 }
+.results-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.results-pagination .active {
+  background: var(--green);
+  color: white;
+}
 .place-card {
   position: relative;
   background: white;
   border: 1px solid var(--line);
   border-radius: 11px;
-  margin-bottom: 13px;
-  padding: 15px;
+  margin-bottom: 10px;
+  padding: 11px;
   display: flex;
-  gap: 15px;
-  min-height: 174px;
+  gap: 11px;
+  min-height: 0;
 }
 .place-image {
-  width: 100px;
-  height: 112px;
+  width: 120px;
+  align-self: stretch;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -881,14 +921,6 @@ footer > a:last-child {
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   box-shadow: 0 2px 5px #20212450;
-}
-.place-marker-pin > span {
-  transform: rotate(45deg);
-  color: white;
-  font: 700 16px / 1 sans-serif;
-}
-.place-marker-pin.uncertain {
-  background: #b06000;
 }
 .place-marker:focus-visible {
   outline: 3px solid #1a73e8;
@@ -1233,7 +1265,14 @@ footer > a:last-child {
   gap: 20px;
   align-items: start;
 }
+.route-controls {
+  display: grid;
+  gap: 16px;
+}
 .route-form {
+  padding: 24px;
+}
+.route-needs {
   padding: 24px;
 }
 .route-form h2 {
@@ -1609,14 +1648,14 @@ legend {
     gap: 15px;
   }
   .place-card {
-    flex-direction: column;
-    padding: 14px;
+    flex-direction: row;
+    padding: 10px;
   }
   .place-image {
-    width: 100%;
+    width: 76px;
   }
   .place-image img {
-    height: 100px;
+    height: 100%;
   }
   .place-card-body .eyebrow {
     padding-right: 0;
@@ -1982,7 +2021,7 @@ legend {
     flex-wrap: wrap;
     gap: 9px 16px;
   }
-  footer > a:last-child {
+  footer > .footer-links {
     margin-left: 0;
   }
   .bottom-nav {
@@ -2057,11 +2096,18 @@ legend {
   .search-top .eyebrow {
     font-size: 0.59rem;
   }
+  .search-controls {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 15px;
+  }
+  .search-controls .search-box,
+  .search-sort {
+    width: 100%;
+    max-width: none;
+  }
   .mobile-search {
     display: block;
-  }
-  .mobile-search .search-box {
-    width: 100%;
   }
   .toolbar {
     display: flex;
@@ -2103,9 +2149,6 @@ legend {
   .filters.show {
     display: block;
   }
-  .filters > .search-box {
-    display: none;
-  }
   .filters .check-field {
     font-size: 0.95rem;
   }
@@ -2124,15 +2167,15 @@ legend {
   }
   .place-card {
     gap: 12px;
-    padding: 13px;
-    min-height: 170px;
-    margin-bottom: 12px;
+    padding: 9px;
+    min-height: 0;
+    margin-bottom: 9px;
   }
   .place-image {
-    width: 86px;
+    width: 68px;
   }
   .place-image img {
-    height: 105px;
+    height: 100%;
   }
   .place-card-body .eyebrow {
     padding-right: 25px;
@@ -2271,6 +2314,9 @@ legend {
   }
   .route-form {
     padding: 22px;
+  }
+  .route-controls {
+    width: 100%;
   }
   .route-map .map-view {
     height: 420px;

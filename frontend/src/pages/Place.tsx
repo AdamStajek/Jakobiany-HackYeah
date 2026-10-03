@@ -117,7 +117,7 @@ export function PlacePage() {
               {p.address && p.address_is_nearest ? `Najbliższy adres: ${p.address}` : p.address || "Adres nieznany"}
               {distanceFromUser !== null && (
                 <small>
-                  {(distanceFromUser / 1000).toLocaleString("pl-PL")} km od Ciebie
+                  {(distanceFromUser / 1000).toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km od Ciebie
                 </small>
               )}
             </span>

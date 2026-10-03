@@ -122,16 +122,9 @@ def source(updated: datetime, url: str | None = None) -> m.Source:
     )
 
 
-def _details(
-    db: sqlite3.Connection, row: sqlite3.Row, constraints: m.Constraints | None
-) -> m.PlaceDetails:
-    updated = datetime.fromisoformat(
-        json.loads(
-            db.execute(
-                "SELECT value_json FROM metadata WHERE key='imported_at'"
-            ).fetchone()[0]
-        )
-    )
+def _facts(
+    db: sqlite3.Connection, row: sqlite3.Row, updated: datetime
+) -> list[m.Fact]:
     facts = []
     for item in db.execute(
         "SELECT * FROM accessibility_facts WHERE place_id=? ORDER BY attribute",
@@ -178,7 +171,20 @@ def _details(
                 unconfirmed_reason="missing",
             )
         facts.append(fact)
-    facts = accessibility_facts(db, row["id"], facts)
+    return accessibility_facts(db, row["id"], facts)
+
+
+def _details(
+    db: sqlite3.Connection, row: sqlite3.Row, constraints: m.Constraints | None
+) -> m.PlaceDetails:
+    updated = datetime.fromisoformat(
+        json.loads(
+            db.execute(
+                "SELECT value_json FROM metadata WHERE key='imported_at'"
+            ).fetchone()[0]
+        )
+    )
+    facts = _facts(db, row, updated)
     categories = [
         item[0]
         for item in db.execute(
@@ -327,9 +333,16 @@ def get(place_id: str, constraints: m.Constraints | None = None) -> m.PlaceDetai
 def search(
     body: m.PlaceSearchRequest, constraints: m.Constraints | None
 ) -> m.PlaceSearchResponse:
-    items = []
     with closing(_connect()) as db:
-        rows = db.execute("SELECT * FROM places ORDER BY id").fetchall()
+        rows = db.execute(
+            """SELECT p.* FROM places p
+            WHERE EXISTS (
+                SELECT 1 FROM place_categories pc
+                WHERE pc.place_id = p.id
+                AND pc.category_id NOT IN ('rest_point', 'steps', 'kerb')
+            )
+            ORDER BY p.id"""
+        ).fetchall()
         if body.cursor is not None and not any(
             row["id"] == body.cursor for row in rows
         ):
@@ -420,22 +433,44 @@ def search(
                 )
             )
         candidates.sort(key=lambda candidate: candidate[:4])
-        if body.cursor is not None:
-            try:
-                cursor_index = next(
-                    index
-                    for index, candidate in enumerate(candidates)
-                    if candidate[3] == body.cursor
-                )
-            except StopIteration:
-                raise HTTPException(422, "VALIDATION_ERROR") from None
-            candidates = candidates[cursor_index + 1 :]
-        for *_, row, distance in candidates:
-            place = _details(db, row, constraints)
-            if place.assessment.status == "does_not_meet_requirements" or (
-                not body.include_uncertain and place.assessment.status == "uncertain"
+        updated = datetime.fromisoformat(
+            json.loads(
+                db.execute(
+                    "SELECT value_json FROM metadata WHERE key='imported_at'"
+                ).fetchone()[0]
+            )
+        )
+        matching = []
+        unassessed = assess([], constraints)
+        has_requirements = bool(unassessed.reasons)
+        for candidate in candidates:
+            row = candidate[4]
+            assessment = (
+                assess(_facts(db, row, updated), constraints)
+                if has_requirements
+                else unassessed
+            )
+            if assessment.status == "does_not_meet_requirements" or (
+                not body.include_uncertain and assessment.status == "uncertain"
             ):
                 continue
+            matching.append(candidate)
+        total_count = len(matching)
+        if body.cursor is not None:
+            cursor_index = next(
+                (
+                    index
+                    for index, candidate in enumerate(matching)
+                    if candidate[3] == body.cursor
+                ),
+                None,
+            )
+            if cursor_index is None:
+                raise HTTPException(422, "VALIDATION_ERROR") from None
+            matching = matching[cursor_index + 1 :]
+        items = []
+        for *_, row, distance in matching[: body.limit]:
+            place = _details(db, row, constraints)
             items.append(
                 m.PlaceSummary.model_validate(
                     {
@@ -444,18 +479,11 @@ def search(
                     }
                 )
             )
-            if len(items) > body.limit:
-                break
-        updated = datetime.fromisoformat(
-            json.loads(
-                db.execute(
-                    "SELECT value_json FROM metadata WHERE key='imported_at'"
-                ).fetchone()[0]
-            )
-        )
+        next_cursor = items[-1].id if len(matching) > body.limit else None
     return m.PlaceSearchResponse(
         items=items[: body.limit],
-        next_cursor=items[body.limit - 1].id if len(items) > body.limit else None,
+        next_cursor=next_cursor,
+        total_count=total_count,
         warnings=[
             "Dane pochodzą z lokalnej kopii OSM; import nie jest weryfikacją terenową."
         ],

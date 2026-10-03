@@ -51,6 +51,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export type Page<T> = { items: T[]; next_cursor: string | null };
 export type PlacePage = Page<PlaceSummary> & {
+  total_count: number;
   warnings: string[];
   attribution: Place["attribution"];
 };
@@ -127,6 +128,7 @@ export async function searchPlaces(
   constraints: Constraints,
   cursor?: string | null,
   near?: { lat: number; lon: number } | null,
+  limit = 50,
 ): Promise<PlacePage> {
   return api("/places/search", {
     method: "POST",
@@ -134,7 +136,7 @@ export async function searchPlaces(
       query: query || "*",
       constraints,
       include_uncertain: true,
-      limit: 50,
+      limit,
       cursor,
       ...(near ? { near, radius_m: 20000 } : {}),
     }),

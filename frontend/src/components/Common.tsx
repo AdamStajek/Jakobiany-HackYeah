@@ -1,16 +1,9 @@
-import {
-  Bookmark,
-  Check,
-  ChevronRight,
-  MapPin,
-  Search,
-  ShieldCheck,
-  TriangleAlert,
-} from "lucide-react";
+import { Check, MapPin, Route as RouteIcon, Search, TriangleAlert } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, type FormEvent } from "react";
 import type { Assessment, Fact, PlaceSummary } from "../data/types";
 import { formatFact, labels } from "../data/mock";
+import { useDemo } from "../state/DemoContext";
 export function SearchBox({
   initial = "",
   compact = false,
@@ -34,13 +27,13 @@ export function SearchBox({
         className="sr-only"
         htmlFor={compact ? "sidebar-search" : "main-search"}
       >
-        Wyszukaj miejsce lub kategorię
+        Wyszukaj miejsce
       </label>
       <input
         id={compact ? "sidebar-search" : "main-search"}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Wyszukaj miejsce lub trasę"
+        placeholder="Wyszukaj miejsce"
       />
       <button className="button primary" type="submit">
         Szukaj
@@ -64,15 +57,13 @@ export function Status({ assessment }: { assessment: Assessment }) {
 }
 export function PlaceCard({
   place,
-  assessment,
-  saved,
-  toggle,
+  onShowOnMap,
 }: {
   place: PlaceSummary;
-  assessment: Assessment;
-  saved: boolean;
-  toggle: () => void;
+  onShowOnMap?: () => void;
 }) {
+  const navigate = useNavigate();
+  const { location } = useDemo();
   return (
     <article className="place-card">
       <Link
@@ -96,40 +87,23 @@ export function PlaceCard({
           <MapPin size={15} />
           {place.address && place.address_is_nearest ? `Najbliższy adres: ${place.address}` : place.address || "Adres nieznany"}
           {place.distance_m !== null &&
-            ` · ${(place.distance_m / 1000).toLocaleString("pl-PL")} km od Ciebie`}
+            ` · ${(place.distance_m / 1000).toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km od Ciebie`}
         </p>
-        <Status assessment={assessment} />
-        <div className="feature-chips">
-          {(place.facts || [])
-            .filter((f) =>
-              ["steps_count", "entrance_width_cm"].includes(f.attribute),
+        {onShowOnMap && (
+          <button className="button subtle" onClick={onShowOnMap}>Pokaż na mapie</button>
+        )}
+        <button
+          className="button subtle place-route-button"
+          onClick={() =>
+            navigate(
+              `/route?to=${encodeURIComponent(place.id)}&from=${location ? "location" : "empty"}`,
             )
-            .map((f) => (
-              <span key={f.id}>
-                <Check size={14} />
-                {formatFact(f)}
-              </span>
-            ))}
-        </div>
-        <p className="reliability">
-          <ShieldCheck size={16} /> Źródła i daty dostępne w szczegółach
-        </p>
+          }
+        >
+          <RouteIcon size={17} />
+          Wyznacz trasę
+        </button>
       </div>
-      <button
-        className={`icon-button bookmark ${saved ? "is-saved" : ""}`}
-        aria-label={`${saved ? "Usuń z zapisanych" : "Zapisz"}: ${place.name}`}
-        aria-pressed={saved}
-        onClick={toggle}
-      >
-        <Bookmark size={21} fill={saved ? "currentColor" : "none"} />
-      </button>
-      <Link
-        className="card-arrow"
-        aria-label={`Szczegóły: ${place.name}`}
-        to={`/place/${encodeURIComponent(place.id)}`}
-      >
-        <ChevronRight />
-      </Link>
     </article>
   );
 }

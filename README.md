@@ -193,10 +193,11 @@ bez zapisu do SQLite lub pliku. Odpowiedź ma `weather` i sygnały ryzyka
 w odcinkach; awaria daje ostrzeżenie i `weather=null`.
 Dokumentacja: [dane czasowe](docs/dane-czasowe.md).
 
-## Frontend demonstracyjny
+## Frontend
 
-Responsywny template React + TypeScript znajduje się w [frontend](frontend/README.md).
-Używa wyłącznie przykładowych danych, bez wywołań API.
+Responsywny interfejs React + TypeScript znajduje się w [frontend](frontend/README.md).
+Wyszukiwanie i szczegóły miejsc pobierają dane z API; trasy i część profilu
+pozostają demonstracyjne.
 
 ```bash
 cd frontend

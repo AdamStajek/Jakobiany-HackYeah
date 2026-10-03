@@ -189,9 +189,9 @@ Frontend umożliwia poprawienie i zatwierdzenie pól przed użyciem. Interpretac
 
 Odpowiedź `200`: `{ items: PlaceSummary[], next_cursor, warnings: string[], attribution: Source[] }`. `Source` ma pola jak element `sources` z sekcji 4.2.
 
-`PlaceSummary = { id, name, category, address, location, distance_m, assessment: Assessment }`. `address` i `distance_m` mogą być `null`; odległość jest odległością w linii prostej od `near`, a nie długością trasy. Pusta lista jest prawidłowym wynikiem. `warnings` informuje np. o korzystaniu z ostatniej dostępnej kopii OSM.
+`PlaceSummary = { id, name, category, address, location, distance_m, assessment, facts, website, phone, opening_hours, operator, access }`. `address`, `distance_m` i dane kontaktowe mogą być `null`; odległość jest odległością w linii prostej od `near`, a nie długością trasy. `facts` zawiera dostępne fakty OSM, nadal oznaczone jako niepotwierdzone. Pusta lista wyników jest prawidłowa. `warnings` informuje o źródle i aktualności danych.
 
-`GET /places/{id}` zwraca publicznie `200`, `PlaceDetails = PlaceSummary + { facts: Fact[], barriers: Barrier[], updated_at, attribution: Source[] }`. Opcjonalny parametr `profile_id` daje ocenę dla własnego profilu; bez niego ocena ma status `uncertain` i wyjaśnienie braku wymagań. Wszystkie kategorie faktów z sekcji 4.2 występują w szczegółach; brak wiedzy jest reprezentowany faktem z `value=null`, a nie pominięciem kategorii.
+`GET /places/{id}` zwraca publicznie `200`, `PlaceDetails = PlaceSummary + { barriers, updated_at, attribution, website_title, website_description, website_telephone, website_opening_hours, accessibility_summary, website_source }`. Pola strony internetowej pochodzą ze skryptu `scripts.scrape_place_websites` i importu `scripts.import_place_web_data`; pozostają oddzielone od faktów dostępności. Opcjonalny parametr `profile_id` daje ocenę dla własnego profilu; bez niego ocena ma status `uncertain` i wyjaśnienie braku wymagań. Wszystkie kategorie faktów z sekcji 4.2 występują w szczegółach; brak wiedzy jest reprezentowany faktem z `value=null`, a nie pominięciem kategorii.
 
 Specyfikacja dostępności każdego miejsca obejmuje następujące niedogodności i udogodnienia:
 
@@ -475,7 +475,7 @@ Template w `frontend/` jest samodzielną aplikacją React z danymi w pamięci pr
 
 Podczas integracji należy rozstrzygnąć następujące różnice pomiędzy projektem UI a kontraktem:
 
-- Miniatury, galeria, godziny otwarcia, telefon i opis miejsca nie są polami `PlaceDetails` v0.1. Template pokazuje ilustracje oraz opis w osobnym modelu widoku `demo`; nie zakłada istnienia tych pól w API.
+- Miniatury i galeria zdjęć nie są dostarczane. `PlaceDetails` zawiera dane kontaktowe z OSM oraz opcjonalny opis, godziny i informacje o dostępności pobrane ze strony miejsca; opis strony pozostaje niepotwierdzoną informacją źródłową.
 - Zapisane miejsca są lokalnym stanem demonstracji; trwały zapis wymaga osobnego kontraktu albo jawnej funkcji lokalnej.
 - Filtry podjazdu, windy, siedzenia i źródeł oraz sortowanie lokalne nie mają własnych parametrów w `/places/search`. W template działają na pełnym, skończonym zbiorze przykładowym. Nie należy filtrować tylko jednej strony wyników API i prezentować jej jako pełnego wyniku.
 - Anonimowe szczegóły miejsca nie przyjmują `constraints` w v0.1. Template ocenia dane lokalnie; integracja musi korzystać z oceny backendu, a ewentualna ocena anonimowych potrzeb w szczegółach wymaga rozszerzenia kontraktu.
@@ -483,4 +483,4 @@ Podczas integracji należy rozstrzygnąć następujące różnice pomiędzy proj
 - Formularz demonstracyjny zachowuje datę obserwacji lokalnie. `POST /reports` v0.1 nie ma `observed_at`; nie należy wysyłać tego pola bez rozszerzenia schematu. Odpowiedź „Nie wiem” jest brakiem potwierdzenia, a nie obserwacją `false`.
 - Mapa jest lokalnym schematem; trasa jest stałym scenariuszem, który nie oblicza wariantów po zmianie punktów ani potrzeb. Nawigacja zmienia kroki ręcznie, bez geolokalizacji.
 
-Do prezentacji podstawowych przepływów nie jest wymagana zmiana backendu ani obecnych schematów żądań. Przed podłączeniem rzeczywistych danych trzeba zapewnić sesję dla zapisów wymagających konta, ochronę CSRF, transport zdjęć, walidację serwera oraz odpowiednie stany błędów.
+Wyszukiwanie i szczegóły miejsc korzystają z rzeczywistego katalogu OSM. Pozostałe demonstracyjne przepływy nadal wymagają integracji opisanej powyżej. Przed podłączeniem rzeczywistych danych trzeba zapewnić sesję dla zapisów wymagających konta, ochronę CSRF, transport zdjęć, walidację serwera oraz odpowiednie stany błędów.

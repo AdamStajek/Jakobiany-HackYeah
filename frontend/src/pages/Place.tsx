@@ -24,7 +24,7 @@ function PhotoFigure({ photo, name }: { photo: PlacePhoto; name: string }) {
         <a href={photo.source_url} target="_blank" rel="noreferrer">
           <img
             src={photo.url}
-            alt={`${name} — ${photo.title}`}
+            alt={`${name} — ${photo.description?.trim() || photo.title}`}
             loading="lazy"
             onError={() => setFailed(true)}
           />
@@ -66,20 +66,22 @@ export function PlacePage() {
       );
   }, [id]);
   const { saved, toggleSave, location } = useDemo();
-  const distanceFromUser = p && location
-    ? (() => {
-        const earthRadiusM = 6_371_000;
-        const lat1 = (location.lat * Math.PI) / 180;
-        const lat2 = (p.location.lat * Math.PI) / 180;
-        const deltaLat = lat2 - lat1;
-        const deltaLon = ((p.location.lon - location.lon) * Math.PI) / 180;
-        const a =
-          Math.sin(deltaLat / 2) ** 2 +
-          Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
-        return earthRadiusM * 2 * Math.asin(Math.sqrt(Math.min(1, a)));
-      })()
-    : null;
+  const distanceFromUser =
+    p && location
+      ? (() => {
+          const earthRadiusM = 6_371_000;
+          const lat1 = (location.lat * Math.PI) / 180;
+          const lat2 = (p.location.lat * Math.PI) / 180;
+          const deltaLat = lat2 - lat1;
+          const deltaLon = ((p.location.lon - location.lon) * Math.PI) / 180;
+          const a =
+            Math.sin(deltaLat / 2) ** 2 +
+            Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+          return earthRadiusM * 2 * Math.asin(Math.sqrt(Math.min(1, a)));
+        })()
+      : null;
   const [tab, setTab] = useState("Dostępność");
+  const tabs = ["Dostępność", "Informacje", "Zdjęcia", "Źródła danych"];
   if (error)
     return (
       <div className="page narrow">
@@ -114,10 +116,16 @@ export function PlacePage() {
           <div className="place-address">
             <MapPin />
             <span>
-              {p.address && p.address_is_nearest ? `Najbliższy adres: ${p.address}` : p.address || "Adres nieznany"}
+              {p.address && p.address_is_nearest
+                ? `Najbliższy adres: ${p.address}`
+                : p.address || "Adres nieznany"}
               {distanceFromUser !== null && (
                 <small>
-                  {(distanceFromUser / 1000).toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km od Ciebie
+                  {(distanceFromUser / 1000).toLocaleString("pl-PL", {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}{" "}
+                  km od Ciebie
                 </small>
               )}
             </span>
@@ -134,7 +142,7 @@ export function PlacePage() {
           <div className="detail-heading">
             <div>
               <p className="eyebrow">{p.category}</p>
-              <h1>{p.name}</h1>
+              <h1 data-no-translate>{p.name}</h1>
               <Status
                 assessment={
                   p.assessment || {
@@ -176,23 +184,43 @@ export function PlacePage() {
             role="tablist"
             aria-label="Informacje o miejscu"
           >
-            {["Dostępność", "Informacje", "Zdjęcia", "Źródła danych"].map(
-              (t) => (
-                <button
-                  key={t}
-                  role="tab"
-                  id={`tab-${t}`}
-                  aria-controls="place-tab"
-                  aria-selected={tab === t}
-                  className={tab === t ? "active" : ""}
-                  onClick={() => setTab(t)}
-                >
-                  {t}
-                </button>
-              ),
-            )}
+            {tabs.map((t, index) => (
+              <button
+                key={t}
+                role="tab"
+                id={`place-tab-${index}`}
+                aria-controls="place-tab"
+                aria-selected={tab === t}
+                tabIndex={tab === t ? 0 : -1}
+                className={tab === t ? "active" : ""}
+                onClick={() => setTab(t)}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === "ArrowRight"
+                      ? (index + 1) % tabs.length
+                      : event.key === "ArrowLeft"
+                        ? (index + tabs.length - 1) % tabs.length
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? tabs.length - 1
+                            : null;
+                  if (next === null) return;
+                  event.preventDefault();
+                  setTab(tabs[next]);
+                  document.getElementById(`place-tab-${next}`)?.focus();
+                }}
+              >
+                {t}
+              </button>
+            ))}
           </div>
-          <div role="tabpanel" id="place-tab" aria-labelledby={`tab-${tab}`}>
+          <div
+            role="tabpanel"
+            id="place-tab"
+            tabIndex={0}
+            aria-labelledby={`place-tab-${tabs.indexOf(tab)}`}
+          >
             {tab === "Dostępność" ? (
               <>
                 <h2 className="small-heading">
@@ -216,7 +244,10 @@ export function PlacePage() {
                 {p.website_description && <p>{p.website_description}</p>}
                 {p.accessibility_summary && <p>{p.accessibility_summary}</p>}
                 <p>
-                  <strong>{p.address_is_nearest ? "Najbliższy adres:" : "Adres:"}</strong> {p.address || "Adres nieznany"}
+                  <strong>
+                    {p.address_is_nearest ? "Najbliższy adres:" : "Adres:"}
+                  </strong>{" "}
+                  {p.address || "Adres nieznany"}
                 </p>
                 {p.operator && (
                   <p>

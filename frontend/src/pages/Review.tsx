@@ -88,7 +88,7 @@ function ReviewCard({
       <p className="muted">
         Wysłano: {new Date(report.created_at).toLocaleString("pl-PL")}
       </p>
-      <EvidencePhotos ids={report.photo_ids} />
+      <EvidencePhotos ids={report.photo_ids} description={report.description} />
       <form onSubmit={submit}>
         <fieldset disabled={busy} className="form-fields">
           <label className="field">
@@ -207,9 +207,18 @@ export function ReviewPage() {
             report={report}
             progress={item}
             mission={missions.find((value) => value.id === item?.mission_id)}
-            done={(id) =>
-              setReports((items) => items.filter((value) => value.id !== id))
-            }
+            done={(id) => {
+              setReports((items) => items.filter((value) => value.id !== id));
+              requestAnimationFrame(() => {
+                const heading = document.querySelector<HTMLElement>(
+                  ".review-card h2, main h1",
+                );
+                if (heading) {
+                  heading.tabIndex = -1;
+                  heading.focus();
+                }
+              });
+            }}
           />
         );
       })}

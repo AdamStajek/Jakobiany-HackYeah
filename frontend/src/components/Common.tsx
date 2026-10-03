@@ -1,6 +1,12 @@
-import { Check, MapPin, Route as RouteIcon, Search, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  MapPin,
+  Route as RouteIcon,
+  Search,
+  TriangleAlert,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import type { Assessment, Fact, PlaceSummary } from "../data/types";
 import { formatFact, labels } from "../data/mock";
 import { useDemo } from "../state/DemoContext";
@@ -12,6 +18,7 @@ export function SearchBox({
   compact?: boolean;
 }) {
   const [query, setQuery] = useState(initial);
+  const inputId = useId();
   const navigate = useNavigate();
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -23,14 +30,11 @@ export function SearchBox({
       onSubmit={submit}
     >
       <Search aria-hidden="true" size={23} />
-      <label
-        className="sr-only"
-        htmlFor={compact ? "sidebar-search" : "main-search"}
-      >
+      <label className="sr-only" htmlFor={inputId}>
         Wyszukaj miejsce
       </label>
       <input
-        id={compact ? "sidebar-search" : "main-search"}
+        id={inputId}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Wyszukaj miejsce"
@@ -69,9 +73,15 @@ export function PlaceCard({
       <Link
         to={`/place/${encodeURIComponent(place.id)}`}
         className="place-image"
+        aria-label={place.name}
+        data-no-translate
       >
         {place.photos?.[0] ? (
-          <img src={place.photos[0].url} alt={`${place.name} — ${place.photos[0].title}`} loading="lazy" />
+          <img
+            src={place.photos[0].url}
+            alt={`${place.name} — ${place.photos[0].description?.trim() || place.photos[0].title}`}
+            loading="lazy"
+          />
         ) : (
           <MapPin size={34} aria-hidden="true" />
         )}
@@ -79,18 +89,22 @@ export function PlaceCard({
       <div className="place-card-body">
         <p className="eyebrow">{place.category}</p>
         <h3>
-          <Link to={`/place/${encodeURIComponent(place.id)}`}>
+          <Link to={`/place/${encodeURIComponent(place.id)}`} data-no-translate>
             {place.name}
           </Link>
         </h3>
         <p className="muted location">
           <MapPin size={15} />
-          {place.address && place.address_is_nearest ? `Najbliższy adres: ${place.address}` : place.address || "Adres nieznany"}
+          {place.address && place.address_is_nearest
+            ? `Najbliższy adres: ${place.address}`
+            : place.address || "Adres nieznany"}
           {place.distance_m !== null &&
             ` · ${(place.distance_m / 1000).toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km od Ciebie`}
         </p>
         {onShowOnMap && (
-          <button className="button subtle" onClick={onShowOnMap}>Pokaż na mapie</button>
+          <button className="button subtle" onClick={onShowOnMap}>
+            Pokaż na mapie
+          </button>
         )}
         <button
           className="button subtle place-route-button"
@@ -134,12 +148,11 @@ export function FactRow({ fact }: { fact: Fact }) {
                 timeZone: "Europe/Warsaw",
               })
             : "Brak daty obserwacji"}{" "}
-          ·{" "}
-          Wiarygodność: {confidenceLabels[fact.confidence_level]} ({
-            fact.confidence_score.toLocaleString("pl-PL", {
-              maximumFractionDigits: 2,
-            })
-          } pkt)
+          · Wiarygodność: {confidenceLabels[fact.confidence_level]} (
+          {fact.confidence_score.toLocaleString("pl-PL", {
+            maximumFractionDigits: 2,
+          })}{" "}
+          pkt)
         </small>
         {fact.alternatives && (
           <ul>
@@ -169,7 +182,7 @@ export function PageHeading({
   return (
     <div className="page-heading">
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-      <h1>{title}</h1>
+      <h1 tabIndex={-1}>{title}</h1>
       {description && <p className="muted">{description}</p>}
     </div>
   );

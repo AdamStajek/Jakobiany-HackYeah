@@ -105,6 +105,9 @@ test("konto, profil, zdjęcie, zgłoszenie i zweryfikowana misja pozostają po p
     .getByLabel("Co udało Ci się sprawdzić?")
     .fill("Wejście sprawdzono w terenie: nie ma stopni.");
   await page
+    .getByLabel("Zdjęcie (wymagane)", { exact: true })
+    .setInputFiles("tests/fixtures/evidence.png");
+  await page
     .getByRole("button", {
       name: "Wyślij odpowiedź do weryfikacji",
       exact: true,
@@ -163,7 +166,10 @@ test("konto, profil, zdjęcie, zgłoszenie i zweryfikowana misja pozostają po p
   ).toBeVisible();
   await page.goto("/profile");
   await expect(page.locator(".points")).toHaveText("30 pkt");
-  await page.getByRole("button", { name: "Wyloguj się", exact: true }).click();
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Wyloguj się", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Twój profil", exact: true }),
   ).toBeVisible();
@@ -195,4 +201,86 @@ test("konto, profil, zdjęcie, zgłoszenie i zweryfikowana misja pozostają po p
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test("powiadomienie o pobliskiej misji prowadzi do szczegółów i nie powtarza się", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const notifications: { onclick?: () => void; close: () => void }[] = [];
+    Object.assign(window, { missionNotifications: notifications });
+    class BrowserNotification {
+      static permission = "granted";
+      static requestPermission = async () => "granted";
+      onclick?: () => void;
+      close() {}
+      constructor() {
+        notifications.push(this);
+      }
+    }
+    Object.defineProperty(window, "Notification", {
+      value: BrowserNotification,
+    });
+    const position = { coords: { latitude: 50.0614, longitude: 19.9366 } };
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        watchPosition: (success: (value: unknown) => void) => {
+          success(position);
+          return 1;
+        },
+        clearWatch: () => {},
+        getCurrentPosition: (success: (value: unknown) => void) =>
+          success(position),
+      },
+    });
+  });
+  await page.goto("/missions");
+  await expect(
+    page.getByRole("button", {
+      name: "Włącz powiadomienia o misjach w pobliżu",
+    }),
+  ).toHaveCount(0);
+  await page.goto("/register");
+  await page.getByLabel("Imię", { exact: true }).fill("Jan");
+  await page
+    .getByLabel("E-mail", { exact: true })
+    .fill(`nearby-${test.info().project.name}-${Date.now()}@example.com`);
+  await page.getByLabel("Hasło", { exact: true }).fill("browser-user-password");
+  await page.getByRole("button", { name: "Utwórz konto", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Cześć, Jan!" }),
+  ).toBeVisible();
+  await page.goto("/missions");
+  await page
+    .getByRole("button", { name: "Włącz powiadomienia o misjach w pobliżu" })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { missionNotifications: unknown[] })
+            .missionNotifications.length,
+      ),
+    )
+    .toBe(1);
+  await page.evaluate(() =>
+    (
+      window as unknown as { missionNotifications: { onclick: () => void }[] }
+    ).missionNotifications[0].onclick(),
+  );
+  await expect(page).toHaveURL(/\/missions\/mission_/);
+  await expect(
+    page.getByText("Do sprawdzenia:", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Wszystkie misje" }).click();
+  await expect(
+    page.getByRole("button", { name: "Wyłącz powiadomienia o misjach" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { missionNotifications: unknown[] })
+          .missionNotifications.length,
+    ),
+  ).toBe(1);
 });

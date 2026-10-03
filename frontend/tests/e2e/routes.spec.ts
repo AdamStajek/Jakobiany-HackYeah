@@ -317,3 +317,48 @@ test("opis profilu jest interpretowany, zatwierdzany i przekazywany do planera",
     },
   });
 });
+
+test("dwa warianty piesze pokazują niedogodności i przełączają szczegóły", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/routes/plan", (route) => {
+    const result = response(true);
+    result.routes[0].variant = "constrained";
+    const fastest = response().routes[0];
+    fastest.id = "fastest-route";
+    fastest.variant = "fastest";
+    fastest.assessment = {
+      status: "does_not_meet_requirements",
+      summary: "Najszybsza trasa prowadzi przez schody.",
+      reasons: [
+        {
+          code: "OSM_INCONVENIENCE",
+          message: "Schody: 6 stopni.",
+          fact_ids: [],
+        },
+      ],
+    };
+    result.routes.push(fastest);
+    return route.fulfill({ json: result });
+  });
+  await page.goto("/route");
+  await page.getByRole("button", { name: "Pokaż trasę" }).click();
+  await expect(
+    page.getByRole("button", { name: /Trasa z uwzględnieniem ograniczeń/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByText("Schody: 6 stopni.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Najszybsza trasa/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "12 min", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Szczegóły trasy", exact: true })
+    .click();
+  await expect(page).toHaveURL(/route\/fastest-route\/details/);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Idź do Wawelu.", exact: true }),
+  ).toBeVisible();
+});

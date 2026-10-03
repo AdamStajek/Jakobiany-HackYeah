@@ -1,4 +1,10 @@
-export function EvidencePhotos({ ids }: { ids: string[] }) {
+export function EvidencePhotos({
+  ids,
+  description,
+}: {
+  ids: string[];
+  description?: string | null;
+}) {
   if (!ids.length) return null;
   return (
     <div className="evidence-photos">
@@ -11,7 +17,7 @@ export function EvidencePhotos({ ids }: { ids: string[] }) {
         >
           <img
             src={`/api/v1/photos/${encodeURIComponent(id)}/content`}
-            alt="Zdjęcie dołączone do zgłoszenia"
+            alt={`Zdjęcie dołączone do zgłoszenia${description?.trim() ? ` — ${description.trim()}` : ""}`}
           />
         </a>
       ))}

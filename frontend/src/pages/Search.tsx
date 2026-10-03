@@ -12,6 +12,7 @@ import {
 import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
 import Numeric from "../components/Numeric";
+import AISearch from "../components/AISearch";
 import { SearchBox, PlaceCard } from "../components/Common";
 import { searchPlaces } from "../data/api";
 import type { PlaceSummary } from "../data/types";
@@ -134,12 +135,19 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           </select>
         </label>
       </div>
+      <AISearch
+        mode="places"
+        onApply={(proposal) => {
+          setParams({ q: proposal.query || "*" });
+        }}
+      />
       <div className="mobile-search">
         <div className="toolbar">
           <button
             className="button subtle"
             onClick={() => setFiltersOpen(!filtersOpen)}
             aria-expanded={filtersOpen}
+            aria-controls="search-filters"
           >
             <Settings2 size={18} />
             Filtry
@@ -147,12 +155,14 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <div className="segmented">
             <button
               className={view === "list" ? "active" : ""}
+              aria-pressed={view === "list"}
               onClick={() => setView("list")}
             >
               Lista
             </button>
             <button
               className={view === "map" ? "active" : ""}
+              aria-pressed={view === "map"}
               onClick={() => setView("map")}
             >
               Mapa
@@ -163,6 +173,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       <div className="search-columns">
         <aside
           className={`filters ${filtersOpen ? "show" : ""}`}
+          id="search-filters"
           aria-label="Filtry wyszukiwania"
         >
           <h3>Dopasuj do swoich potrzeb</h3>
@@ -247,14 +258,34 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
                   <PlaceCard
                     key={p.id}
                     place={p}
-                    onShowOnMap={() => setSelectedPlace(p)}
+                    onShowOnMap={() => {
+                      setSelectedPlace(p);
+                      setView("map");
+                      requestAnimationFrame(() =>
+                        document
+                          .querySelector<HTMLElement>(".search-map .map-canvas")
+                          ?.focus(),
+                      );
+                    }}
                   />
                 ))}
               <nav className="results-pagination" aria-label="Strony wyników">
-                <button className="button subtle" aria-label="Pierwsza strona" title="Pierwsza strona" onClick={() => goToPage(1)} disabled={loadingMore || currentPage === 1}>
+                <button
+                  className="button subtle"
+                  aria-label="Pierwsza strona"
+                  title="Pierwsza strona"
+                  onClick={() => goToPage(1)}
+                  disabled={loadingMore || currentPage === 1}
+                >
                   <ChevronsLeft size={18} />
                 </button>
-                <button className="button subtle" aria-label="Poprzednie 5 stron" title="Poprzednie 5 stron" onClick={() => goToPage(Math.max(1, pageWindowStart - 5))} disabled={loadingMore || pageWindowStart === 1}>
+                <button
+                  className="button subtle"
+                  aria-label="Poprzednie 5 stron"
+                  title="Poprzednie 5 stron"
+                  onClick={() => goToPage(Math.max(1, pageWindowStart - 5))}
+                  disabled={loadingMore || pageWindowStart === 1}
+                >
                   <ChevronLeft size={18} />
                 </button>
                 {visiblePages.map((page) => (
@@ -268,15 +299,29 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
                     {page}
                   </button>
                 ))}
-                <button className="button subtle" aria-label="Następne 5 stron" title="Następne 5 stron" onClick={() => goToPage(Math.min(totalPages, pageWindowStart + 5))} disabled={loadingMore || pageWindowStart + 5 > totalPages}>
+                <button
+                  className="button subtle"
+                  aria-label="Następne 5 stron"
+                  title="Następne 5 stron"
+                  onClick={() =>
+                    goToPage(Math.min(totalPages, pageWindowStart + 5))
+                  }
+                  disabled={loadingMore || pageWindowStart + 5 > totalPages}
+                >
                   <ChevronRight size={18} />
                 </button>
-                <button className="button subtle" aria-label="Ostatnia strona" title="Ostatnia strona" onClick={() => goToPage(totalPages)} disabled={loadingMore || currentPage === totalPages}>
+                <button
+                  className="button subtle"
+                  aria-label="Ostatnia strona"
+                  title="Ostatnia strona"
+                  onClick={() => goToPage(totalPages)}
+                  disabled={loadingMore || currentPage === totalPages}
+                >
                   <ChevronsRight size={18} />
                 </button>
               </nav>
             </>
-          ) : !error ? (
+          ) : !error && !loading ? (
             <div className="empty-state">
               <Search size={36} />
               <h2>Nie znaleźliśmy miejsc</h2>
@@ -297,7 +342,10 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           className={`search-map ${view === "list" ? "mobile-hidden" : ""}`}
           aria-label="Mapa wyników"
         >
-          <MapView places={selectedPlace ? [selectedPlace] : []} userLocation={location} />
+          <MapView
+            places={selectedPlace ? [selectedPlace] : []}
+            userLocation={location}
+          />
 
           {mapOnly && (
             <Link className="button subtle map-list-link" to="/search">

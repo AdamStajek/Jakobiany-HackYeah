@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, Check } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
@@ -17,6 +17,13 @@ export function NeedsPage() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const panel = useRef<HTMLDivElement>(null);
+  const previousStep = useRef(step);
+  useEffect(() => {
+    if (step !== previousStep.current)
+      panel.current?.querySelector<HTMLElement>("h2, textarea")?.focus();
+    previousStep.current = step;
+  }, [step]);
   async function next(e: FormEvent) {
     e.preventDefault();
     if (!description.trim()) {
@@ -48,13 +55,17 @@ export function NeedsPage() {
       />
       <ol className="stepper">
         {["Opisz potrzeby", "Sprawdź ustawienia", "Gotowe"].map((s, i) => (
-          <li className={step === i + 1 ? "active" : ""} key={s}>
+          <li
+            className={step === i + 1 ? "active" : ""}
+            key={s}
+            aria-current={step === i + 1 ? "step" : undefined}
+          >
             <span>{i + 1}</span>
             {s}
           </li>
         ))}
       </ol>
-      <div className="panel needs-panel">
+      <div className="panel needs-panel" ref={panel}>
         {step === 1 ? (
           <form onSubmit={next}>
             <div className="callout">
@@ -117,7 +128,7 @@ export function NeedsPage() {
             }}
           >
             <fieldset disabled={saving} className="form-fields">
-              <h2>Wybierz i potwierdź swoje potrzeby</h2>
+              <h2 tabIndex={-1}>Wybierz i potwierdź swoje potrzeby</h2>
               {saveError && (
                 <p className="warning-box" role="alert">
                   {saveError}
@@ -282,7 +293,7 @@ export function NeedsPage() {
             <span className="success-icon">
               <Check size={36} />
             </span>
-            <h2>Twoje potrzeby są zapisane</h2>
+            <h2 tabIndex={-1}>Twoje potrzeby są zapisane</h2>
             <p>
               {session
                 ? "Profil zapisano na Twoim koncie. Będzie dostępny po ponownym zalogowaniu."

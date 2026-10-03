@@ -1,15 +1,23 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import { Link, NavLink, Navigate, Routes, Route, useLocation } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  Navigate,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
 import {
   Search,
   Route as RouteIcon,
   Flag,
   Star,
   UserRound,
+  LogOut,
   Menu,
   X,
 } from "lucide-react";
-import { translate, useLanguage, setLanguage } from "./i18n";
+import { translate, textLanguage, useLanguage, setLanguage } from "./i18n";
 import { Context, useDemo, type DemoState } from "./state/DemoContext";
 import { emptyConstraints, type Constraints, type Report } from "./data/types";
 import {
@@ -31,8 +39,14 @@ import { SearchPage } from "./pages/Search";
 import { PlacePage } from "./pages/Place";
 import { NeedsPage } from "./pages/Needs";
 import { RoutePage, RouteDetails, Navigation } from "./pages/Routes";
-import { ReportHub, ReportForm, ReportSuccess, VerificationRequestForm } from "./pages/Reports";
+import {
+  ReportHub,
+  ReportForm,
+  ReportSuccess,
+  VerificationRequestForm,
+} from "./pages/Reports";
 import { MissionsPage, MissionPage } from "./pages/Missions";
+import { NearbyMissions } from "./components/NearbyMissions";
 import { Profile } from "./pages/Profile";
 import { ReviewPage } from "./pages/Review";
 import { Auth, About, NotFound } from "./pages/Info";
@@ -43,12 +57,21 @@ const nav = [
   { to: "/report", label: "Zgłoś", icon: Flag },
   { to: "/missions", label: "Misje", icon: Star },
 ];
-function Layout({ children }: { children: ReactNode }) {
-  const { user } = useDemo();
+function Layout({
+  children,
+  message,
+  dismissMessage,
+}: {
+  children: ReactNode;
+  message: string;
+  dismissMessage: () => void;
+}) {
+  const { user, signOut, notify } = useDemo();
   const [menu, setMenu] = useState(false);
   const location = useLocation();
   const language = useLanguage();
   const languageTransition = useRef(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const languageFlag =
     language === "pl" ? (
       <svg className="language-flag" viewBox="0 0 60 40" aria-hidden="true">
@@ -73,6 +96,10 @@ function Layout({ children }: { children: ReactNode }) {
         const translated = translate(node.textContent);
         if (translated !== node.textContent) node.textContent = translated;
       } else if (node instanceof HTMLElement) {
+        if (node.hasAttribute("data-no-translate")) {
+          node.lang = "pl";
+          return;
+        }
         for (const attr of ["aria-label", "placeholder", "title", "alt"]) {
           const value = node.getAttribute(attr);
           if (value) {
@@ -80,14 +107,24 @@ function Layout({ children }: { children: ReactNode }) {
             if (translated !== value) node.setAttribute(attr, translated);
           }
         }
-        node.childNodes.forEach(apply);
+        if (!(node instanceof HTMLTextAreaElement))
+          node.childNodes.forEach(apply);
+        const copy = Array.from(node.childNodes)
+          .filter((child) => child.nodeType === Node.TEXT_NODE)
+          .map((child) => child.textContent || "");
+        for (const attr of ["aria-label", "title", "alt"]) {
+          const value = node.getAttribute(attr);
+          if (value) copy.push(value);
+        }
+        node.lang = textLanguage(copy);
       }
     };
     root.childNodes.forEach(apply);
     const observer = new MutationObserver((records) =>
       records.forEach((record) => {
-        record.addedNodes.forEach(apply);
-        if (record.type === "characterData") apply(record.target);
+        if (record.type === "childList") apply(record.target);
+        if (record.type === "characterData" && record.target.parentElement)
+          apply(record.target.parentElement);
         if (
           record.type === "attributes" &&
           record.target instanceof HTMLElement
@@ -134,14 +171,77 @@ function Layout({ children }: { children: ReactNode }) {
     setMenu(false);
     window.scrollTo(0, 0);
     document.getElementById("content")?.focus({ preventScroll: true });
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
+  useEffect(() => {
+    const content = document.getElementById("content");
+    if (!content) return;
+    const update = () => {
+      const heading = content.querySelector("h1");
+      const title = heading?.innerText?.replace(/\s+/g, " ").trim();
+      document.title = title ? `${title} · Swoją Drogą` : "Swoją Drogą";
+      if (heading) {
+        heading.tabIndex = -1;
+        if (document.activeElement === content)
+          heading.focus({ preventScroll: true });
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(content, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+    return () => observer.disconnect();
+  }, [location.pathname, language]);
+  useEffect(() => {
+    if (!menu) return;
+    document.querySelector<HTMLElement>("#main-navigation a")?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenu(false);
+        menuButton.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [menu]);
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>(".header");
+    const bottom = document.querySelector<HTMLElement>(".bottom-nav");
+    const update = () => {
+      document.documentElement.style.setProperty(
+        "--focus-top",
+        `${header?.getBoundingClientRect().height || 0}px`,
+      );
+      document.documentElement.style.setProperty(
+        "--focus-bottom",
+        `${bottom?.getBoundingClientRect().height || 0}px`,
+      );
+    };
+    const observer = new ResizeObserver(update);
+    if (header) observer.observe(header);
+    if (bottom) observer.observe(bottom);
+    update();
+    return () => observer.disconnect();
+  }, [location.pathname]);
   const navigating = location.pathname === "/navigation";
   return (
     <>
-      <a href="#content" className="skip-link">
+      <a
+        href="#content"
+        className="skip-link"
+        onClick={() => document.getElementById("content")?.focus()}
+      >
         Przejdź do treści
       </a>
-      <header className="header">
+      <header
+        className="header"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setMenu(false);
+        }}
+      >
         <Link to="/" className="brand">
           <span className="brand-icon">
             <img src="/logo.png" alt="" />
@@ -152,6 +252,7 @@ function Layout({ children }: { children: ReactNode }) {
           </span>
         </Link>
         <nav
+          id="main-navigation"
           className={`desktop-nav ${menu ? "open" : ""}`}
           aria-label="Nawigacja główna"
         >
@@ -161,6 +262,16 @@ function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
           <NavLink to="/about">O projekcie</NavLink>
+          <div className="mobile-account-links">
+            {user ? (
+              <NavLink to="/profile">Twój profil</NavLink>
+            ) : (
+              <>
+                <NavLink to="/login">Zaloguj się</NavLink>
+                <NavLink to="/register">Utwórz konto</NavLink>
+              </>
+            )}
+          </div>
         </nav>
         <div className="account-nav">
           <button
@@ -174,10 +285,28 @@ function Layout({ children }: { children: ReactNode }) {
             {languageFlag}
           </button>
           {user ? (
-            <Link className="button subtle" to="/profile">
-              <UserRound size={19} />
-              {user}
-            </Link>
+            <>
+              <Link className="button subtle" to="/profile">
+                <UserRound size={19} />
+                {user}
+              </Link>
+              <button
+                className="icon-button"
+                onClick={() =>
+                  void signOut().catch((error: unknown) => {
+                    notify(
+                      error instanceof Error
+                        ? error.message
+                        : "Nie udało się wylogować.",
+                    );
+                  })
+                }
+                aria-label="Wyloguj się"
+                title="Wyloguj się"
+              >
+                <LogOut size={19} />
+              </button>
+            </>
           ) : (
             <>
               <Link className="login-link" to="/login">
@@ -190,15 +319,41 @@ function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
         <button
+          ref={menuButton}
           className="mobile-menu icon-button"
           onClick={() => setMenu(!menu)}
           aria-label="Menu"
           aria-expanded={menu}
+          aria-controls="main-navigation"
         >
           {menu ? <X /> : <Menu />}
         </button>
       </header>
       <main id="content" tabIndex={-1}>
+        <div
+          className="toast-region"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {message && (
+            <div className="toast">
+              <span>{message}</span>
+              <button
+                aria-label="Zamknij komunikat"
+                onClick={() => {
+                  dismissMessage();
+                  document
+                    .getElementById("content")
+                    ?.focus({ preventScroll: true });
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+        <NearbyMissions />
         {children}
       </main>
       {!navigating && (
@@ -243,14 +398,17 @@ export default function App() {
     points: 0,
   });
   const [ready, setReady] = useState(false);
-  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(
+    null,
+  );
   const accountVersion = useRef(0);
   const activeSession = useRef<Session | null>(null);
   const [message, notify] = useState("");
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
-      ({ coords }) => setLocation({ lat: coords.latitude, lon: coords.longitude }),
+      ({ coords }) =>
+        setLocation({ lat: coords.latitude, lon: coords.longitude }),
       () => setLocation(null),
       { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },
     );
@@ -328,12 +486,6 @@ export default function App() {
       setActivity(nextActivity);
     }
   }
-  useEffect(() => {
-    if (message) {
-      const timeout = setTimeout(() => notify(""), 5500);
-      return () => clearTimeout(timeout);
-    }
-  }, [message]);
   const value: DemoState = {
     location,
     constraints,
@@ -407,7 +559,7 @@ export default function App() {
   };
   return (
     <Context.Provider value={value}>
-      <Layout>
+      <Layout message={message} dismissMessage={() => notify("")}>
         {!ready ? (
           <div className="page" role="status">
             Odtwarzanie sesji…
@@ -433,7 +585,10 @@ export default function App() {
               path="/report/confirm"
               element={<ReportForm key="confirm" confirm />}
             />
-            <Route path="/report/verify" element={<VerificationRequestForm />} />
+            <Route
+              path="/report/verify"
+              element={<VerificationRequestForm />}
+            />
             <Route path="/report/success" element={<ReportSuccess />} />
             <Route path="/missions" element={<MissionsPage />} />
             <Route path="/missions/:id" element={<MissionPage />} />
@@ -447,16 +602,6 @@ export default function App() {
           </Routes>
         )}
       </Layout>
-      <div className="toast-region" role="status" aria-live="polite">
-        {message && (
-          <div className="toast">
-            {message}
-            <button aria-label="Zamknij komunikat" onClick={() => notify("")}>
-              <X size={18} />
-            </button>
-          </div>
-        )}
-      </div>
     </Context.Provider>
   );
 }

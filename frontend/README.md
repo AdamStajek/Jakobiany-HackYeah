@@ -28,9 +28,12 @@ npm test
 npx playwright install chromium
 npm run test:e2e
 npm run test:account
+npm run test:a11y
 ```
 
 Testy jednostkowe sprawdzają rozróżnienie `null`, `false`, `0`, brak/konflikt/starość danych oraz wymagania. `test:account` uruchamia frontend i API z tymczasową bazą oraz testowym modelem interpretacji. Sprawdza na komputerze i telefonie rejestrację, logowanie, zapis profilu, upload zdjęcia, zgłoszenie i przyznanie punktów po weryfikacji; nie korzysta z produkcyjnej bazy ani płatnego API.
+
+`test:a11y` sprawdza reguły WCAG A/AA przez axe oraz klawiaturę, fokus, formularze, mapę i reflow w Playwright na szerokościach 1440, 768, 390 i 320 px. Zakres poprawek i ograniczenia automatycznej oceny opisuje [raport dostępności](../docs/wcag-2.2-aa.md).
 
 ## Co działa
 

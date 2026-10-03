@@ -2,8 +2,11 @@ import { useSyncExternalStore } from "react";
 
 export type Language = "pl" | "en";
 const listeners = new Set<() => void>();
-let language: Language = (localStorage.getItem("swoja-droga-language") as Language) || "pl";
-export function getLanguage() { return language; }
+let language: Language =
+  (localStorage.getItem("swoja-droga-language") as Language) || "pl";
+export function getLanguage() {
+  return language;
+}
 export function setLanguage(next: Language) {
   language = next;
   localStorage.setItem("swoja-droga-language", next);
@@ -11,7 +14,13 @@ export function setLanguage(next: Language) {
   listeners.forEach((listener) => listener());
 }
 export function useLanguage() {
-  return useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => language);
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => language,
+  );
 }
 
 // Stable UI copy shared by the application. Place names and user supplied text stay intact.
@@ -28,7 +37,10 @@ const en: Record<string, string> = Object.fromEntries([
   ["Interaktywna mapa Krakowa", "Interactive map of Kraków"],
   ["Przywróć widok mapy", "Reset map view"],
   ["Zamknij szczegóły znacznika", "Close marker details"],
-  ["Nie udało się pobrać części mapy. Sprawdź połączenie z internetem.", "Some map tiles could not be loaded. Check your internet connection."],
+  [
+    "Nie udało się pobrać części mapy. Sprawdź połączenie z internetem.",
+    "Some map tiles could not be loaded. Check your internet connection.",
+  ],
   ["Najbliższy adres:", "Nearest address:"],
   ["Adres nieznany", "Unknown address"],
   ["Zobacz szczegóły →", "View details →"],
@@ -45,7 +57,10 @@ const en: Record<string, string> = Object.fromEntries([
   ["Odkrywaj Kraków", "Explore Kraków"],
   ["na swoich", "on your"],
   ["zasadach.", "own terms."],
-  ["Sprawdzaj dostępność miejsc i tras", "Check the accessibility of places and routes"],
+  [
+    "Sprawdzaj dostępność miejsc i tras",
+    "Check the accessibility of places and routes",
+  ],
   ["dopasowanych do Twoich potrzeb.", "tailored to your needs."],
   ["Wyszukaj miejsce", "Search for a place"],
   ["Popularne:", "Popular:"],
@@ -56,7 +71,10 @@ const en: Record<string, string> = Object.fromEntries([
   ["Wszystkie miejsca", "All places"],
   ["KAŻDY MA SWOJĄ DROGĘ", "EVERYONE HAS THEIR OWN WAY"],
   ["Dopasuj wyniki do swoich potrzeb", "Tailor results to your needs"],
-  ["Powiedz, co jest dla Ciebie ważne. Resztę odkrywaj w swoim tempie.", "Tell us what matters to you. Explore the rest at your own pace."],
+  [
+    "Powiedz, co jest dla Ciebie ważne. Resztę odkrywaj w swoim tempie.",
+    "Tell us what matters to you. Explore the rest at your own pace.",
+  ],
   ["Utwórz profil potrzeb", "Set up your needs profile"],
   ["Na razie pomiń", "Skip for now"],
   ["Konkretne informacje", "Specific information"],
@@ -88,7 +106,10 @@ const en: Record<string, string> = Object.fromEntries([
   ["Pobieranie…", "Loading…"],
   ["wyników", "results"],
   ["Nie znaleźliśmy miejsc", "No places found"],
-  ["Zmień frazę lub usuń część filtrów.", "Change your search or remove some filters."],
+  [
+    "Zmień frazę lub usuń część filtrów.",
+    "Change your search or remove some filters.",
+  ],
   ["Pokaż wszystkie miejsca", "Show all places"],
   ["✓ Informacje potwierdzone", "✓ Confirmed information"],
   ["? Część danych niepotwierdzona", "? Some information is unconfirmed"],
@@ -109,7 +130,10 @@ const en: Record<string, string> = Object.fromEntries([
   ["Wróć do wyników", "Back to results"],
   ["Szczegóły:", "Details:"],
   ["Adres nieznany", "Address unknown"],
-  ["Źródła i daty dostępne w szczegółach", "Sources and dates available in details"],
+  [
+    "Źródła i daty dostępne w szczegółach",
+    "Sources and dates available in details",
+  ],
   ["Brak źródła", "No source"],
   ["Brak daty obserwacji", "No observation date"],
   ["Brak oceny wiarygodności", "No confidence rating"],
@@ -118,13 +142,22 @@ const en: Record<string, string> = Object.fromEntries([
   ["Nie", "No"],
   ["Nie wiem", "I don't know"],
   ["Twoje misje", "Your missions"],
-  ["Pomagaj innym odkrywać Kraków bez barier.", "Help others discover accessible Kraków."],
+  [
+    "Pomagaj innym odkrywać Kraków bez barier.",
+    "Help others discover accessible Kraków.",
+  ],
   ["Małe zadania. Wielka różnica.", "Small tasks. Big difference."],
-  ["Sprawdź informacje w okolicy i pomóż uzupełnić mapę.", "Check local information and help complete the map."],
+  [
+    "Sprawdź informacje w okolicy i pomóż uzupełnić mapę.",
+    "Check local information and help complete the map.",
+  ],
   ["Dostępne misje", "Available missions"],
   ["Moje postępy", "My progress"],
   ["Tu pojawią się Twoje misje", "Your missions will appear here"],
-  ["Wybierz zadanie z zakładki „Dostępne misje”.", "Choose a task from the “Available missions” tab."],
+  [
+    "Wybierz zadanie z zakładki „Dostępne misje”.",
+    "Choose a task from the “Available missions” tab.",
+  ],
   ["Wszystkie misje", "All missions"],
   ["Zobacz miejsce", "View place"],
   ["Rozpocznij misję", "Start mission"],
@@ -143,7 +176,10 @@ const en: Record<string, string> = Object.fromEntries([
   ["Nie udało się pobrać miejsca.", "Could not load place."],
   ["Dopasowanie nieznane.", "Match unknown."],
   ["Nie znaleziono tej strony", "Page not found"],
-  ["Wróć do wyszukiwania i wybierz miejsce.", "Return to search and choose a place."],
+  [
+    "Wróć do wyszukiwania i wybierz miejsce.",
+    "Return to search and choose a place.",
+  ],
   ["Szukaj miejsc", "Search places"],
   ["Zamknij komunikat", "Dismiss notification"],
   ["Profil", "Profile"],
@@ -154,54 +190,111 @@ const en: Record<string, string> = Object.fromEntries([
   ["Zgłoś", "Report"],
   ["Zgłoś lub potwierdź informację", "Report or confirm information"],
   ["Poproś o weryfikację", "Request verification"],
-  ["Wskaż miejsce i informację o dostępności, której pewność jest niska.", "Choose a place and accessibility information with low confidence."],
-  ["Zgłoś zauważony problem albo poproś o sprawdzenie niepewnej informacji.", "Report a problem you noticed or ask for uncertain information to be checked."],
+  [
+    "Wskaż miejsce i informację o dostępności, której pewność jest niska.",
+    "Choose a place and accessibility information with low confidence.",
+  ],
+  [
+    "Zgłoś zauważony problem albo poproś o sprawdzenie niepewnej informacji.",
+    "Report a problem you noticed or ask for uncertain information to be checked.",
+  ],
   ["Wybierz informację", "Choose information"],
   ["Wróć do zgłoszeń", "Back to reports"],
-  ["Wybierz miejsce i informację o niskiej pewności. Wysłanie prośby utworzy misję dla społeczności.", "Choose a place and low-confidence information. Your request will create a mission for the community."],
+  [
+    "Wybierz miejsce i informację o niskiej pewności. Wysłanie prośby utworzy misję dla społeczności.",
+    "Choose a place and low-confidence information. Your request will create a mission for the community.",
+  ],
   ["Szukaj miejsca", "Search for a place"],
   ["Wpisz nazwę miejsca", "Enter a place name"],
   ["Problem lub parametr do sprawdzenia", "Problem or detail to check"],
-  ["To miejsce nie ma informacji oznaczonych jako niepotwierdzone ani z pewnością do 60%.", "This place has no information marked as unconfirmed or with confidence at or below 60%."],
+  [
+    "To miejsce nie ma informacji oznaczonych jako niepotwierdzone ani z pewnością do 60%.",
+    "This place has no information marked as unconfirmed or with confidence at or below 60%.",
+  ],
   ["Utwórz misję weryfikacji", "Create verification mission"],
   ["Tworzenie misji…", "Creating mission…"],
-  ["Zaloguj się, aby utworzyć misję sprawdzenia informacji.", "Log in to create a mission to check this information."],
+  [
+    "Zaloguj się, aby utworzyć misję sprawdzenia informacji.",
+    "Log in to create a mission to check this information.",
+  ],
   ["Misja weryfikacji została utworzona", "Verification mission created"],
-  ["Inni użytkownicy mogą teraz sprawdzić tę informację.", "Other users can now check this information."],
+  [
+    "Inni użytkownicy mogą teraz sprawdzić tę informację.",
+    "Other users can now check this information.",
+  ],
   ["Zobacz misję", "View mission"],
-  ["Pomóż innym znaleźć drogę. Każda informacja trafia do weryfikacji.", "Help others find their way. Every report is reviewed."],
-  ["Niedziałający podjazd, remont lub błędna informacja.", "A broken ramp, construction work or incorrect information."],
-  ["Sprawdź, czy dane o miejscu są nadal aktualne.", "Check whether the information about this place is still current."],
-  ["Zgłoszenia i zdjęcia trafiają do moderatora. Dane nie zmieniają się przed weryfikacją.", "Reports and photos are sent to a moderator. Information is not changed before review."],
-  ["Twoje zgłoszenie nie zmienia danych przed weryfikacją.", "Your report will not change the data before it has been reviewed."],
-  ["Informacja, której dotyczy zgłoszenie", "Information related to this report"],
-  ["Czy podana informacja nadal jest aktualna?", "Is this information still current?"],
+  [
+    "Pomóż innym znaleźć drogę. Każda informacja trafia do weryfikacji.",
+    "Help others find their way. Every report is reviewed.",
+  ],
+  [
+    "Niedziałający podjazd, remont lub błędna informacja.",
+    "A broken ramp, construction work or incorrect information.",
+  ],
+  [
+    "Sprawdź, czy dane o miejscu są nadal aktualne.",
+    "Check whether the information about this place is still current.",
+  ],
+  [
+    "Zgłoszenia i zdjęcia trafiają do moderatora. Dane nie zmieniają się przed weryfikacją.",
+    "Reports and photos are sent to a moderator. Information is not changed before review.",
+  ],
+  [
+    "Twoje zgłoszenie nie zmienia danych przed weryfikacją.",
+    "Your report will not change the data before it has been reviewed.",
+  ],
+  [
+    "Informacja, której dotyczy zgłoszenie",
+    "Information related to this report",
+  ],
+  [
+    "Czy podana informacja nadal jest aktualna?",
+    "Is this information still current?",
+  ],
   ["Dodatkowy komentarz (opcjonalnie)", "Additional comment (optional)"],
   ["Opisz problem", "Describe the problem"],
   ["Zdjęcie (opcjonalnie)", "Photo (optional)"],
   ["Data obserwacji", "Date observed"],
   ["Wyślij zgłoszenie", "Submit report"],
   ["Dziękujemy za pomoc!", "Thank you for your help!"],
-  ["Zgłoszenie wysłano i zapisano na Twoim koncie.", "The report was submitted and saved to your account."],
+  [
+    "Zgłoszenie wysłano i zapisano na Twoim koncie.",
+    "The report was submitted and saved to your account.",
+  ],
   ["Moje zgłoszenia", "My reports"],
   ["Nie udało się pobrać miejsca.", "Could not load place."],
   ["Pobieranie danych miejsca…", "Loading place details…"],
-  ["Sprawdź konkretne cechy miejsca. Ocena dopasowania zależy od wybranych potrzeb.", "Check the specific features of this place. The match depends on your selected needs."],
+  [
+    "Sprawdź konkretne cechy miejsca. Ocena dopasowania zależy od wybranych potrzeb.",
+    "Check the specific features of this place. The match depends on your selected needs.",
+  ],
   ["Potwierdź informację", "Confirm information"],
   ["Dostępność interfejsu", "Interface accessibility"],
   ["Edytuj profil potrzeb", "Edit needs profile"],
-  ["Twoje preferencje są aktywne. Możesz je sprawdzić i edytować.", "Your preferences are active. You can review and edit them."],
+  [
+    "Twoje preferencje są aktywne. Możesz je sprawdzić i edytować.",
+    "Your preferences are active. You can review and edit them.",
+  ],
   ["Nie określono jeszcze potrzeb.", "No needs have been set yet."],
-  ["Twoje potrzeby i aktywność są zapisane na koncie.", "Your needs and activity are saved to your account."],
+  [
+    "Twoje potrzeby i aktywność są zapisane na koncie.",
+    "Your needs and activity are saved to your account.",
+  ],
   ["Większy tekst", "Larger text"],
   ["Zwiększony kontrast", "Higher contrast"],
   ["Wyloguj się", "Log out"],
-  ["Zapisuj miejsca przyciskiem z zakładką, aby łatwo do nich wrócić.", "Save places with the bookmark button to find them easily later."],
+  [
+    "Zapisuj miejsca przyciskiem z zakładką, aby łatwo do nich wrócić.",
+    "Save places with the bookmark button to find them easily later.",
+  ],
   ["Około", "About"],
   ["minut", "minutes"],
   ["Dostępna", "Available"],
   ["po zatwierdzeniu", "after approval"],
-  ["Wybierz potrzeby, aby sprawdzić dopasowanie", "Set your needs to see how well a place matches"],
+  [
+    "Wybierz potrzeby, aby sprawdzić dopasowanie",
+    "Set your needs to see how well a place matches",
+  ],
   ["Brakuje pewnych informacji", "Some information is missing"],
   ["Dobrze dopasowane do Twoich potrzeb", "A good match for your needs"],
   ["Nie spełnia podanych wymagań", "Does not meet your requirements"],
@@ -223,11 +316,23 @@ const en: Record<string, string> = Object.fromEntries([
   ["Asfalt", "Asphalt"],
   ["Kostka brukowa", "Cobblestone"],
   ["Szczegóły trasy", "Route details"],
-  ["Idź prosto ulicą Pawią w stronę Plant.", "Continue straight along Pawia Street towards the Planty."],
-  ["Skręć w prawo i idź alejką przez Planty.", "Turn right and follow the path through the Planty."],
-  ["Sprawdź warunki w terenie przed przejściem.", "Check conditions on site before setting off."],
+  [
+    "Idź prosto ulicą Pawią w stronę Plant.",
+    "Continue straight along Pawia Street towards the Planty.",
+  ],
+  [
+    "Skręć w prawo i idź alejką przez Planty.",
+    "Turn right and follow the path through the Planty.",
+  ],
+  [
+    "Sprawdź warunki w terenie przed przejściem.",
+    "Check conditions on site before setting off.",
+  ],
   ["Znajdź swoją trasę", "Find your route"],
-  ["Wybierz cel i ustaw to, co ma znaczenie po drodze.", "Choose a destination and set what matters along the way."],
+  [
+    "Wybierz cel i ustaw to, co ma znaczenie po drodze.",
+    "Choose a destination and set what matters along the way.",
+  ],
   ["Zgłoś problem", "Report a problem"],
   ["Około {m.time} minut", "About {m.time} minutes"],
   ["Imię", "Name"],
@@ -237,10 +342,22 @@ const en: Record<string, string> = Object.fromEntries([
   ["Nieprawidłowy e-mail lub hasło.", "Incorrect email or password."],
   ["Masz już konto? Zaloguj się", "Already have an account? Log in"],
   ["Nie masz konta? Zarejestruj się", "No account yet? Sign up"],
-  ["Zapisuj swoje potrzeby, wysyłaj zgłoszenia i zdobywaj punkty za zweryfikowane misje.", "Save your needs, submit reports and earn points for reviewed missions."],
-  ["Zaloguj się, aby zapisywać profil, miejsca i postępy misji.", "Log in to save your profile, places and mission progress."],
-  ["Profil zapisano na Twoim koncie. Będzie dostępny po ponownym zalogowaniu.", "Your profile was saved to your account. It will be available when you log in again."],
-  ["Opisz potrzeby, a zaproponujemy ustawienia. W kolejnym kroku sprawdzisz i zatwierdzisz wymagania.", "Describe your needs and we will suggest settings. Review and confirm the requirements in the next step."],
+  [
+    "Zapisuj swoje potrzeby, wysyłaj zgłoszenia i zdobywaj punkty za zweryfikowane misje.",
+    "Save your needs, submit reports and earn points for reviewed missions.",
+  ],
+  [
+    "Zaloguj się, aby zapisywać profil, miejsca i postępy misji.",
+    "Log in to save your profile, places and mission progress.",
+  ],
+  [
+    "Profil zapisano na Twoim koncie. Będzie dostępny po ponownym zalogowaniu.",
+    "Your profile was saved to your account. It will be available when you log in again.",
+  ],
+  [
+    "Opisz potrzeby, a zaproponujemy ustawienia. W kolejnym kroku sprawdzisz i zatwierdzisz wymagania.",
+    "Describe your needs and we will suggest settings. Review and confirm the requirements in the next step.",
+  ],
   ["Twoje punkty", "Your points"],
   ["Moje misje", "My missions"],
   ["Zaakceptowano", "Accepted"],
@@ -253,18 +370,40 @@ const en: Record<string, string> = Object.fromEntries([
   ["Kontynuuj", "Continue"],
   ["Każdy ma swoją drogę", "Everyone has their own way"],
   ["Informacje, które dają wybór", "Information that gives you choices"],
-  ["Co wiemy, a czego jeszcze nie?", "What do we know, and what is still unknown?"],
+  [
+    "Co wiemy, a czego jeszcze nie?",
+    "What do we know, and what is still unknown?",
+  ],
   ["Zakres działania", "What is available"],
   ["Dostępność", "Accessibility"],
-  ["Nie podawaj prawdziwego hasła ani danych logowania.", "Do not enter a real password or login details."],
+  [
+    "Nie podawaj prawdziwego hasła ani danych logowania.",
+    "Do not enter a real password or login details.",
+  ],
   ["Nie podano źródła", "No source provided"],
 ]);
+const englishCopy = new Set([
+  ...Object.values(en),
+  "Switch to English",
+  "English",
+]);
+
 export function translate(text: string) {
   const trimmed = text.trim();
   if (language === "pl") {
-    const polish = Object.entries(en).find(([, value]) => value === trimmed)?.[0];
+    const polish = Object.entries(en).find(
+      ([, value]) => value === trimmed,
+    )?.[0];
     return polish ? text.replace(trimmed, polish) : text;
   }
   const translated = en[trimmed];
   return translated ? text.replace(trimmed, translated) : text;
+}
+
+// Untranslated Polish copy keeps its pronunciation when the UI is in English.
+export function textLanguage(parts: string[]) {
+  const text = parts.map((part) => part.trim()).filter(Boolean);
+  return text.length > 0 && text.every((part) => englishCopy.has(part))
+    ? "en"
+    : "pl";
 }

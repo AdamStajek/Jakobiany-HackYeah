@@ -11,17 +11,25 @@ import {
   ArrowUp,
   Plus,
   Volume2,
+  Bus,
+  Footprints,
+  Car,
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
 import Numeric from "../components/Numeric";
+import AISearch from "../components/AISearch";
 import { FactRow, PageHeading, Status } from "../components/Common";
 import {
   getPlace,
   planRoute,
   searchRoutePoints,
+  getMobilityMap,
+  type MobilityPoint,
+  type TravelMode,
   type PlannedRoute,
 } from "../data/api";
+import type { Source } from "../data/types";
 
 // Quick choices; any catalogue place or point selected on the map is supported.
 const points = [
@@ -33,16 +41,18 @@ const noPlaces: [] = [];
 type Coordinates = { lat: number; lon: number };
 function PointSearch({
   label,
+  initialQuery = "",
   onSelect,
 }: {
   label: string;
+  initialQuery?: string;
   onSelect: (point: {
     id: string;
     name: string;
     location: Coordinates;
   }) => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<
     {
       id: string;
@@ -52,6 +62,7 @@ function PointSearch({
     }[]
   >([]);
   const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const controller = new AbortController();
     setResults([]);
@@ -81,6 +92,7 @@ function PointSearch({
       <label className="field">
         {label}
         <input
+          ref={input}
           value={query}
           placeholder="Nazwa miejsca lub adres"
           onChange={(event) => setQuery(event.target.value)}
@@ -102,6 +114,7 @@ function PointSearch({
                   onSelect(point);
                   setQuery("");
                   setResults([]);
+                  input.current?.focus();
                 }}
               >
                 <strong>{point.name}</strong>
@@ -116,9 +129,11 @@ function PointSearch({
 }
 type SavedPlan = {
   route: PlannedRoute;
+  alternatives?: PlannedRoute[];
   warnings: string[];
   origin: string;
   destination: string;
+  attribution?: Source[];
 };
 const storageKey = "swoja-droga-route";
 function readPlan(): SavedPlan | null {
@@ -144,6 +159,79 @@ function distanceLabel(meters: number) {
 }
 function durationLabel(seconds: number | null) {
   return seconds === null ? "Czas nieznany" : `${Math.ceil(seconds / 60)} min`;
+}
+const modeLabels = {
+  walk: "Pieszo",
+  transit: "Komunikacja miejska",
+  car: "Samochód",
+};
+function timeLabel(value: string) {
+  return new Date(value).toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Warsaw",
+  });
+}
+function TransitTime({
+  segment,
+}: {
+  segment?: PlannedRoute["segments"][number];
+}) {
+  if (segment?.mode !== "transit" || !segment.departure_at) return null;
+  return (
+    <p className="transit-time">
+      <Bus size={18} aria-hidden="true" /> {timeLabel(segment.departure_at)}
+      {segment.arrival_at && ` → ${timeLabel(segment.arrival_at)}`}
+      {segment.delay_s == null
+        ? " · Według rozkładu"
+        : segment.delay_s > 0
+          ? ` · Opóźnienie ${Math.ceil(segment.delay_s / 60)} min`
+          : segment.delay_s < 0
+            ? ` · ${Math.ceil(-segment.delay_s / 60)} min przed rozkładem`
+            : " · Dane bieżące: punktualnie"}
+    </p>
+  );
+}
+function RouteSources({ plan }: { plan: SavedPlan }) {
+  return (
+    <p className="small route-sources">
+      {plan.attribution
+        ?.filter((s) => s.url)
+        .map((s, i) => (
+          <span key={s.url}>
+            {i > 0 && " · "}
+            <a href={s.url!} target="_blank" rel="noreferrer">
+              {s.label}
+            </a>
+          </span>
+        ))}
+    </p>
+  );
+}
+function routeMarkers(route: PlannedRoute): MobilityPoint[] {
+  const stops = route.segments
+    .filter((s) => s.mode === "transit")
+    .flatMap((s) => [
+      {
+        id: `${s.id}-start`,
+        name: s.from_stop || "Przystanek początkowy",
+        coordinates: s.geometry.coordinates[0],
+      },
+      {
+        id: `${s.id}-end`,
+        name: s.to_stop || "Przystanek końcowy",
+        coordinates: s.geometry.coordinates.at(-1)!,
+      },
+    ])
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: "stop" as const,
+      location: { lon: p.coordinates[0], lat: p.coordinates[1] },
+      line: null,
+      updated_at: null,
+    }));
+  return [...stops, ...(route.parking ? [route.parking] : [])];
 }
 function Warnings({ warnings }: { warnings: string[] }) {
   return (
@@ -171,14 +259,27 @@ function MissingRoute() {
 }
 
 export function RoutePage() {
+  const [aiPoints, setAiPoints] = useState({
+    origin: "",
+    destination: "",
+    revision: 0,
+  });
   const [params] = useSearchParams();
-  const { constraints, setConstraints, notify, location: userLocation } = useDemo();
-  const [origin, setOrigin] = useState(params.get("from") === "empty" ? "" : "rynek");
+  const {
+    constraints,
+    setConstraints,
+    notify,
+    location: userLocation,
+  } = useDemo();
+  const [origin, setOrigin] = useState(
+    params.get("from") === "empty" ? "" : "rynek",
+  );
   const [destination, setDestination] = useState(params.get("to") || "wawel");
   const [originName, setOriginName] = useState("Wybrany punkt");
-  const [originCoordinates, setOriginCoordinates] = useState<Coordinates | null>(
-    params.get("from") === "location" ? userLocation : null,
-  );
+  const [originCoordinates, setOriginCoordinates] =
+    useState<Coordinates | null>(
+      params.get("from") === "location" ? userLocation : null,
+    );
   const [destinationCoordinates, setDestinationCoordinates] =
     useState<Coordinates | null>(null);
   const [picking, setPicking] = useState<"origin" | "destination" | null>(null);
@@ -188,6 +289,15 @@ export function RoutePage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<TravelMode>("walk");
+  const [accessibleParking, setAccessibleParking] = useState(false);
+  const [departureAt, setDepartureAt] = useState("");
+  const [mobility, setMobility] = useState<MobilityPoint[]>([]);
+  const [vehicles, setVehicles] = useState<MobilityPoint[]>([]);
+  const [autoUpdateVehicles, setAutoUpdateVehicles] = useState(true);
+  const [mapWarnings, setMapWarnings] = useState<string[]>([]);
+  const [vehicleWarnings, setVehicleWarnings] = useState<string[]>([]);
+  const [mapSources, setMapSources] = useState<Source[]>([]);
   const request = useRef<AbortController | null>(null);
   const endpoints = useMemo(
     () => [
@@ -215,7 +325,64 @@ export function RoutePage() {
     originCoordinates,
     destinationCoordinates,
     constraints,
+    mode,
+    accessibleParking,
+    departureAt,
   ]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setMobility([]);
+    setMapWarnings([]);
+    setMapSources([]);
+    if (mode === "walk" || (mode === "car" && !accessibleParking)) return;
+    getMobilityMap(mode === "transit" ? "stops" : "parking", controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setMobility(result.items);
+          setMapWarnings(result.warnings);
+          setMapSources(result.attribution);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setMapWarnings([
+            "Nie udało się pobrać przystanków lub parkingów na mapę.",
+          ]);
+      });
+    return () => controller.abort();
+  }, [mode, accessibleParking]);
+
+  useEffect(() => {
+    if (mode !== "transit") {
+      setVehicles([]);
+      setVehicleWarnings([]);
+      return;
+    }
+    if (!autoUpdateVehicles) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      try {
+        const result = await getMobilityMap("vehicles", controller.signal);
+        if (!controller.signal.aborted) {
+          setVehicles(result.items);
+          setVehicleWarnings(result.warnings);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setVehicles([]);
+          setVehicleWarnings(["Pozycje pojazdów są chwilowo niedostępne."]);
+        }
+      }
+      if (!controller.signal.aborted) timer = setTimeout(refresh, 30000);
+    }
+    void refresh();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [mode, autoUpdateVehicles]);
 
   useEffect(() => {
     const target = params.get("to");
@@ -253,6 +420,15 @@ export function RoutePage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (
+      (!origin && !originCoordinates) ||
+      (!destination && !destinationCoordinates)
+    ) {
+      setError(
+        "Wybierz początek i cel trasy z wyników wyszukiwania lub na mapie.",
+      );
+      return;
+    }
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -266,6 +442,13 @@ export function RoutePage() {
         destinationCoordinates || destination,
         constraints,
         controller.signal,
+        {
+          mode,
+          accessible_parking: mode === "car" && accessibleParking,
+          ...(mode === "transit" && departureAt
+            ? { departure_at: new Date(departureAt).toISOString() }
+            : {}),
+        },
       );
       if (controller.signal.aborted) return;
       setWarnings(response.warnings);
@@ -276,11 +459,13 @@ export function RoutePage() {
       }
       const result = {
         route,
+        alternatives: response.routes,
         warnings: response.warnings,
         origin: points.find((point) => point.id === origin)?.name || originName,
         destination:
           points.find((point) => point.id === destination)?.name ||
           destinationName,
+        attribution: response.attribution,
       };
       setPlan(result);
       try {
@@ -304,10 +489,13 @@ export function RoutePage() {
 
   function chooseOnMap(which: "origin" | "destination") {
     setPicking(which);
-    mapContainer.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+    requestAnimationFrame(() =>
+      mapContainer.current?.querySelector<HTMLElement>(".map-canvas")?.focus(),
+    );
+  }
+  function finishPicking() {
+    setPicking(null);
+    document.getElementById(`pick-${picking}`)?.focus();
   }
   function selectMapPoint(point: Coordinates) {
     const name = `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`;
@@ -320,7 +508,7 @@ export function RoutePage() {
       setDestinationName(name);
       setDestinationCoordinates(point);
     }
-    setPicking(null);
+    finishPicking();
   }
 
   return (
@@ -333,7 +521,85 @@ export function RoutePage() {
       <div className="route-grid">
         <form className="panel route-form" onSubmit={submit}>
           <h2>Dokąd się wybierasz?</h2>
+          <fieldset className="route-modes">
+            <legend>Sposób podróży</legend>
+            {(
+              [
+                { mode: "walk", icon: Footprints },
+                { mode: "transit", icon: Bus },
+                { mode: "car", icon: Car },
+              ] as const
+            ).map(({ mode: value, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={mode === value}
+                aria-label={modeLabels[value]}
+                onClick={() => setMode(value)}
+              >
+                <Icon size={23} aria-hidden="true" />
+                <span>{modeLabels[value]}</span>
+              </button>
+            ))}
+          </fieldset>
+          {mode === "car" && (
+            <label className="check-field route-parking-choice">
+              <input
+                type="checkbox"
+                checked={accessibleParking}
+                onChange={(event) => setAccessibleParking(event.target.checked)}
+              />
+              Prowadź do miejsca parkingowego dla osób z niepełnosprawnościami
+            </label>
+          )}
+          {mode === "transit" && (
+            <>
+              <label className="field route-departure">
+                <span id="departure-label">Wyjazd</span>
+                <input
+                  aria-labelledby="departure-label"
+                  aria-describedby="departure-help"
+                  type="datetime-local"
+                  value={departureAt}
+                  onChange={(event) => setDepartureAt(event.target.value)}
+                />
+                <small id="departure-help">
+                  Puste pole oznacza wyjazd teraz.
+                </small>
+              </label>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={autoUpdateVehicles}
+                  onChange={(event) =>
+                    setAutoUpdateVehicles(event.target.checked)
+                  }
+                />
+                Automatycznie aktualizuj pozycje pojazdów (co 30 s)
+              </label>
+            </>
+          )}
+          <AISearch
+            mode="routes"
+            onApply={(proposal) => {
+              setAiPoints((current) => ({
+                origin: proposal.origin_query || "",
+                destination: proposal.destination_query || "",
+                revision: current.revision + 1,
+              }));
+              if (proposal.origin_query) {
+                setOrigin("");
+                setOriginCoordinates(null);
+              }
+              if (proposal.destination_query) {
+                setDestination("");
+                setDestinationCoordinates(null);
+              }
+            }}
+          />
           <PointSearch
+            key={`origin-${aiPoints.revision}`}
+            initialQuery={aiPoints.origin}
             label="Skąd"
             onSelect={(point) => {
               setOrigin(point.id);
@@ -342,13 +608,27 @@ export function RoutePage() {
             }}
           />
           <button
+            id="pick-origin"
             type="button"
             className="button subtle full"
+            aria-pressed={picking === "origin"}
             onClick={() => chooseOnMap("origin")}
           >
             Wskaż początek na mapie
           </button>
+          <p role="status" className="small">
+            Wybrany początek:{" "}
+            {points.find((point) => point.id === origin)?.name ||
+              (origin ? originName : "Nie wybrano")}
+          </p>
+          <p className="small route-selected-point">
+            Skąd:{" "}
+            {points.find((p) => p.id === origin)?.name ||
+              (origin || originCoordinates ? originName : "Wybierz punkt")}
+          </p>
           <PointSearch
+            key={`destination-${aiPoints.revision}`}
+            initialQuery={aiPoints.destination}
             label="Dokąd"
             onSelect={(point) => {
               setDestination(point.id);
@@ -357,86 +637,140 @@ export function RoutePage() {
             }}
           />
           <button
+            id="pick-destination"
             type="button"
             className="button subtle full"
+            aria-pressed={picking === "destination"}
             onClick={() => chooseOnMap("destination")}
           >
             Wskaż cel na mapie
           </button>
+          <p role="status" className="small">
+            Wybrany cel:{" "}
+            {points.find((point) => point.id === destination)?.name ||
+              (destination ? destinationName : "Nie wybrano")}
+          </p>
+          <p className="small route-selected-point">
+            Dokąd:{" "}
+            {points.find((p) => p.id === destination)?.name ||
+              (destination || destinationCoordinates
+                ? destinationName
+                : "Wybierz punkt")}
+          </p>
           {picking && (
             <p role="status" className="route-picking-status">
-              Kliknij na mapie {picking === "origin" ? "początek" : "cel"} trasy.{" "}
+              Wybierz {picking === "origin" ? "początek" : "cel"} trasy
+              kliknięciem na mapie lub przesuń mapę strzałkami i naciśnij Enter.{" "}
               <button
                 type="button"
                 className="button subtle"
-                onClick={() => setPicking(null)}
+                onClick={finishPicking}
               >
                 Anuluj wybór
               </button>
             </p>
           )}
-          <button className="button primary full route-submit" disabled={loading}>
+          <button
+            className="button primary full route-submit"
+            disabled={loading}
+          >
             {loading ? "Planowanie…" : "Pokaż trasę"}
             <ArrowRight size={18} />
           </button>
         </form>
-        <section className="panel route-needs">
-          <h2>Twoje potrzeby na trasie</h2>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={constraints.require_step_free_access === true}
-              onChange={(event) =>
+        {mode !== "car" && (
+          <section className="panel route-needs">
+            <h2>Twoje potrzeby na trasie</h2>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={constraints.require_step_free_access === true}
+                onChange={(event) =>
+                  setConstraints({
+                    ...constraints,
+                    require_step_free_access: event.target.checked
+                      ? true
+                      : null,
+                    max_steps: event.target.checked ? 0 : null,
+                  })
+                }
+              />
+              Unikaj schodów
+            </label>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={constraints.allowed_surfaces !== null}
+                onChange={(event) =>
+                  setConstraints({
+                    ...constraints,
+                    allowed_surfaces: event.target.checked
+                      ? ["paved", "asphalt"]
+                      : null,
+                  })
+                }
+              />
+              Utwardzona nawierzchnia
+            </label>
+            <Numeric
+              label="Maks. nachylenie (%)"
+              value={constraints.max_slope_percent}
+              onChange={(value) =>
+                setConstraints({ ...constraints, max_slope_percent: value })
+              }
+            />
+            <Numeric
+              label="Odpoczynek co (m)"
+              min={1}
+              value={constraints.max_distance_without_rest_m}
+              onChange={(value) =>
                 setConstraints({
                   ...constraints,
-                  require_step_free_access: event.target.checked ? true : null,
-                  max_steps: event.target.checked ? 0 : null,
+                  max_distance_without_rest_m: value,
                 })
               }
             />
-            Unikaj schodów
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={constraints.allowed_surfaces !== null}
-              onChange={(event) =>
-                setConstraints({
-                  ...constraints,
-                  allowed_surfaces: event.target.checked
-                    ? ["paved", "asphalt"]
-                    : null,
-                })
-              }
-            />
-            Utwardzona nawierzchnia
-          </label>
-          <Numeric
-            label="Maks. nachylenie (%)"
-            value={constraints.max_slope_percent}
-            onChange={(value) =>
-              setConstraints({ ...constraints, max_slope_percent: value })
-            }
-          />
-          <Numeric
-            label="Odpoczynek co (m)"
-            min={1}
-            value={constraints.max_distance_without_rest_m}
-            onChange={(value) =>
-              setConstraints({
-                ...constraints,
-                max_distance_without_rest_m: value,
-              })
-            }
-          />
-        </section>
+          </section>
+        )}
         <div className="route-map" ref={mapContainer}>
           <MapView
             places={noPlaces}
             route={plan?.route.geometry}
+            segments={plan?.route.segments}
+            mobility={[
+              ...mobility,
+              ...vehicles,
+              ...(plan?.route.parking &&
+              !mobility.some((p) => p.id === plan.route.parking?.id)
+                ? [plan.route.parking]
+                : []),
+            ]}
             endpoints={endpoints}
             onSelectPoint={picking ? selectMapPoint : undefined}
+            onCancelSelection={finishPicking}
           />
+          {mode === "transit" && (
+            <p className="small route-map-legend">
+              ● Przystanki · 🚌 Bieżące pozycje pojazdów · Zielona trasa:
+              komunikacja · Niebieska: dojście piesze
+            </p>
+          )}
+          {mode === "car" && accessibleParking && (
+            <p className="small route-map-legend">
+              P ♿ Miejskie miejsca postojowe OZN — bez informacji o zajętości.
+            </p>
+          )}
+          <Warnings warnings={[...mapWarnings, ...vehicleWarnings]} />
+          <p className="small route-sources">
+            {mapSources.map(
+              (s) =>
+                s.url && (
+                  <a key={s.url} href={s.url} target="_blank" rel="noreferrer">
+                    {s.label}
+                  </a>
+                ),
+            )}
+          </p>
         </div>
         {loading || plan || error ? (
           <aside
@@ -448,14 +782,103 @@ export function RoutePage() {
               <p>Obliczamy trasę z uwzględnieniem Twoich potrzeb…</p>
             ) : plan ? (
               <>
+                {plan.route.mode !== "car" && plan.route.mode !== "transit" && (
+                  <div aria-label="Warianty trasy pieszej">
+                    {[...(plan.alternatives || [])]
+                      .sort(
+                        (a, b) =>
+                          Number(b.variant === "fastest") -
+                          Number(a.variant === "fastest"),
+                      )
+                      .map((route) => (
+                        <div key={route.id}>
+                          <button
+                            type="button"
+                            className="button subtle full"
+                            aria-pressed={plan.route.id === route.id}
+                            onClick={() => {
+                              const selected = { ...plan, route };
+                              setPlan(selected);
+                              try {
+                                sessionStorage.setItem(
+                                  storageKey,
+                                  JSON.stringify(selected),
+                                );
+                              } catch {
+                                notify(
+                                  "Nie udało się zachować wybranej trasy po odświeżeniu.",
+                                );
+                              }
+                            }}
+                          >
+                            {route.variant === "fastest"
+                              ? "Najszybsza trasa"
+                              : "Trasa z uwzględnieniem ograniczeń"}
+                            {" · "}
+                            {durationLabel(route.estimated_duration_s)}
+                            {" · "}
+                            {distanceLabel(route.distance_m)}
+                          </button>
+                          <p>{route.assessment.summary}</p>
+                          {route.assessment.reasons.map((reason, index) => (
+                            <p className="warning-box" key={index}>
+                              {reason.message}
+                            </p>
+                          ))}
+                          {route.segments
+                            .flatMap((segment) => [
+                              ...segment.barriers,
+                              ...(segment.temporary_difficulties || []),
+                            ])
+                            .map((difficulty, index) => (
+                              <p className="warning-box" key={index}>
+                                {difficulty.description}
+                              </p>
+                            ))}
+                        </div>
+                      ))}
+                    {plan.alternatives?.some(
+                      (route) => route.variant === "fastest",
+                    ) &&
+                      !plan.alternatives.some(
+                        (route) => route.variant === "constrained",
+                      ) && (
+                        <p className="warning-box">
+                          Nie znaleziono trasy uwzględniającej wybrane
+                          ograniczenia.
+                        </p>
+                      )}
+                    {plan.alternatives?.length === 2 &&
+                      JSON.stringify(plan.alternatives[0].geometry) ===
+                        JSON.stringify(plan.alternatives[1].geometry) && (
+                        <p>Oba warianty prowadzą tą samą drogą.</p>
+                      )}
+                  </div>
+                )}
                 <p className="eyebrow">ZAPLANOWANA TRASA</p>
                 <h2>{durationLabel(plan.route.estimated_duration_s)}</h2>
                 <p>
                   {distanceLabel(plan.route.distance_m)} · {plan.origin} →{" "}
                   {plan.destination}
                 </p>
+                <p>
+                  {modeLabels[plan.route.mode || "walk"]}
+                  {plan.route.parking &&
+                    ` · Parking: ${plan.route.parking.name}`}
+                </p>
+                {plan.route.segments
+                  .filter((s) => s.mode === "transit")
+                  .map((s) => (
+                    <div key={s.id}>
+                      <strong>
+                        Linia {s.line}: {s.from_stop} → {s.to_stop}
+                      </strong>
+                      <TransitTime segment={s} />
+                    </div>
+                  ))}
                 <Status assessment={plan.route.assessment} />
                 <Warnings warnings={plan.warnings} />
+                <RouteSources plan={plan} />
                 <Link
                   className="button subtle full"
                   to={`/route/${encodeURIComponent(plan.route.id)}/details`}
@@ -501,7 +924,13 @@ export function RouteDetails() {
         description={`${plan.origin} → ${plan.destination} · ${distanceLabel(plan.route.distance_m)} · ${durationLabel(plan.route.estimated_duration_s)}`}
       />
       <Warnings warnings={plan.warnings} />
-      <MapView places={noPlaces} route={plan.route.geometry} />
+      <RouteSources plan={plan} />
+      <MapView
+        places={noPlaces}
+        route={plan.route.geometry}
+        segments={plan.route.segments}
+        mobility={routeMarkers(plan.route)}
+      />
       {plan.route.segments.length === 0 && (
         <p>Jesteś już w punkcie docelowym. Trasa nie zawiera odcinków.</p>
       )}
@@ -510,6 +939,7 @@ export function RouteDetails() {
           <span className="step-number">{index + 1}</span>
           <div>
             <h2>{segment.instruction}</h2>
+            <TransitTime segment={segment} />
             <p>{distanceLabel(segment.distance_m)}</p>
             <Status assessment={segment.assessment} />
             {segment.facts.map((fact) => (
@@ -590,7 +1020,9 @@ export function Navigation() {
               ? `Podgląd kroku ${step + 1} z ${segments.length}`
               : "Cel osiągnięty"}
           </p>
-          <h1>{current?.instruction || "Jesteś w punkcie docelowym."}</h1>
+          <h1 aria-live="polite" aria-atomic="true">
+            {current?.instruction || "Jesteś w punkcie docelowym."}
+          </h1>
         </div>
         <button
           className="icon-button"
@@ -608,10 +1040,16 @@ export function Navigation() {
           <Plus />
         </button>
       </div>
-      <MapView places={noPlaces} route={plan.route.geometry} />
+      <TransitTime segment={current} />
+      <MapView
+        places={noPlaces}
+        route={plan.route.geometry}
+        segments={plan.route.segments}
+        mobility={routeMarkers(plan.route)}
+      />
       <p className="warning-box">
         Podgląd zaplanowanej trasy — bez śledzenia pozycji. Sprawdź warunki w
-        terenie przed przejściem.
+        terenie przed podróżą.
       </p>
       <Warnings warnings={plan.warnings} />
       {(current?.temporary_difficulties || []).map((difficulty) => (

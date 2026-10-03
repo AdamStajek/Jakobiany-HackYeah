@@ -207,7 +207,10 @@ export function Profile() {
                 {report.review_comment && (
                   <p>Komentarz moderatora: {report.review_comment}</p>
                 )}
-                <EvidencePhotos ids={report.photo_ids} />
+                <EvidencePhotos
+                  ids={report.photo_ids}
+                  description={report.description}
+                />
               </div>
             ))
           ) : (

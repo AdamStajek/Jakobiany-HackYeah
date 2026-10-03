@@ -12,6 +12,8 @@ import {
   type Mission,
   type MissionProgress,
 } from "../data/api";
+import { MetricInput } from "../components/MetricInput";
+import type { Fact } from "../data/types";
 import { labels } from "../data/mock";
 
 export const missionStatus = {
@@ -22,12 +24,16 @@ export const missionStatus = {
 };
 export function MissionsPage() {
   const { activity, session, refreshActivity } = useDemo();
+  const [offset, setOffset] = useState(0);
+  const [more, setMore] = useState(true);
   const [tab, setTab] = useState("available");
   const [missions, setMissions] = useState<Mission[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
+    setOffset(0);
+    setMore(true);
     getMissions()
       .then((items) => {
         if (active) setMissions(items);
@@ -58,8 +64,20 @@ export function MissionsPage() {
   }, [session?.user.id]);
   const shown = missions.filter(
     (mission) =>
-      tab === "available" ||
-      activity.items.some((item) => item.mission_id === mission.id),
+      (tab === "available" &&
+        mission.available &&
+        !activity.items.some(
+          (item) =>
+            item.mission_id === mission.id &&
+            ["pending", "accepted"].includes(item.status),
+        )) ||
+      (tab === "completed" &&
+        activity.items.some(
+          (item) =>
+            item.mission_id === mission.id && item.status === "accepted",
+        )) ||
+      (tab === "progress" &&
+        activity.items.some((item) => item.mission_id === mission.id)),
   );
   return (
     <div className="page narrow">
@@ -74,20 +92,29 @@ export function MissionsPage() {
           <h2>Małe zadania. Wielka różnica.</h2>
           <p>Sprawdź informacje w okolicy i pomóż uzupełnić mapę.</p>
         </div>
-        <span>{activity.points} pkt</span>
+        <span>Saldo: {activity.points} pkt</span>
       </div>
-      <div className="tabs">
+      <div className="tabs" role="group" aria-label="Wybierz widok misji">
         <button
           className={tab === "available" ? "active" : ""}
+          aria-pressed={tab === "available"}
           onClick={() => setTab("available")}
         >
           Dostępne misje
         </button>
         <button
           className={tab === "progress" ? "active" : ""}
+          aria-pressed={tab === "progress"}
           onClick={() => setTab("progress")}
         >
           Moje postępy
+        </button>
+        <button
+          className={tab === "completed" ? "active" : ""}
+          aria-pressed={tab === "completed"}
+          onClick={() => setTab("completed")}
+        >
+          Wykonane misje
         </button>
       </div>
       {error && (
@@ -111,6 +138,16 @@ export function MissionsPage() {
             </span>
             <div>
               <h2>{mission.title}</h2>
+              <p>
+                {labels[mission.attribute] || mission.attribute} ·{" "}
+                {
+                  {
+                    1: "Zgłoszone do weryfikacji",
+                    2: "Brakujące dane",
+                    3: "Niepewne dane",
+                  }[mission.priority]
+                }
+              </p>
               <p className="muted">
                 Około {mission.time_minutes} minut ·{" "}
                 {progress ? missionStatus[progress.status] : "Dostępna"}
@@ -125,6 +162,32 @@ export function MissionsPage() {
           </Link>
         );
       })}
+      {tab === "available" && more && (
+        <button
+          className="button subtle"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const items = await getMissions(undefined, offset + 100);
+              const fresh = items.filter(
+                (item) => !missions.some((old) => old.id === item.id),
+              );
+              setMore(fresh.length > 0);
+              setOffset(offset + 100);
+              setMissions((old) =>
+                [...old, ...fresh].sort((a, b) => a.priority - b.priority),
+              );
+            } catch {
+              setError("Nie udało się pobrać kolejnych misji.");
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          Wczytaj kolejne miejsca
+        </button>
+      )}
       {!loading && !shown.length && (
         <div className="empty-state">
           <Flag />
@@ -137,8 +200,8 @@ export function MissionsPage() {
         </div>
       )}
       <p className="muted">
-        Punkty są przyznawane po akceptacji odpowiedzi przez moderatora. Postępy
-        i nagrody są zapisywane na Twoim koncie.
+        Punkty są przyznawane po akceptacji odpowiedzi przez model lub
+        moderatora. Postępy i nagrody są zapisywane na Twoim koncie.
       </p>
       {!session && (
         <Link className="button primary" to="/login?next=%2Fmissions">
@@ -155,6 +218,8 @@ export function MissionPage() {
   const [mission, setMission] = useState<Mission | null>(null);
   const [current, setCurrent] = useState<MissionProgress | null>(null);
   const [answer, setAnswer] = useState("");
+  const [metricValue, setMetricValue] = useState<Fact["value"]>(null);
+  useEffect(() => setMetricValue(null), [id]);
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -216,12 +281,23 @@ export function MissionPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!mission || busy) return;
+    if (!photo) {
+      setError("Dodaj zdjęcie, aby zweryfikować misję.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       setCurrent(
         await withPhoto(photo, (ids) =>
-          submitMission(mission.id, answer.trim(), ids),
+          submitMission(
+            mission.id,
+            answer.trim(),
+            ids,
+            metricValue === null
+              ? []
+              : [{ attribute: mission.attribute, value: metricValue }],
+          ),
         ),
       );
       setPhoto(null);
@@ -260,10 +336,7 @@ export function MissionPage() {
       )}
       {mission && (
         <div className="panel">
-          <p>
-            Sprawdź wskazane miejsce i opisz zaobserwowane warunki. Nie zakładaj
-            dostępności, jeśli nie możesz jej potwierdzić.
-          </p>
+          <p>{mission.description}</p>
           <p>
             <strong>
               Do sprawdzenia: {labels[mission.attribute] || mission.attribute}
@@ -290,12 +363,18 @@ export function MissionPage() {
             <>
               <p
                 className={`status ${current.status === "accepted" ? "good" : "warning"}`}
+                role="status"
               >
                 {missionStatus[current.status]} · {current.awarded_points}{" "}
                 naliczonych punktów
               </p>
+              {current.answer && <p>Twoja odpowiedź: {current.answer}</p>}
+              <p className="muted">
+                Aktualizacja:{" "}
+                {new Date(current.updated_at).toLocaleString("pl-PL")}
+              </p>
               {current.review_comment && (
-                <p>Komentarz moderatora: {current.review_comment}</p>
+                <p>Wynik weryfikacji: {current.review_comment}</p>
               )}
               {current.status === "pending" && (
                 <p>
@@ -308,21 +387,34 @@ export function MissionPage() {
                 <form onSubmit={submit}>
                   <fieldset disabled={busy} className="form-fields">
                     <label className="field">
-                      Co udało Ci się sprawdzić?
+                      <span id="mission-answer-label">
+                        Co udało Ci się sprawdzić?
+                      </span>
                       <textarea
+                        aria-labelledby="mission-answer-label"
                         required
                         minLength={10}
+                        aria-describedby="mission-answer-help"
                         maxLength={4000}
                         rows={4}
                         value={answer}
                         onChange={(event) => setAnswer(event.target.value)}
                       />
+                      <small id="mission-answer-help">
+                        Wpisz co najmniej 10 znaków.
+                      </small>
                     </label>
+                    <MetricInput
+                      attribute={mission.attribute}
+                      value={metricValue}
+                      onChange={setMetricValue}
+                    />
                     <label className="field">
-                      Zdjęcie (opcjonalnie)
+                      Zdjęcie (wymagane)
                       <input
                         type="file"
-                        aria-label="Zdjęcie (opcjonalnie)"
+                        required
+                        aria-label="Zdjęcie (wymagane)"
                         aria-describedby="mission-photo-help"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={(event) =>
@@ -330,7 +422,8 @@ export function MissionPage() {
                         }
                       />
                       <small id="mission-photo-help">
-                        JPEG, PNG lub WebP, do 10 MiB.
+                        JPEG, PNG lub WebP, do 10 MiB. Model sprawdzi na zdjęciu
+                        cechę wskazaną w misji.
                       </small>
                     </label>
                     <button className="button primary" disabled={busy}>

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { PageHeading, FactRow } from "../components/Common";
+import { MetricInput } from "../components/MetricInput";
 import { labels } from "../data/mock";
 import {
   createReport,
@@ -63,7 +64,9 @@ export function ReportHub() {
             <ClipboardCheck />
           </span>
           <h2>Poproś o weryfikację</h2>
-          <p>Wskaż miejsce i informację o dostępności, której pewność jest niska.</p>
+          <p>
+            Wskaż miejsce i informację o dostępności, której pewność jest niska.
+          </p>
           <span className="button subtle">
             Wybierz informację <ArrowRight size={18} />
           </span>
@@ -110,7 +113,11 @@ export function VerificationRequestForm() {
         })
         .catch((reason: unknown) => {
           if (active)
-            setLoadError(reason instanceof Error ? reason.message : "Nie udało się pobrać miejsc.");
+            setLoadError(
+              reason instanceof Error
+                ? reason.message
+                : "Nie udało się pobrać miejsc.",
+            );
         });
     }, 250);
     return () => {
@@ -132,7 +139,11 @@ export function VerificationRequestForm() {
         })
         .catch((reason: unknown) => {
           if (active)
-            setLoadError(reason instanceof Error ? reason.message : "Nie udało się pobrać miejsca.");
+            setLoadError(
+              reason instanceof Error
+                ? reason.message
+                : "Nie udało się pobrać miejsca.",
+            );
         });
     return () => {
       active = false;
@@ -141,9 +152,10 @@ export function VerificationRequestForm() {
 
   const available = place?.facts.filter(needsVerification) || [];
   const selectedFacts = available.filter((item) => factIds.includes(item.id));
-  const placeOptions = place && !options.some((item) => item.id === place.id)
-    ? [place, ...options]
-    : options;
+  const placeOptions =
+    place && !options.some((item) => item.id === place.id)
+      ? [place, ...options]
+      : options;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -152,10 +164,16 @@ export function VerificationRequestForm() {
     setError("");
     try {
       const missions = await requestVerificationMission(place.id, factIds);
-      const missionParams = missions.map((mission) => `mission=${encodeURIComponent(mission.id)}`).join("&");
+      const missionParams = missions
+        .map((mission) => `mission=${encodeURIComponent(mission.id)}`)
+        .join("&");
       navigate(`/report/success?${missionParams}`, { state: { missions } });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Nie udało się utworzyć misji.");
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Nie udało się utworzyć misji.",
+      );
     } finally {
       setBusy(false);
     }
@@ -164,34 +182,108 @@ export function VerificationRequestForm() {
   if (!session)
     return (
       <div className="page narrow">
-        <PageHeading title="Poproś o weryfikację" description="Zaloguj się, aby utworzyć misję sprawdzenia informacji." />
-        <Link className="button primary" to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`}>Zaloguj się</Link>
+        <PageHeading
+          title="Poproś o weryfikację"
+          description="Zaloguj się, aby utworzyć misję sprawdzenia informacji."
+        />
+        <Link
+          className="button primary"
+          to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`}
+        >
+          Zaloguj się
+        </Link>
       </div>
     );
 
   return (
     <div className="page narrow">
-      <Link to="/report" className="back-link"><ChevronLeft size={18} />Wróć do zgłoszeń</Link>
-      <PageHeading title="Poproś o weryfikację" description="Wybierz miejsce i informację o niskiej pewności. Wysłanie prośby utworzy misję dla społeczności." />
+      <Link to="/report" className="back-link">
+        <ChevronLeft size={18} />
+        Wróć do zgłoszeń
+      </Link>
+      <PageHeading
+        title="Poproś o weryfikację"
+        description="Wybierz miejsce i informację o niskiej pewności. Wysłanie prośby utworzy misję dla społeczności."
+      />
       <form className="panel form-panel" onSubmit={submit}>
         <fieldset disabled={busy} className="form-fields">
-          <label className="field">Szukaj miejsca<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Wpisz nazwę miejsca" /></label>
-          <label className="field">Miejsce<select value={placeId} onChange={(event) => setPlaceId(event.target.value)} required>
-            <option value="" disabled>Wybierz miejsce</option>
-            {placeOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select></label>
-          {loadError && <p className="warning-box" role="alert">{loadError}</p>}
-          {place && available.length === 0 && <p className="empty-state">To miejsce nie ma informacji oznaczonych jako niepotwierdzone ani z pewnością do 60%.</p>}
-          {available.length > 0 && <fieldset>
-            <legend>Problemy lub parametry do sprawdzenia (możesz wybrać kilka)</legend>
-            {available.map((item) => <label className="check-field" key={item.id}>
-              <input type="checkbox" checked={factIds.includes(item.id)} onChange={(event) => setFactIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />
-              {labels[item.attribute] || item.attribute}{item.confidence_percent !== null ? ` · pewność ${item.confidence_percent}%` : " · niepotwierdzona"}
-            </label>)}
-          </fieldset>}
-          {selectedFacts.map((item) => <FactRow key={item.id} fact={item} />)}
-          {error && <p className="warning-box" role="alert">{error}</p>}
-          <button className="button primary full" disabled={busy || !selectedFacts.length}>{busy ? "Tworzenie misji…" : "Utwórz misję weryfikacji"}<ArrowRight size={18} /></button>
+          <label className="field">
+            Szukaj miejsca
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Wpisz nazwę miejsca"
+            />
+          </label>
+          <label className="field">
+            Miejsce
+            <select
+              value={placeId}
+              onChange={(event) => setPlaceId(event.target.value)}
+              required
+            >
+              <option value="" disabled>
+                Wybierz miejsce
+              </option>
+              {placeOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {loadError && (
+            <p className="warning-box" role="alert">
+              {loadError}
+            </p>
+          )}
+          {place && available.length === 0 && (
+            <p className="empty-state">
+              To miejsce nie ma informacji oznaczonych jako niepotwierdzone ani
+              z pewnością do 60%.
+            </p>
+          )}
+          {available.length > 0 && (
+            <fieldset>
+              <legend>
+                Problemy lub parametry do sprawdzenia (możesz wybrać kilka)
+              </legend>
+              {available.map((item) => (
+                <label className="check-field" key={item.id}>
+                  <input
+                    type="checkbox"
+                    checked={factIds.includes(item.id)}
+                    onChange={(event) =>
+                      setFactIds((current) =>
+                        event.target.checked
+                          ? [...current, item.id]
+                          : current.filter((id) => id !== item.id),
+                      )
+                    }
+                  />
+                  {labels[item.attribute] || item.attribute}
+                  {item.confidence_percent !== null
+                    ? ` · pewność ${item.confidence_percent}%`
+                    : " · niepotwierdzona"}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {selectedFacts.map((item) => (
+            <FactRow key={item.id} fact={item} />
+          ))}
+          {error && (
+            <p className="warning-box" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            className="button primary full"
+            disabled={busy || !selectedFacts.length}
+          >
+            {busy ? "Tworzenie misji…" : "Utwórz misję weryfikacji"}
+            <ArrowRight size={18} />
+          </button>
         </fieldset>
       </form>
     </div>
@@ -210,6 +302,8 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
   const [attribute, setAttribute] = useState("accessible_toilet");
   const [answer, setAnswer] = useState("");
   const [description, setDescription] = useState("");
+  const [metricValue, setMetricValue] = useState<Fact["value"]>(null);
+  useEffect(() => setMetricValue(null), [placeId, attribute]);
   const [photo, setPhoto] = useState<File | null>(null);
   const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
@@ -276,14 +370,22 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
     const fact = place.facts.find((item) => item.attribute === attribute);
     if (!fact) {
       setError("Wybierz informację, której dotyczy zgłoszenie.");
+      document.getElementById("report-attribute")?.focus();
       return;
     }
-    if (confirm && !answer) {
+    if (photo && !description.trim()) {
+      setError("Opisz, co przedstawia dołączone zdjęcie.");
+      document.getElementById("report-description")?.focus();
+      return;
+    }
+    if (confirm && !answer && metricValue === null) {
       setError("Wybierz odpowiedź.");
+      document.querySelector<HTMLInputElement>('input[name="answer"]')?.focus();
       return;
     }
-    if (!confirm && !description.trim() && !photo) {
+    if (!confirm && !description.trim() && !photo && metricValue === null) {
       setError("Dodaj opis lub zdjęcie.");
+      document.getElementById("report-description")?.focus();
       return;
     }
     setError("");
@@ -305,9 +407,11 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
               ? `${labels[fact.attribute] || fact.attribute}: ${answer === "yes" ? "potwierdzam" : answer === "no" ? "nie potwierdzam" : "nie wiem"}`
               : "Zdjęcie zaobserwowanego problemu"),
           observations:
-            confirm && answer === "yes" && fact.value !== null
-              ? [{ attribute: fact.attribute, value: fact.value }]
-              : [],
+            metricValue !== null
+              ? [{ attribute: fact.attribute, value: metricValue }]
+              : confirm && answer === "yes" && fact.value !== null
+                ? [{ attribute: fact.attribute, value: fact.value }]
+                : [],
           observed_at: new Date(`${date}T00:00:00`).toISOString(),
           photo_ids,
         }),
@@ -391,10 +495,21 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
           <label className="field">
             Informacja, której dotyczy zgłoszenie
             <select
+              id="report-attribute"
+              aria-invalid={
+                error === "Wybierz informację, której dotyczy zgłoszenie." ||
+                undefined
+              }
+              aria-describedby={
+                error === "Wybierz informację, której dotyczy zgłoszenie."
+                  ? "report-error"
+                  : undefined
+              }
               value={attribute}
               disabled={!place}
               onChange={(event) => {
                 setAttribute(event.target.value);
+                setMetricValue(null);
                 setAnswer("");
               }}
             >
@@ -406,6 +521,13 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
             </select>
           </label>
           {fact && <FactRow fact={fact} />}
+          {fact && (
+            <MetricInput
+              attribute={fact.attribute}
+              value={metricValue}
+              onChange={setMetricValue}
+            />
+          )}
           {confirm && (
             <fieldset>
               <legend>Czy podana informacja nadal jest aktualna?</legend>
@@ -418,6 +540,12 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
                   <input
                     type="radio"
                     name="answer"
+                    aria-invalid={error === "Wybierz odpowiedź." || undefined}
+                    aria-describedby={
+                      error === "Wybierz odpowiedź."
+                        ? "report-error"
+                        : undefined
+                    }
                     value={item.id}
                     checked={answer === item.id}
                     onChange={() => setAnswer(item.id)}
@@ -428,14 +556,40 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
             </fieldset>
           )}
           <label className="field">
-            {confirm ? "Dodatkowy komentarz (opcjonalnie)" : "Opisz problem"}
+            <span id="report-description-label">
+              {confirm ? "Dodatkowy komentarz (opcjonalnie)" : "Opisz problem"}
+            </span>
             <textarea
+              id="report-description"
+              aria-labelledby="report-description-label"
+              aria-invalid={
+                [
+                  "Dodaj opis lub zdjęcie.",
+                  "Opisz, co przedstawia dołączone zdjęcie.",
+                ].includes(error) || undefined
+              }
+              aria-describedby={
+                [
+                  "Dodaj opis lub zdjęcie.",
+                  "Opisz, co przedstawia dołączone zdjęcie.",
+                ].includes(error)
+                  ? "report-description-help report-error"
+                  : "report-description-help"
+              }
+              required={Boolean(photo)}
               rows={4}
               maxLength={4000}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Np. podjazd jest obecnie zamknięty z powodu remontu."
             />
+            <small id="report-description-help">
+              {photo
+                ? "Opis jest wymagany: wyjaśnij, co przedstawia zdjęcie."
+                : confirm
+                  ? "Komentarz jest opcjonalny."
+                  : "Dodaj opis, zdjęcie z opisem lub wartość metryki."}
+            </small>
           </label>
           <label className="field upload-field">
             Zdjęcie (opcjonalnie)
@@ -462,7 +616,7 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
             />
           </label>
           {error && (
-            <p className="warning-box" role="alert">
+            <p id="report-error" className="warning-box" role="alert">
               {error}
             </p>
           )}
@@ -485,7 +639,10 @@ export function ReportSuccess() {
   const [report, setReport] = useState<Report | null>(
     location.state?.report || null,
   );
-  const [missions, setMissions] = useState<Mission[]>(location.state?.missions || (location.state?.mission ? [location.state.mission] : []));
+  const [missions, setMissions] = useState<Mission[]>(
+    location.state?.missions ||
+      (location.state?.mission ? [location.state.mission] : []),
+  );
   const [error, setError] = useState("");
   const id = params.get("id");
   const missionIds = params.getAll("mission");
@@ -495,11 +652,16 @@ export function ReportSuccess() {
     if (missionIds.length)
       Promise.all(missionIds.map((missionId) => getMission(missionId)))
         .then((items) => {
-          if (active) setMissions((current) => current.length ? current : items);
+          if (active)
+            setMissions((current) => (current.length ? current : items));
         })
         .catch((reason: unknown) => {
           if (active)
-            setError(reason instanceof Error ? reason.message : "Nie udało się pobrać utworzonych misji.");
+            setError(
+              reason instanceof Error
+                ? reason.message
+                : "Nie udało się pobrać utworzonych misji.",
+            );
         });
     if (id)
       getReport(id)
@@ -522,12 +684,24 @@ export function ReportSuccess() {
     return (
       <div className="page narrow">
         <div className="panel success-state">
-          <span className="success-icon"><Check size={36} /></span>
+          <span className="success-icon">
+            <Check size={36} />
+          </span>
           <h1>Misja weryfikacji została utworzona</h1>
           <p>Inni użytkownicy mogą teraz sprawdzić wskazane informacje.</p>
           <div className="actions">
-            {missions.map((mission) => <Link className="button primary" key={mission.id} to={`/missions/${encodeURIComponent(mission.id)}`}>Zobacz misję: {mission.place_name}</Link>)}
-            <Link className="button subtle" to="/missions">Wszystkie misje</Link>
+            {missions.map((mission) => (
+              <Link
+                className="button primary"
+                key={mission.id}
+                to={`/missions/${encodeURIComponent(mission.id)}`}
+              >
+                Zobacz misję: {mission.place_name}
+              </Link>
+            ))}
+            <Link className="button subtle" to="/missions">
+              Wszystkie misje
+            </Link>
           </div>
         </div>
       </div>

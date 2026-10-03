@@ -55,7 +55,7 @@ export function Auth({ register = false }: { register?: boolean }) {
                 <input
                   required
                   maxLength={100}
-                  autoComplete="nickname"
+                  autoComplete="given-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                 />

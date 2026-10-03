@@ -69,7 +69,28 @@ export type RouteGeometry = {
   type: "LineString";
   coordinates: [number, number][];
 };
+export type TravelMode = "walk" | "transit" | "car";
+export type MobilityPoint = {
+  id: string;
+  name: string;
+  location: { lat: number; lon: number };
+  kind: "stop" | "parking" | "vehicle";
+  line: string | null;
+  updated_at: string | null;
+};
+export type MobilityMap = {
+  items: MobilityPoint[];
+  warnings: string[];
+  attribution: Source[];
+};
+export function getMobilityMap(
+  kind: "stops" | "parking" | "vehicles",
+  signal?: AbortSignal,
+): Promise<MobilityMap> {
+  return api(`/routes/mobility?kind=${kind}`, { signal });
+}
 export type PlannedRoute = {
+  variant?: "fastest" | "constrained" | null;
   id: string;
   distance_m: number;
   estimated_duration_s: number | null;
@@ -77,6 +98,8 @@ export type PlannedRoute = {
   geometry: RouteGeometry;
   computed_at: string;
   facts: Fact[];
+  mode?: TravelMode;
+  parking?: MobilityPoint | null;
   segments: {
     id: string;
     distance_m: number;
@@ -84,6 +107,13 @@ export type PlannedRoute = {
     geometry: RouteGeometry;
     assessment: Assessment;
     facts: Fact[];
+    mode?: TravelMode;
+    line?: string | null;
+    departure_at?: string | null;
+    arrival_at?: string | null;
+    delay_s?: number | null;
+    from_stop?: string | null;
+    to_stop?: string | null;
     barriers: { id: string; description: string }[];
     rest_points: { id: string; description: string }[];
     temporary_difficulties: { id: string; description: string }[];
@@ -96,6 +126,25 @@ export type RoutePlan = {
 };
 
 export type RouteEndpoint = string | { lat: number; lon: number };
+export type SearchProposal = {
+  query?: string;
+  origin_query?: string | null;
+  destination_query?: string | null;
+  constraints: Constraints;
+  summary: string;
+  questions: string[];
+};
+export function interpretSearch(
+  mode: "places" | "routes",
+  description: string,
+  constraints: Constraints,
+): Promise<SearchProposal> {
+  return api(`/${mode}/interpret`, {
+    method: "POST",
+    body: JSON.stringify({ description, constraints }),
+  });
+}
+
 export function searchRoutePoints(
   query: string,
   signal?: AbortSignal,
@@ -108,6 +157,11 @@ export function planRoute(
   destination: RouteEndpoint,
   constraints: Constraints,
   signal?: AbortSignal,
+  options?: {
+    mode: TravelMode;
+    accessible_parking: boolean;
+    departure_at?: string;
+  },
 ): Promise<RoutePlan> {
   return api("/routes/plan", {
     method: "POST",
@@ -118,6 +172,7 @@ export function planRoute(
           ? { place_id: destination }
           : destination,
       constraints,
+      ...options,
     }),
     signal,
   });
@@ -285,6 +340,10 @@ export const reviewReport = (
   });
 
 export type Mission = {
+  priority: 1 | 2 | 3;
+  description: string;
+  location: { lat: number; lon: number } | null;
+  available: boolean;
   id: string;
   place_id: string;
   place_name: string;
@@ -307,10 +366,18 @@ export type MissionProgress = {
   updated_at: string;
 };
 export type MissionActivity = { items: MissionProgress[]; points: number };
-export const getMissions = () => api<Mission[]>("/missions");
+export const getMissions = (near?: { lat: number; lon: number }, offset = 0) =>
+  api<Mission[]>(
+    near
+      ? `/missions?lat=${near.lat}&lon=${near.lon}`
+      : `/missions?offset=${offset}`,
+  );
 export const getMission = (id: string) =>
   api<Mission>(`/missions/${encodeURIComponent(id)}`);
-export const requestVerificationMission = (place_id: string, fact_ids: string[]) =>
+export const requestVerificationMission = (
+  place_id: string,
+  fact_ids: string[],
+) =>
   api<Mission[]>("/missions/verification-requests", {
     method: "POST",
     body: JSON.stringify({ place_id, fact_ids }),
@@ -325,10 +392,11 @@ export const submitMission = (
   id: string,
   description: string,
   photo_ids: string[],
+  observations: Report["observations"] = [],
 ) =>
   api<MissionProgress>(`/missions/${encodeURIComponent(id)}/submit`, {
     method: "POST",
-    body: JSON.stringify({ description, photo_ids }),
+    body: JSON.stringify({ description, photo_ids, observations }),
   });
 export const reviewMission = (
   id: string,

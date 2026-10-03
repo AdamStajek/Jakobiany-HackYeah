@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from hackyeah import models as m
+from hackyeah.confidence import get as get_confidence
 from hackyeah.database import database_path
 from hackyeah.place_enrichment import accessibility_facts, enrichment
 
@@ -144,15 +145,24 @@ def _facts(
                 (row["id"], item["attribute"]),
             )
         ]
+        raw_value = (
+            json.loads(item["value_json"])
+            if item["value_json"] is not None
+            else None
+        )
+        score, confidence_level, calculated_at = get_confidence(
+            db, "place", row["id"], item["attribute"], raw_value
+        )
         try:
             fact = m.Fact(
                 id=f"{row['id']}:{item['attribute']}",
                 attribute=item["attribute"],
-                value=json.loads(item["value_json"])
-                if item["value_json"] is not None
-                else None,
+                value=raw_value,
                 unit=item["unit"],
                 status=item["status"],
+                confidence_score=score,
+                confidence_level=confidence_level,
+                confidence_calculated_at=calculated_at,
                 confidence_percent=item["confidence_percent"],
                 observed_at=item["observed_at"],
                 updated_at=updated,

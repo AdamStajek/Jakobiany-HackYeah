@@ -331,6 +331,55 @@ export function RoutePage() {
         description="Wybierz cel i ustaw to, co ma znaczenie po drodze."
       />
       <div className="route-grid">
+        <form className="panel route-form" onSubmit={submit}>
+          <h2>Dokąd się wybierasz?</h2>
+          <PointSearch
+            label="Skąd"
+            onSelect={(point) => {
+              setOrigin(point.id);
+              setOriginName(point.name);
+              setOriginCoordinates(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button subtle full"
+            onClick={() => chooseOnMap("origin")}
+          >
+            Wskaż początek na mapie
+          </button>
+          <PointSearch
+            label="Dokąd"
+            onSelect={(point) => {
+              setDestination(point.id);
+              setDestinationName(point.name);
+              setDestinationCoordinates(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button subtle full"
+            onClick={() => chooseOnMap("destination")}
+          >
+            Wskaż cel na mapie
+          </button>
+          {picking && (
+            <p role="status" className="route-picking-status">
+              Kliknij na mapie {picking === "origin" ? "początek" : "cel"} trasy.{" "}
+              <button
+                type="button"
+                className="button subtle"
+                onClick={() => setPicking(null)}
+              >
+                Anuluj wybór
+              </button>
+            </p>
+          )}
+          <button className="button primary full route-submit" disabled={loading}>
+            {loading ? "Planowanie…" : "Pokaż trasę"}
+            <ArrowRight size={18} />
+          </button>
+        </form>
         <section className="panel route-needs">
           <h2>Twoje potrzeby na trasie</h2>
           <label className="check-field">
@@ -381,56 +430,6 @@ export function RoutePage() {
             }
           />
         </section>
-        <form className="panel route-form" onSubmit={submit}>
-          <h2>Dokąd się wybierasz?</h2>
-          <PointSearch
-            label="Skąd"
-            onSelect={(point) => {
-              setOrigin(point.id);
-              setOriginName(point.name);
-              setOriginCoordinates(null);
-            }}
-          />
-          <button
-            type="button"
-            className="button subtle full"
-            onClick={() => chooseOnMap("origin")}
-          >
-            Wskaż początek na mapie
-          </button>
-          <PointSearch
-            label="Dokąd"
-            onSelect={(point) => {
-              setDestination(point.id);
-              setDestinationName(point.name);
-              setDestinationCoordinates(null);
-            }}
-          />
-          <button
-            type="button"
-            className="button subtle full"
-            onClick={() => chooseOnMap("destination")}
-          >
-            Wskaż cel na mapie
-          </button>
-          {picking && (
-            <p role="status">
-              Kliknij na mapie {picking === "origin" ? "początek" : "cel"}{" "}
-              trasy.{" "}
-              <button
-                type="button"
-                className="button subtle"
-                onClick={() => setPicking(null)}
-              >
-                Anuluj wybór
-              </button>
-            </p>
-          )}
-          <button className="button primary full" disabled={loading}>
-            {loading ? "Planowanie…" : "Pokaż trasę"}
-            <ArrowRight size={18} />
-          </button>
-        </form>
         <div className="route-map" ref={mapContainer}>
           <MapView
             places={noPlaces}

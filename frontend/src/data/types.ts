@@ -27,6 +27,9 @@ export type Fact = {
   value: number | boolean | string | null;
   unit: string | null;
   status: "confirmed" | "unconfirmed";
+  confidence_score: number;
+  confidence_level: "certain" | "probable" | "uncertain";
+  confidence_calculated_at: string | null;
   confidence_percent: number | null;
   observed_at: string | null;
   updated_at: string;

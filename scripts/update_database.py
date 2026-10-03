@@ -90,6 +90,9 @@ def update_database(
                 "--input",
                 str(stage / "construction.json"),
             )
+            run_script(
+                "scripts.update_confidence", "--database", str(candidate)
+            )
             for module, filename in (
                 ("scripts.scrape_public_places", "public-places.json"),
                 ("scripts.scrape_place_websites", "place-web.json"),

@@ -218,6 +218,9 @@ class Fact(Observation):
     id: Id
     unit: Literal["count", "cm", "percent", "m"] | None
     status: FactStatus
+    confidence_score: NonNegative = 0
+    confidence_level: Literal["certain", "probable", "uncertain"] = "uncertain"
+    confidence_calculated_at: AwareDatetime | None = None
     confidence_percent: Percent | None
     observed_at: AwareDatetime | None
     updated_at: AwareDatetime

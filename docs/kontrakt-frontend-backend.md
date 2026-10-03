@@ -83,7 +83,10 @@ Email musi mieć poprawny format; hasło: 12–128 znaków; nazwa: 1–100 znak�
   "value": 92,
   "unit": "cm",
   "status": "confirmed",
+  "confidence_score": 15,
+  "confidence_level": "certain",
   "confidence_percent": 95,
+  "confidence_calculated_at": "2026-10-03T10:00:00Z",
   "observed_at": "2026-10-02T10:00:00Z",
   "updated_at": "2026-10-03T10:00:00Z",
   "valid_until": null,
@@ -111,9 +114,9 @@ Email musi mieć poprawny format; hasło: 12–128 znaków; nazwa: 1–100 znak�
 | `distance_without_rest_m` | number ≥ 0 / `m` |
 | `heat_risk`, `icing_risk`, `snow_risk`, `construction_present` | boolean lub `null` / `null` |
 
-Każdy typ `value` dopuszcza też `null`. `status`: `confirmed | unconfirmed`. `unconfirmed_reason`: `missing | conflicting | stale | pending_verification` lub `null`; dla `unconfirmed` powód jest wymagany. `confidence_percent`: liczba 0–100 lub `null`, gdy brak podstaw do oceny. `observed_at` i `valid_until` mogą być `null`; `updated_at` jest wymagane. `sources` może być puste tylko przy braku danych.
+Każdy typ `value` dopuszcza też `null`. `status`: `confirmed | unconfirmed`. `unconfirmed_reason`: `missing | conflicting | stale | pending_verification` lub `null`; dla `unconfirmed` powód jest wymagany. `confidence_score` to nieujemny wynik punktowy, `confidence_level`: `certain | probable | uncertain`, a `confidence_calculated_at` wskazuje ostatnie przeliczenie. `confidence_percent` pozostaje opcjonalną wartością 0–100 przeznaczoną do prezentacji i nie służy do wyznaczania poziomu. `observed_at` i `valid_until` mogą być `null`; `updated_at` jest wymagane. `sources` może być puste tylko przy braku danych.
 
-Źródło: `owner | user | ai | osm | weather | other`. OSM wymaga `license: "ODbL"` i odnośnika do źródła. Dane osobowe zgłaszających nie trafiają do publicznych źródeł. Hierarchia wag pochodzi z opisu projektu: właściciel, użytkownicy, weryfikacja AI, pogoda, automatyczne źródła. Dokładny algorytm i zasady starzenia danych pozostają po stronie backendu; frontend nie oblicza wiarygodności. Sama propozycja AI ma status `unconfirmed`.
+Źródło: `owner | user | ai | osm | weather | other`. OSM wymaga `license: "ODbL"` i odnośnika do źródła. Dane osobowe zgłaszających nie trafiają do publicznych źródeł. Backend wylicza punkty, poziom i starzenie według dokumentu [Wiarygodność informacji](wiarygodnosc-danych.md); frontend ich nie oblicza. Sama propozycja AI ma status `unconfirmed` i nie dodaje punktów przed przyjęciem zgłoszenia.
 
 ### 4.3. Dopasowanie i bariery
 

@@ -108,6 +108,11 @@ export function PlaceCard({
   );
 }
 export function FactRow({ fact }: { fact: Fact }) {
+  const confidenceLabels = {
+    certain: "Pewne",
+    probable: "Prawdopodobne",
+    uncertain: "Niepewne",
+  };
   return (
     <div className="fact-row">
       <div
@@ -130,9 +135,11 @@ export function FactRow({ fact }: { fact: Fact }) {
               })
             : "Brak daty obserwacji"}{" "}
           ·{" "}
-          {fact.confidence_percent === null
-            ? "Brak oceny wiarygodności"
-            : `Wiarygodność: ${fact.confidence_percent}%`}
+          Wiarygodność: {confidenceLabels[fact.confidence_level]} ({
+            fact.confidence_score.toLocaleString("pl-PL", {
+              maximumFractionDigits: 2,
+            })
+          } pkt)
         </small>
         {fact.alternatives && (
           <ul>

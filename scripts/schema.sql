@@ -81,6 +81,16 @@ CREATE TABLE fact_evidence (
     FOREIGN KEY (place_id, attribute) REFERENCES accessibility_facts(place_id, attribute),
     PRIMARY KEY (place_id, attribute, object_id, tag_key, scope)
 );
+CREATE TABLE fact_confidence (
+    target_type TEXT NOT NULL CHECK(target_type IN ('place', 'segment')),
+    target_id TEXT NOT NULL,
+    attribute TEXT NOT NULL,
+    value_json TEXT NOT NULL CHECK(json_valid(value_json)),
+    score REAL NOT NULL CHECK(score >= 0),
+    level TEXT NOT NULL CHECK(level IN ('certain', 'probable', 'uncertain')),
+    calculated_at TEXT NOT NULL,
+    PRIMARY KEY(target_type, target_id, attribute, value_json)
+);
 CREATE INDEX idx_places_location ON places(lat, lon);
 CREATE INDEX idx_categories_places ON place_categories(category_id);
 CREATE INDEX idx_facts_attribute ON accessibility_facts(attribute);

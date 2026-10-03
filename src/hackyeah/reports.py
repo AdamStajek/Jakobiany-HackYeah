@@ -23,6 +23,19 @@ _accepted_observations = Store[str, list[m.Observation]](
 )
 
 
+def _refresh_confidence(report: m.Report) -> None:
+    from hackyeah.confidence import recalculate_all
+
+    targets = {
+        (item.target.type, item.target.id)
+        for item in _reports.values()
+        if item.author_id == report.author_id
+    }
+    targets.add((report.target.type, report.target.id))
+    for target in targets:
+        recalculate_all(target=target)
+
+
 def get(user: m.User, report_id: str) -> m.Report:
     with _lock:
         report = _reports.get(report_id)
@@ -50,6 +63,7 @@ def create(user: m.User, body: m.ReportCreate) -> m.Report:
         photos.replace_report_links(user, report.id, report.photo_ids)
         _reports[report.id] = report
         _history[report.id] = []
+        _refresh_confidence(report)
     return report.model_copy(deep=True)
 
 
@@ -139,6 +153,7 @@ def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
         _reports[report_id] = updated
         _reviews.pop(report_id, None)
         _accepted_observations.pop(report_id, None)
+        _refresh_confidence(report)
         return updated.model_copy(deep=True)
 
 
@@ -182,5 +197,6 @@ def review(user: m.User, report_id: str, body: m.ReportReview) -> m.Report:
                 )
                 for index in indexes
             ]
+        _refresh_confidence(report)
         missions.sync_review(updated)
         return updated.model_copy(deep=True)

@@ -133,6 +133,9 @@ def initialize() -> None:
                 accessibility_summary TEXT
             )"""
         )
+        from hackyeah.confidence import ensure_schema
+
+        ensure_schema(_state.connection)
 
 
 class Store[K, V](MutableMapping[K, V]):

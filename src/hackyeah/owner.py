@@ -82,7 +82,7 @@ def declare(
     user: m.User, place_id: str, body: m.DeclarationRequest
 ) -> m.DeclarationResponse:
     _require_owner(user)
-    with _lock:
+    with _lock as connection:
         _, _, baseline = _get(user, place_id)
         now = datetime.now(UTC)
         if body.observed_at > now:
@@ -152,4 +152,15 @@ def declare(
         stored = body.model_copy(deep=True)
         _declarations[place_id] = stored
         _history[place_id] = [*_history.get(place_id, []), stored.model_copy(deep=True)]
+        from hackyeah.confidence import get as get_confidence
+        from hackyeah.confidence import recalculate_all
+
+        recalculate_all(now, target=("place", place_id))
+        for fact in facts:
+            score, level, calculated_at = get_confidence(
+                connection, "place", place_id, fact.attribute, fact.value
+            )
+            fact.confidence_score = score
+            fact.confidence_level = level
+            fact.confidence_calculated_at = calculated_at
         return m.DeclarationResponse(place_id=place_id, facts=facts, updated_at=now)

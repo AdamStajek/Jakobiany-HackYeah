@@ -51,6 +51,9 @@ function facts(id: string, issue?: Fact["unconfirmed_reason"]): Fact[] {
       value: problem ? null : value,
       unit,
       status: problem ? "unconfirmed" : "confirmed",
+      confidence_score: problem ? 5 : i % 2 ? 8 : 15,
+      confidence_level: problem ? "uncertain" : i % 2 ? "probable" : "certain",
+      confidence_calculated_at: date,
       confidence_percent: problem ? null : i % 2 ? 88 : 95,
       observed_at:
         problem === "missing"

@@ -71,6 +71,8 @@ Grupa zależności `data` nie jest potrzebna do startu API ani instalowana w jeg
 | Teatry | `amenity=theatre` |
 | Domy kultury | `amenity=community_centre/arts_centre/social_centre`, poza centrami seniora |
 | Kluby seniora | `club=senior/seniors`, `community_centre:for=senior`, dzienne/środowiskowe placówki dla seniorów; także jawne nazwy „Klub Seniora”, „Centrum Aktywności Seniora” i „Centrum Aktywizacji Seniora” na centrach społecznych |
+| Paczkomaty | `amenity=parcel_locker` |
+| Kościoły | `amenity=place_of_worship` i `religion=christian` |
 
 Nazwa sama w sobie nie jest wystarczająca do zaklasyfikowania dowolnego budynku.
 Dom opieki nie jest automatycznie klubem seniora. Każda kategoria pozostaje
@@ -92,7 +94,7 @@ Punkt reprezentatywny obszaru nie jest pozycją wejścia do obiektu.
 
 - `places`: nazwa, współrzędne, części adresu, strona, telefon, godziny otwarcia,
   operator i ograniczenia dostępu. Brakujące dane pozostają `NULL`.
-- `categories` i `place_categories`: wszystkie 14 kategorii i ich przypisania.
+- `categories` i `place_categories`: kategorie miejsc i ich przypisania.
 - `osm_objects`: oryginalne tagi, geometria GeoJSON, ID, typ, URL, wersja
   i czas modyfikacji OSM, jeżeli występują w wyciągu.
 - `accessibility_facts`: jeden rekord na każde obsługiwane pole każdego miejsca,

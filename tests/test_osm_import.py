@@ -300,6 +300,11 @@ class OSMImportTests(unittest.TestCase):
             ({"amenity": "library"}, "library"),
             ({"amenity": "cinema"}, "cinema"),
             ({"amenity": "theatre"}, "theatre"),
+            ({"amenity": "parcel_locker"}, "parcel_locker"),
+            (
+                {"amenity": "place_of_worship", "religion": "christian"},
+                "church",
+            ),
             ({"amenity": "arts_centre"}, "community_centre"),
             (
                 {"amenity": "community_centre", "name": "Centrum Aktywizacji Seniora"},

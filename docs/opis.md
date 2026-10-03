@@ -45,15 +45,11 @@ Przy każdej informacji pokażemy jej źródło, datę i procentową wiarygodno�
 
 ## Wiarygodność danych
 
-Wiarygodność będziemy obliczać na podstawie:
-
-1. Zgłoszeń właścicieli miejsc — najwyższa waga.
-2. Zgłoszeń i weryfikacji użytkowników.
-3. Weryfikacji zgłoszeń użytkowników przez AI.
-4. Danych pogodowych w przypadku informacji zależnych od pogody — średnia waga.
-5. Automatycznej analizy OpenStreetMap i innych źródeł — najniższa waga.
-
-Waga zgłoszenia użytkownika będzie malała wraz z upływem czasu od jego dodania.
+Każda informacja ma wynik punktowy i poziom `pewne`, `prawdopodobne` albo
+`niepewne`. Wynik uwzględnia zgłoszenia właścicieli, wiarygodność użytkowników,
+potwierdzenie zdjęcia przez AI, dane mapowe oraz spadek wagi każdego dowodu o
+10% za każdy pełny tydzień. Dokładny wzór, progi oraz zasady codziennego
+odświeżania opisuje dokument [Wiarygodność informacji](wiarygodnosc-danych.md).
 
 ## Dane i ich aktualizacja
 

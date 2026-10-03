@@ -43,6 +43,8 @@ CATEGORIES = {
     "theatre": "Teatry",
     "community_centre": "Domy kultury",
     "senior_club": "Kluby seniora",
+    "parcel_locker": "Paczkomaty",
+    "church": "Kościoły",
 }
 FIELDS = {
     "steps_present": ("Obecność schodów", None),
@@ -114,6 +116,10 @@ def classify(tags: dict[str, str]) -> list[str]:
         categories.append(tourism)
     if amenity in {"post_office", "bank", "library", "cinema", "theatre"}:
         categories.append(amenity)
+    if amenity == "parcel_locker":
+        categories.append("parcel_locker")
+    if amenity == "place_of_worship" and tags.get("religion") == "christian":
+        categories.append("church")
     if tags.get("office") == "government" or amenity == "townhall":
         categories.append("government")
     if tags.get("shop") in {"supermarket", "convenience", "grocery", "greengrocer"}:

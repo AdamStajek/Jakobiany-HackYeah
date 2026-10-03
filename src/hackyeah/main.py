@@ -14,6 +14,9 @@ from hackyeah.models import APIError, ErrorDetail, ErrorResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     initialize()
+    from hackyeah.confidence import recalculate_all
+
+    recalculate_all()
     yield
 
 

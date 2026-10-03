@@ -2392,3 +2392,18 @@ legend {
     scroll-behavior: auto !important;
   }
 }
+.language-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 42px;
+  padding: 6px;
+  border: 1px solid var(--line, #d8dfd8);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+.language-switch:hover,
+.language-switch:focus-visible { outline: 2px solid var(--green, #246b4c); outline-offset: 2px; }

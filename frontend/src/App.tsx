@@ -9,7 +9,9 @@ import {
   UserRound,
   Menu,
   X,
+  Languages,
 } from "lucide-react";
+import { translate, useLanguage, setLanguage } from "./i18n";
 import { Context, useDemo, type DemoState } from "./state/DemoContext";
 import { emptyConstraints, type Constraints, type Report } from "./data/types";
 import { Home } from "./pages/Home";
@@ -31,6 +33,35 @@ function Layout({ children }: { children: ReactNode }) {
   const { user } = useDemo();
   const [menu, setMenu] = useState(false);
   const location = useLocation();
+  const language = useLanguage();
+  useEffect(() => {
+    document.documentElement.lang = language;
+    const root = document.getElementById("root");
+    if (!root) return;
+    const apply = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+        node.textContent = translate(node.textContent);
+      } else if (node instanceof HTMLElement) {
+        for (const attr of ["aria-label", "placeholder", "title", "alt"]) {
+          const value = node.getAttribute(attr);
+          if (value) node.setAttribute(attr, translate(value));
+        }
+        node.childNodes.forEach(apply);
+      }
+    };
+    root.childNodes.forEach(apply);
+    const observer = new MutationObserver((records) => records.forEach((record) => {
+      record.addedNodes.forEach(apply);
+      if (record.type === "characterData") apply(record.target);
+      if (record.type === "attributes" && record.target instanceof HTMLElement) {
+        const attr = record.attributeName;
+        const value = attr && record.target.getAttribute(attr);
+        if (attr && value) record.target.setAttribute(attr, translate(value));
+      }
+    }));
+    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "placeholder", "title", "alt"] });
+    return () => observer.disconnect();
+  }, [language]);
   useEffect(() => {
     setMenu(false);
     window.scrollTo(0, 0);
@@ -64,6 +95,9 @@ function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/about">O projekcie</NavLink>
         </nav>
         <div className="account-nav">
+          <button className="icon-button language-switch" onClick={() => setLanguage(language === "pl" ? "en" : "pl")} aria-label={language === "pl" ? "Switch to English" : "Przełącz na polski"} title={language === "pl" ? "English" : "Polski"}>
+            <Languages size={19} /><span aria-hidden="true">{language === "pl" ? "🇬🇧" : "🇵🇱"}</span>
+          </button>
           {user ? (
             <Link className="button subtle" to="/profile">
               <UserRound size={19} />

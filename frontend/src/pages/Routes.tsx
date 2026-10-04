@@ -19,6 +19,7 @@ import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
 import Numeric from "../components/Numeric";
 import AISearch from "../components/AISearch";
+import ProfileSettingsButton from "../components/ProfileSettingsButton";
 import { FactRow, PageHeading, Status } from "../components/Common";
 import {
   getPlace,
@@ -579,6 +580,9 @@ export function RoutePage() {
               </label>
             </>
           )}
+          <div className="profile-settings-control">
+            <ProfileSettingsButton />
+          </div>
           <AISearch
             mode="routes"
             onApply={(proposal) => {

@@ -3839,6 +3839,9 @@ main h1[tabindex="-1"]:focus-visible {
 .search-sort {
   margin-bottom: 0;
 }
+.profile-settings-control {
+  margin-bottom: 16px;
+}
 .ai-search {
   margin-bottom: 24px;
   padding: 0;

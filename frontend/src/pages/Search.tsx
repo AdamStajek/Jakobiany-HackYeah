@@ -13,6 +13,7 @@ import { useDemo } from "../state/DemoContext";
 import MapView from "../components/MapView";
 import Numeric from "../components/Numeric";
 import AISearch from "../components/AISearch";
+import ProfileSettingsButton from "../components/ProfileSettingsButton";
 import { SearchBox, PlaceCard } from "../components/Common";
 import { searchPlaces } from "../data/api";
 import type { PlaceSummary } from "../data/types";
@@ -147,6 +148,9 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             <option value="name">Nazwa miejsca</option>
           </select>
         </label>
+      </div>
+      <div className="profile-settings-control">
+        <ProfileSettingsButton />
       </div>
       <AISearch
         mode="places"

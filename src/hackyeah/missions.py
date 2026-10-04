@@ -87,6 +87,11 @@ def catalog(near: m.Coordinates | None = None, offset: int = 0) -> list[m.Missio
 
         for row in rows:
             facts = facts_by_place[row["id"]]
+            address = " ".join(filter(None, (row["street"], row["housenumber"])))
+            address_is_nearest = False
+            if not address:
+                address = places._nearest_address(db, row["lat"], row["lon"])
+                address_is_nearest = address is not None
             known = facts.keys()
             for attribute in (
                 "steps_count",
@@ -115,7 +120,8 @@ def catalog(near: m.Coordinates | None = None, offset: int = 0) -> list[m.Missio
                 id=mission_id,
                 place_id=row["id"],
                 place_name=row["name"] or "Miejsce bez nazwy",
-                address=" ".join(filter(None, (row["street"], row["housenumber"]))) or None,
+                address=address or None,
+                address_is_nearest=address_is_nearest,
                 title=f"Sprawdź: {row['name'] or 'Miejsce bez nazwy'}",
                 fact_id=fact_id,
                 attribute=attribute,
@@ -169,6 +175,8 @@ def request_verification(body: m.MissionRequest) -> list[m.Mission]:
                     id=mission_id,
                     place_id=place.id,
                     place_name=place.name,
+                    address=place.address,
+                    address_is_nearest=place.address_is_nearest,
                     title=f"Sprawdź: {place.name}",
                     fact_id=fact.id,
                     attribute=fact.attribute,

@@ -10,6 +10,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Clock3,
+  Award,
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { PageHeading } from "../components/Common";
@@ -26,6 +28,7 @@ import { MetricInput } from "../components/MetricInput";
 import type { Fact } from "../data/types";
 import { labels } from "../data/mock";
 import { missionDistance, sortMissions } from "../data/missionSorting";
+import MapView from "../components/MapView";
 
 export const missionStatus = {
   in_progress: "W trakcie",
@@ -35,24 +38,20 @@ export const missionStatus = {
 };
 const missionTitle = (mission: Mission) =>
   mission.target_type === "segment"
-    ? mission.title
-    : `Sprawdź: ${mission.place_name}`;
+    ? mission.title.replace(/^Sprawdź(?: odcinek trasy)?:\s*/i, "")
+    : mission.place_name;
 export function MissionsPage() {
   const { activity, session, refreshActivity, location, setLocation } =
     useDemo();
   const [sort, setSort] = useState<"points" | "distance">("points");
   const [currentPage, setCurrentPage] = useState(1);
   const [locationError, setLocationError] = useState("");
-  const [offset, setOffset] = useState(0);
-  const [more, setMore] = useState(true);
   const [tab, setTab] = useState("available");
   const [missions, setMissions] = useState<Mission[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
-    setOffset(0);
-    setMore(true);
     getMissions()
       .then((items) => {
         if (active) setMissions(items);
@@ -136,7 +135,7 @@ export function MissionsPage() {
         <Star size={45} />
         <div>
           <h2>Małe zadania. Wielka różnica.</h2>
-          <p>Sprawdź informacje w okolicy i pomóż uzupełnić mapę.</p>
+          <p>Uzupełnij informacje o miejscach w okolicy i pomóż innym.</p>
         </div>
         <span>Saldo: {activity.points} pkt</span>
       </div>
@@ -216,12 +215,18 @@ export function MissionsPage() {
                 Około {mission.time_minutes} minut ·{" "}
                 {progress ? missionStatus[progress.status] : "Dostępna"}
               </p>
-              {sort === "distance" && Number.isFinite(distance) && (
-                <p className="muted">
-                  Odległość:{" "}
+              {mission.address && (
+                <p className="muted mission-address">
+                  <MapPin size={15} aria-hidden="true" />
+                  {mission.address_is_nearest ? "Najbliższy adres: " : ""}
+                  {mission.address}
+                </p>
+              )}
+              {Number.isFinite(distance) && (
+                <p className="muted mission-distance">
                   {distance < 1000
-                    ? `${Math.round(distance)} m`
-                    : `${(distance / 1000).toFixed(1)} km`}
+                    ? `${Math.round(distance)} m od Ciebie`
+                    : `${(distance / 1000).toFixed(1)} km od Ciebie`}
                 </p>
               )}
               <strong className="points">
@@ -282,32 +287,6 @@ export function MissionsPage() {
           </button>
         </nav>
       )}
-      {tab === "available" && more && (
-        <button
-          className="button subtle"
-          disabled={loading}
-          onClick={async () => {
-            setLoading(true);
-            try {
-              const items = await getMissions(undefined, offset + 100);
-              const fresh = items.filter(
-                (item) => !missions.some((old) => old.id === item.id),
-              );
-              setMore(fresh.length > 0);
-              setOffset(offset + 100);
-              setMissions((old) =>
-                [...old, ...fresh].sort((a, b) => a.priority - b.priority),
-              );
-            } catch {
-              setError("Nie udało się pobrać kolejnych misji.");
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          Wczytaj kolejne misje
-        </button>
-      )}
       {!loading && !shown.length && (
         <div className="empty-state">
           <Flag />
@@ -334,7 +313,8 @@ export function MissionsPage() {
 
 export function MissionPage() {
   const { id } = useParams();
-  const { activity, session, refreshActivity } = useDemo();
+  const { activity, session, refreshActivity, location, setLocation } =
+    useDemo();
   const [mission, setMission] = useState<Mission | null>(null);
   const [current, setCurrent] = useState<MissionProgress | null>(null);
   const [metricValue, setMetricValue] = useState<Fact["value"]>(null);
@@ -342,6 +322,21 @@ export function MissionPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [locationMessage, setLocationMessage] = useState("");
+  useEffect(() => {
+    if (location) return;
+    if (!navigator.geolocation) {
+      setLocationMessage("Przeglądarka nie obsługuje lokalizacji.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) =>
+        setLocation({ lat: coords.latitude, lon: coords.longitude }),
+      () =>
+        setLocationMessage("Udostępnij lokalizację, aby pokazać ją na mapie."),
+      { timeout: 10000, maximumAge: 60000 },
+    );
+  }, [location, setLocation]);
   useEffect(() => {
     let active = true;
     if (id)
@@ -450,19 +445,82 @@ export function MissionPage() {
         </p>
       )}
       {mission && (
-        <div className="panel">
+        <div className="panel mission-detail-panel">
+          <div className="mission-facts">
+            <span>
+              <Clock3 size={17} /> Około {mission.time_minutes} min
+            </span>
+            <span>
+              <Award size={17} /> {mission.points} pkt po zatwierdzeniu
+            </span>
+          </div>
           <p>{mission.description}</p>
-          <p>
+          <p className="mission-detail-address">
             <strong>
-              {mission.target_type === "segment" ? "Odcinek:" : "Adres:"}
-            </strong>{" "}
-            {mission.target_type === "segment"
-              ? mission.place_name
-              : mission.address || "Adres niedostępny"}
+              {mission.target_type === "segment"
+                ? "Odcinek"
+                : mission.address_is_nearest
+                  ? "Najbliższy adres"
+                  : "Adres"}
+            </strong>
+            <span>
+              {mission.target_type === "segment"
+                ? mission.place_name
+                : mission.address || "Adres niedostępny"}
+            </span>
           </p>
+          {location &&
+            mission.location &&
+            Number.isFinite(missionDistance(mission, location)) && (
+              <p className="mission-distance-detail">
+                <MapPin size={17} />{" "}
+                {missionDistance(mission, location) < 1000
+                  ? `${Math.round(missionDistance(mission, location))} m od Ciebie`
+                  : `${(missionDistance(mission, location) / 1000).toFixed(1)} km od Ciebie`}
+              </p>
+            )}
+          {mission.location && (
+            <>
+              {!location && (
+                <p className="muted" role="status">
+                  {locationMessage || "Ustalanie Twojej lokalizacji…"}
+                </p>
+              )}
+              <MapView
+                places={
+                  mission.target_type === "segment"
+                    ? []
+                    : [
+                        {
+                          id: mission.place_id,
+                          name: mission.place_name,
+                          category: "",
+                          address: mission.address,
+                          address_is_nearest: mission.address_is_nearest,
+                          location: mission.location,
+                          distance_m: null,
+                        },
+                      ]
+                }
+                endpoints={
+                  mission.target_type === "segment"
+                    ? [
+                        {
+                          ...mission.location,
+                          label: "Miejsce misji",
+                        },
+                      ]
+                    : []
+                }
+                userLocation={location}
+                showMobilityList={false}
+              />
+            </>
+          )}
           <p>
             <strong>
-              Do sprawdzenia: {labels[mission.attribute] || mission.attribute}
+              Informacja do potwierdzenia:{" "}
+              {labels[mission.attribute] || mission.attribute}
             </strong>
           </p>
           {mission.target_type !== "segment" && (

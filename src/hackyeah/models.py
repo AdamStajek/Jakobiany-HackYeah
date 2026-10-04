@@ -659,6 +659,7 @@ class Mission(Model):
     place_id: Id
     place_name: str
     address: str | None = None
+    address_is_nearest: bool = False
     title: str
     fact_id: Id
     attribute: Attribute

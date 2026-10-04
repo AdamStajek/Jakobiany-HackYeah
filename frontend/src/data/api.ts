@@ -368,6 +368,7 @@ export type Mission = {
   place_id: string;
   place_name: string;
   address: string | null;
+  address_is_nearest?: boolean;
   title: string;
   fact_id: string;
   attribute: Fact["attribute"];

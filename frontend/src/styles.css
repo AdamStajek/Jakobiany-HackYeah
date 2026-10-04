@@ -1520,12 +1520,6 @@ legend {
   text-decoration: none;
   border-color: #a3b393;
 }
-.mission-card img {
-  width: 115px;
-  height: 95px;
-  object-fit: cover;
-  border-radius: 9px;
-}
 .mission-card h2 {
   font-size: 1.12rem;
   margin: 0 0 7px;
@@ -2449,10 +2443,6 @@ legend {
     padding: 15px;
     gap: 12px;
   }
-  .mission-card img {
-    width: 65px;
-    height: 85px;
-  }
   .mission-card h2 {
     font-size: 0.98rem;
   }
@@ -3207,6 +3197,90 @@ strong,
 .mission-card .points {
   color: #805000;
   font-size: 1.05rem;
+}
+
+.mission-card {
+  display: flex;
+  grid-template-columns: none;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 22px 10px;
+}
+
+.mission-card .option-icon {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  color: var(--green);
+  background: #edf2e8;
+}
+
+.mission-card > div {
+  flex: 1;
+}
+
+.mission-card h2 {
+  margin-bottom: 8px;
+}
+
+.mission-card .mission-address,
+.mission-card .mission-distance {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.mission-address svg,
+.mission-distance svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.mission-card .points {
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.mission-detail-panel {
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 4vw, 36px);
+}
+
+.mission-detail-panel > p {
+  margin: 0;
+}
+
+.mission-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  color: var(--green);
+  font-weight: 650;
+}
+
+.mission-facts span,
+.mission-distance-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mission-detail-address {
+  display: grid;
+  gap: 4px;
+}
+
+.mission-detail-address span {
+  color: var(--muted);
+}
+
+.mission-detail-panel .map-view {
+  height: 330px;
+}
+
+.mission-detail-panel .map-help {
+  margin-bottom: 7px;
 }
 
 /* Report hub: editorial intro beside two rule-separated actions. */

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { interpretSearch, type SearchProposal } from "../data/api";
 import { useDemo } from "../state/DemoContext";
 
@@ -14,14 +14,19 @@ export default function AISearch({
   const [proposal, setProposal] = useState<SearchProposal | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const prepareButton = useRef<HTMLButtonElement>(null);
-
   async function search() {
     setLoading(true);
     setError("");
     setProposal(null);
     try {
-      setProposal(await interpretSearch(mode, prompt.trim(), constraints));
+      const nextProposal = await interpretSearch(
+        mode,
+        prompt.trim(),
+        constraints,
+      );
+      setConstraints(nextProposal.constraints);
+      onApply(nextProposal);
+      setProposal(nextProposal);
     } catch {
       setError("Nie udało się przygotować wyszukiwania AI. Spróbuj ponownie.");
     } finally {
@@ -51,16 +56,15 @@ export default function AISearch({
           />
         </label>
         <button
-          ref={prepareButton}
           type="button"
           className="button primary"
           disabled={loading || !prompt.trim()}
           onClick={search}
         >
-          {loading ? "Przygotowywanie…" : "Przygotuj wyszukiwanie"}
+          {loading ? "Szukam…" : "Szukaj"}
         </button>
         <div aria-live="polite">
-          {loading && <p>Przygotowywanie wyszukiwania…</p>}
+          {loading && <p>Przygotowuję wyszukiwanie…</p>}
           {error && <p role="alert">{error}</p>}
           {proposal && (
             <>
@@ -74,24 +78,12 @@ export default function AISearch({
                 <p key={index}>{question}</p>
               ))}
               <p className="small">
-                Zastosuj propozycję i sprawdź filtry
+                Wyszukiwanie zostało zastosowane. Możesz poprawić filtry i
+                wyniki.
                 {mode === "routes"
-                  ? " oraz wybierz punkty z wyników wyszukiwania"
+                  ? " Wybierz punkty trasy z podpowiedzi."
                   : ""}
-                . Możesz je poprawić.
               </p>
-              <button
-                type="button"
-                className="button primary"
-                onClick={() => {
-                  setConstraints(proposal.constraints);
-                  onApply(proposal);
-                  setProposal(null);
-                  prepareButton.current?.focus();
-                }}
-              >
-                Zastosuj wyszukiwanie
-              </button>
             </>
           )}
         </div>

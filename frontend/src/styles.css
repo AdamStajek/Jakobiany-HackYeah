@@ -3574,9 +3574,22 @@ main {
   padding-right: 32px;
 }
 .high-contrast {
-  --green: #084a28;
-  --muted: #364431;
-  --warning: #633500;
+  color: #000;
+  background: #fff;
+  --green: #003b16;
+  --deep: #000;
+  --muted: #292929;
+  --line: #595959;
+  --cream: #fff;
+  --light: #f2f2f2;
+  --warning: #592d00;
+}
+.high-contrast :where(.panel, .card, .mission-card, .map-card) {
+  border-color: #000;
+}
+.high-contrast :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: #000;
+  box-shadow: 0 0 0 6px #ff0;
 }
 .high-contrast .toast small {
   color: white;

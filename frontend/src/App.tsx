@@ -252,7 +252,7 @@ function Layout({
           </span>
           <span>
             <strong>Swoją Drogą</strong>
-            <small>Kraków bez barier</small>
+            <small>Bo najkrótsza nie musi być twoja</small>
           </span>
         </Link>
         <nav

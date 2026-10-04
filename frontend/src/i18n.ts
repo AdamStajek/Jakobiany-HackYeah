@@ -53,7 +53,7 @@ const en: Record<string, string> = Object.fromEntries([
   ["O projekcie", "About"],
   ["Zaloguj się", "Log in"],
   ["Utwórz konto", "Create account"],
-  ["Kraków bez barier", "Accessible Kraków"],
+  ["Bo najkrótsza nie musi być twoja", "Because the shortest route may not be yours"],
   ["Więcej możliwości. Mniej barier.", "More possibilities. Fewer barriers."],
   ["O danych i projekcie", "About the data and project"],
   ["KRAKÓW DLA KAŻDEGO", "KRAKÓW FOR EVERYONE"],

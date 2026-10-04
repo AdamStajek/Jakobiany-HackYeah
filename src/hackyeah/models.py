@@ -652,9 +652,6 @@ class ReportReview(Model):
 
 class Mission(Model):
     priority: Literal[1, 2, 3] = 3
-    description: str = (
-        "Sprawdź wskazaną cechę na miejscu, opisz wynik i dołącz wymagane zdjęcie."
-    )
     location: Coordinates | None = None
     available: bool = True
     id: Id

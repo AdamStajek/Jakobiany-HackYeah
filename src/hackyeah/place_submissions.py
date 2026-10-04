@@ -48,7 +48,7 @@ def list_page(
     )
 
 
-def review(user: m.User, id: str, body: m.ReportReview) -> m.PlaceSubmission:
+def review(user: m.User, id: str, body: m.PlaceSubmissionReview) -> m.PlaceSubmission:
     if "moderator" not in user.roles:
         raise HTTPException(403, "FORBIDDEN")
     if not body.comment.strip() or body.accepted_ai_proposal_indexes:
@@ -66,13 +66,17 @@ def review(user: m.User, id: str, body: m.ReportReview) -> m.PlaceSubmission:
         item.reviewed_at = datetime.now(UTC)
         item.review_comment = body.comment.strip()
         if item.status == "accepted":
+            location = body.location or item.location
+            if location is None:
+                raise HTTPException(422, "PLACE_LOCATION_REQUIRED")
+            item.location = location
             db.execute(
                 "INSERT INTO community_places (id,name,lat,lon,street) VALUES (?,?,?,?,?)",
                 (
                     item.id,
                     item.name,
-                    item.location.lat,
-                    item.location.lon,
+                    location.lat,
+                    location.lon,
                     item.address,
                 ),
             )

@@ -753,17 +753,34 @@ class RouteDataFeature(Model):
 class PlaceSubmissionCreate(Model):
     name: Annotated[str, Field(min_length=1, max_length=100)]
     category: Annotated[str, Field(min_length=1, max_length=100)]
-    address: Annotated[str, Field(min_length=1, max_length=300)]
-    location: Coordinates
+    address: Annotated[str, Field(max_length=300)] | None = None
+    location: Coordinates | None = None
     description: Description = ""
 
     @model_validator(mode="after")
     def check_text(self) -> Self:
-        for field in ("name", "category", "address"):
+        for field in ("name", "category"):
             value = getattr(self, field).strip()
             if not value:
                 raise ValueError("Pole nie może być puste.")
             setattr(self, field, value)
+        if self.address is not None:
+            self.address = self.address.strip() or None
+        if self.address is None and self.location is None:
+            raise ValueError("Podaj adres albo współrzędne miejsca.")
+        return self
+
+
+class PlaceSubmissionReview(Model):
+    decision: Literal["accepted", "rejected"]
+    comment: Annotated[str, Field(min_length=1, max_length=4000)]
+    location: Coordinates | None = None
+
+    @model_validator(mode="after")
+    def check_acceptance_location(self) -> Self:
+        self.comment = self.comment.strip()
+        if not self.comment:
+            raise ValueError("Pole nie może być puste.")
         return self
 
 

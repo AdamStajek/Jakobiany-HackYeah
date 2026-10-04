@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeading } from "../components/Common";
 import { EvidencePhotos } from "../components/EvidencePhotos";
+import MapView from "../components/MapView";
 import { useDemo } from "../state/DemoContext";
 import {
   api,
@@ -13,7 +14,9 @@ import {
   type Mission,
   type MissionProgress,
 } from "../data/api";
-import type { Report } from "../data/types";
+import type { PlaceSummary, Report } from "../data/types";
+
+const noPlaces: PlaceSummary[] = [];
 
 function ReviewCard({
   report,
@@ -142,18 +145,29 @@ function PlaceSubmissionCard({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [location, setLocation] = useState(item.location);
+  const [pickingLocation, setPickingLocation] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const decision = (event.nativeEvent as SubmitEvent).submitter?.getAttribute(
       "value",
     );
-    if (!comment.trim() || !decision) return;
+    if (
+      !comment.trim() ||
+      !decision ||
+      (decision === "accepted" && !location)
+    )
+      return;
     setBusy(true);
     setError("");
     try {
       await api(`/place-submissions/${encodeURIComponent(item.id)}/review`, {
         method: "POST",
-        body: JSON.stringify({ decision, comment: comment.trim() }),
+        body: JSON.stringify({
+          decision,
+          comment: comment.trim(),
+          ...(decision === "accepted" && location ? { location } : {}),
+        }),
       });
       done();
     } catch (reason) {
@@ -170,18 +184,38 @@ function PlaceSubmissionCard({
     <article className="panel review-card">
       <h2>{item.name}</h2>
       <p>
-        {item.category} · {item.address}
+        {item.category}
+        {item.address ? ` · ${item.address}` : ""}
       </p>
-      <p>
-        Współrzędne: {item.location.lat}, {item.location.lon}
-      </p>
-      <a
-        href={`https://www.openstreetmap.org/?mlat=${item.location.lat}&mlon=${item.location.lon}#map=18/${item.location.lat}/${item.location.lon}`}
-        target="_blank"
-        rel="noreferrer"
+      {location ? (
+        <>
+          <p>Współrzędne: {location.lat}, {location.lon}</p>
+          <a
+            href={`https://www.openstreetmap.org/?mlat=${location.lat}&mlon=${location.lon}#map=18/${location.lat}/${location.lon}`}
+            target="_blank"
+            rel="noreferrer"
+          >Sprawdź na mapie</a>
+        </>
+      ) : (
+        <p>Przed zatwierdzeniem wskaż położenie miejsca na mapie.</p>
+      )}
+      <button
+        type="button"
+        className="button subtle"
+        onClick={() => setPickingLocation(!pickingLocation)}
       >
-        Sprawdź na mapie
-      </a>
+        {pickingLocation ? "Zamknij mapę" : location ? "Zmień położenie na mapie" : "Wskaż położenie na mapie"}
+      </button>
+      {pickingLocation && (
+        <MapView
+          places={noPlaces}
+          onSelectPoint={(point) => {
+            setLocation(point);
+            setPickingLocation(false);
+          }}
+          onCancelSelection={() => setPickingLocation(false)}
+        />
+      )}
       {item.description && <p>{item.description}</p>}
       <form onSubmit={submit}>
         <label className="field">
@@ -201,7 +235,7 @@ function PlaceSubmissionCard({
         <button
           className="button primary"
           value="accepted"
-          disabled={busy || !comment.trim()}
+          disabled={busy || !comment.trim() || !location}
         >
           Zatwierdź miejsce
         </button>

@@ -196,7 +196,7 @@ def list_place_submissions(
     "/place-submissions/{id}/review", response_model=m.PlaceSubmission, tags=["places"]
 )
 def review_place_submission(
-    id: ResourceId, body: m.ReportReview, request: Request, response: Response
+    id: ResourceId, body: m.PlaceSubmissionReview, request: Request, response: Response
 ) -> m.PlaceSubmission:
     from hackyeah import place_submissions
 

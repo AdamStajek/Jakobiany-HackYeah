@@ -64,6 +64,28 @@ export function NewPlacePage() {
     event.preventDefault();
     const form = event.currentTarget;
     const values = new FormData(form);
+    const address = String(values.get("address")).trim();
+    const latValue = String(values.get("lat")).trim();
+    const lonValue = String(values.get("lon")).trim();
+    const hasCoordinates = latValue !== "" && lonValue !== "";
+    const lat = Number(latValue);
+    const lon = Number(lonValue);
+    if (!address && !hasCoordinates) {
+      setError("Podaj adres albo obie współrzędne miejsca.");
+      return;
+    }
+    if ((latValue === "") !== (lonValue === "")) {
+      setError("Podaj obie współrzędne albo usuń je i wpisz adres.");
+      return;
+    }
+    if (
+      hasCoordinates &&
+      (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+        !Number.isFinite(lon) || lon < -180 || lon > 180)
+    ) {
+      setError("Współrzędne muszą mieścić się w poprawnym zakresie.");
+      return;
+    }
     setBusy(true);
     setError("");
     setSuccess("");
@@ -73,12 +95,9 @@ export function NewPlacePage() {
         body: JSON.stringify({
           name: String(values.get("name")).trim(),
           category: String(values.get("category")).trim(),
-          address: String(values.get("address")).trim(),
+          address: address || null,
           description: String(values.get("description")).trim(),
-          location: {
-            lat: Number(values.get("lat")),
-            lon: Number(values.get("lon")),
-          },
+          ...(hasCoordinates ? { location: { lat, lon } } : {}),
         }),
       });
       setItems((current) => [item, ...current]);
@@ -142,9 +161,9 @@ export function NewPlacePage() {
             </label>
             <label className="field">
               Adres
-              <input name="address" required maxLength={300} />
+              <input name="address" maxLength={300} />
             </label>
-            <p>Wskaż miejsce na mapie lub wpisz jego współrzędne.</p>
+            <p>Podaj poprawny adres albo współrzędne. Przy samym adresie moderator wskaże miejsce na mapie przed zatwierdzeniem.</p>
             <button
               type="button"
               className="button subtle"
@@ -187,7 +206,6 @@ export function NewPlacePage() {
                 step="any"
                 min={-90}
                 max={90}
-                required
                 value={coordinates.lat}
                 onChange={(event) =>
                   setCoordinates({ ...coordinates, lat: event.target.value })
@@ -202,7 +220,6 @@ export function NewPlacePage() {
                 step="any"
                 min={-180}
                 max={180}
-                required
                 value={coordinates.lon}
                 onChange={(event) =>
                   setCoordinates({ ...coordinates, lon: event.target.value })

@@ -425,8 +425,8 @@ export interface PlaceSubmission {
   author_id: string;
   name: string;
   category: string;
-  address: string;
-  location: { lat: number; lon: number };
+  address: string | null;
+  location: { lat: number; lon: number } | null;
   description: string;
   status: "pending" | "accepted" | "rejected";
   review_comment: string | null;

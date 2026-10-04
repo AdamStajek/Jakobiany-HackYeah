@@ -19,7 +19,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from hackyeah import models as m
-from hackyeah.database import database_path
+from hackyeah.database import connect
 from hackyeah.route_data import SMOOTHNESS, SURFACES, extract_facts, height_cm
 
 # Metric projection is local to Kraków; no topology is inferred from line crossings.
@@ -294,9 +294,7 @@ def resolve(point):
         return landmarks[point.place_id]
     from hackyeah.places import catalogue_table
 
-    with closing(
-        sqlite3.connect(database_path().as_uri() + "?mode=ro", uri=True)
-    ) as db:
+    with closing(connect(readonly=True)) as db:
         row = db.execute(
             f"SELECT lon,lat FROM {catalogue_table(db)} WHERE id=?", (point.place_id,)
         ).fetchone()

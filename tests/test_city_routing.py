@@ -15,6 +15,35 @@ from hackyeah.main import app
 
 
 class CityRoutingTests(unittest.TestCase):
+    def test_route_resolves_catalogue_endpoints_from_separate_databases(self):
+        from hackyeah import database
+
+        graph = self.graph()
+        account_path = Path(self.directory.name) / "accounts.sqlite3"
+        catalogue_path = Path(self.directory.name) / "places.sqlite3"
+        for path, table, identifier, point in (
+            (catalogue_path, "places", "node/1", self.nodes[1]),
+            (account_path, "community_places", "community:1", self.nodes[3]),
+        ):
+            with closing(sqlite3.connect(path)) as db:
+                db.execute(f"CREATE TABLE {table}(id TEXT, lon REAL, lat REAL)")
+                db.execute(f"INSERT INTO {table} VALUES(?,?,?)", (identifier, *point))
+                db.commit()
+        request = self.request().model_copy(
+            update={
+                "origin": m.PlaceReference(place_id="node/1"),
+                "destination": m.PlaceReference(place_id="community:1"),
+            }
+        )
+        with (
+            patch.object(database, "database_path", return_value=account_path),
+            patch.object(database, "osm_database_path", return_value=catalogue_path),
+        ):
+            result = plan_city_route(request, graph)
+        self.assertEqual(len(result.routes), 1)
+        self.assertEqual(result.routes[0].geometry.coordinates[0], self.nodes[1])
+        self.assertEqual(result.routes[0].geometry.coordinates[-1], self.nodes[3])
+
     def setUp(self):
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)

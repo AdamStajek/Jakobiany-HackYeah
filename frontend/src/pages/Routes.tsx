@@ -245,6 +245,17 @@ function Warnings({ warnings }: { warnings: string[] }) {
     </>
   );
 }
+function RouteNotes({ warnings }: { warnings: string[] }) {
+  return (
+    <>
+      {warnings.map((warning, i) => (
+        <p className="route-note" key={i}>
+          {warning}
+        </p>
+      ))}
+    </>
+  );
+}
 function MissingRoute() {
   return (
     <div className="page narrow">
@@ -843,21 +854,6 @@ export function RoutePage() {
                             {distanceLabel(route.distance_m)}
                           </button>
                           <p>{route.assessment.summary}</p>
-                          {route.assessment.reasons.map((reason, index) => (
-                            <p className="warning-box" key={index}>
-                              {reason.message}
-                            </p>
-                          ))}
-                          {route.segments
-                            .flatMap((segment) => [
-                              ...segment.barriers,
-                              ...(segment.temporary_difficulties || []),
-                            ])
-                            .map((difficulty, index) => (
-                              <p className="warning-box" key={index}>
-                                {difficulty.description}
-                              </p>
-                            ))}
                         </div>
                       ))}
                     {plan.alternatives?.some(
@@ -900,7 +896,7 @@ export function RoutePage() {
                     </div>
                   ))}
                 <Status assessment={plan.route.assessment} />
-                <Warnings warnings={plan.warnings} />
+                <RouteNotes warnings={plan.warnings} />
                 <RouteSources plan={plan} />
                 <Link
                   className="button subtle full"
@@ -946,7 +942,7 @@ export function RouteDetails() {
         title="Szczegóły trasy"
         description={`${plan.origin} → ${plan.destination} · ${distanceLabel(plan.route.distance_m)} · ${durationLabel(plan.route.estimated_duration_s)}`}
       />
-      <Warnings warnings={plan.warnings} />
+      <RouteNotes warnings={plan.warnings} />
       <RouteSources plan={plan} />
       <MapView
         places={noPlaces}
@@ -1070,11 +1066,11 @@ export function Navigation() {
         segments={plan.route.segments}
         mobility={routeMarkers(plan.route)}
       />
-      <p className="warning-box">
+      <p className="route-note">
         Podgląd zaplanowanej trasy — bez śledzenia pozycji. Sprawdź warunki w
         terenie przed podróżą.
       </p>
-      <Warnings warnings={plan.warnings} />
+      <RouteNotes warnings={plan.warnings} />
       {(current?.temporary_difficulties || []).map((difficulty) => (
         <p className="warning-box" key={difficulty.id}>
           {difficulty.description}

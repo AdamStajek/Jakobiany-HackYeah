@@ -5,11 +5,42 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from hackyeah import confidence, database, place_submissions, reports, reputation
+from hackyeah import (
+    confidence,
+    database,
+    missions,
+    place_submissions,
+    reports,
+    reputation,
+)
 from hackyeah import models as m
 
 
 class ReputationTests(unittest.TestCase):
+    def test_titles_require_reliability_and_experience(self):
+        for accepted, rejected, expected in (
+            (0, 0, "Krakowski Odkrywca"),
+            (1, 0, "Krakowski Odkrywca"),
+            (2, 1, "Tropiciel Plant"),
+            (8, 2, "Przewodnik po Kazimierzu"),
+            (22, 3, "Strażnik Wawelu"),
+            (45, 5, "Legenda Krakowa"),
+            (29, 21, "Krakowski Odkrywca"),
+            (44, 6, "Strażnik Wawelu"),
+        ):
+            with self.subTest(accepted=accepted, rejected=rejected):
+                with patch.object(
+                    reputation,
+                    "_decisions",
+                    return_value={"author": [True] * accepted + [False] * rejected},
+                ):
+                    self.assertEqual(reputation.title("author"), expected)
+                    user = m.User(id="author", display_name="Author", roles=["user"])
+                    with patch.object(missions, "_progress", {}):
+                        self.assertEqual(
+                            missions.activity(user).contributor_title, expected
+                        )
+
     def test_decisions_reweight_existing_facts_without_exposing_score(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "test.sqlite3"
@@ -24,6 +55,9 @@ class ReputationTests(unittest.TestCase):
                 user = m.User(id="author", display_name="Author", roles=["user"])
                 moderator = m.User(id="mod", display_name="Mod", roles=["moderator"])
                 self.assertEqual(reputation.scores().get(user.id, 0.5), 0.5)
+                self.assertEqual(
+                    missions.activity(user).contributor_title, "Krakowski Odkrywca"
+                )
 
                 def create(target):
                     return reports.create(

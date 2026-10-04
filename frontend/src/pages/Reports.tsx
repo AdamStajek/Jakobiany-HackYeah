@@ -9,7 +9,6 @@ import {
   ArrowRight,
   TriangleAlert,
   Check,
-  ShieldCheck,
   ChevronLeft,
   ClipboardCheck,
   MapPin,
@@ -82,13 +81,6 @@ export function ReportHub() {
             Wybierz informację <ArrowRight size={18} />
           </span>
         </Link>
-      </div>
-      <div className="callout">
-        <ShieldCheck />
-        <p>
-          Zgłoszenia i zdjęcia trafiają do moderatora. Dane nie zmieniają się
-          przed weryfikacją.
-        </p>
       </div>
     </div>
   );

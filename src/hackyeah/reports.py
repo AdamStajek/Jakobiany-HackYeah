@@ -187,45 +187,6 @@ def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
 
 
 def review(user: m.User, report_id: str, body: m.ReportReview) -> m.Report:
-    from hackyeah import missions
-
     if "moderator" not in user.roles:
         raise HTTPException(403, "FORBIDDEN")
-    with _lock:
-        report = get(user, report_id)
-        missions.check_review(user, report_id)
-        if report.status != "pending":
-            if _reviews.get(report_id) == body:
-                return report
-            raise HTTPException(409, "CONFLICT")
-        indexes = body.accepted_ai_proposal_indexes
-        if len(set(indexes)) != len(indexes) or any(
-            index >= len(report.ai_proposals) for index in indexes
-        ):
-            raise HTTPException(422, "VALIDATION_ERROR")
-        if body.decision == "rejected" and indexes:
-            raise HTTPException(422, "VALIDATION_ERROR")
-        updated = report.model_copy(
-            update={
-                "status": body.decision,
-                "review_comment": body.comment,
-                "updated_at": datetime.now(UTC),
-            },
-            deep=True,
-        )
-        _history[report_id] = [*_history[report_id], report]
-        _reviews[report_id] = body.model_copy(deep=True)
-        _reports[report_id] = updated
-        if body.decision == "accepted":
-            _accepted_observations[report_id] = [
-                observation.model_copy(deep=True) for observation in report.observations
-            ] + [
-                m.Observation(
-                    attribute=report.ai_proposals[index].attribute,
-                    value=report.ai_proposals[index].value,
-                )
-                for index in indexes
-            ]
-        _refresh_confidence(report)
-        missions.sync_review(updated)
-        return updated.model_copy(deep=True)
+    raise HTTPException(403, "FORBIDDEN")

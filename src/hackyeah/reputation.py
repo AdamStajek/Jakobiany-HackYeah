@@ -4,7 +4,7 @@ from hackyeah import place_submissions, reports
 from hackyeah.database import atomic
 
 
-def scores() -> dict[str, float]:
+def _decisions() -> dict[str, list[bool]]:
     """Acceptance rate in [0, 1]; unreviewed authors default to 0.5.
 
     Each suggestion counts once. Editing it back to pending keeps the last
@@ -31,4 +31,23 @@ def scores() -> dict[str, float]:
         for item in place_submissions.submissions.values():
             if item.status != "pending":
                 results.setdefault(item.author_id, []).append(item.status == "accepted")
-    return {author: sum(values) / len(values) for author, values in results.items()}
+    return results
+
+
+def scores() -> dict[str, float]:
+    return {author: sum(values) / len(values) for author, values in _decisions().items()}
+
+
+def title(author_id: str) -> str:
+    """Reward reliability backed by reviewed contributions, including new users."""
+    decisions = _decisions().get(author_id, [])
+    score = sum(decisions) / len(decisions) if decisions else 0.5
+    for minimum, reliability, name in (
+        (50, 0.9, "Legenda Krakowa"),
+        (25, 0.85, "Strażnik Wawelu"),
+        (10, 0.75, "Przewodnik po Kazimierzu"),
+        (3, 0.6, "Tropiciel Plant"),
+    ):
+        if len(decisions) >= minimum and score >= reliability:
+            return name
+    return "Krakowski Odkrywca"

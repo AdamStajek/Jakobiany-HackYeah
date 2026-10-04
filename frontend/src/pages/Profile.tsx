@@ -10,7 +10,7 @@ import { reportStatus } from "./Reports";
 export function Profile() {
   const {
     saved,
-    constraints,
+    profile,
     reports,
     user,
     session,
@@ -91,10 +91,10 @@ export function Profile() {
         <section className="panel">
           <h2>Moje potrzeby</h2>
           <p>
-            {Object.values(constraints).some(
+            {Object.values(profile?.constraints || {}).some(
               (value) => value !== null && value !== undefined,
             )
-              ? "Twoje preferencje są aktywne. Możesz je sprawdzić i edytować."
+              ? "Twoje preferencje są zapisane. Możesz je sprawdzić i edytować."
               : "Nie określono jeszcze potrzeb."}
           </p>
           <Link className="button primary" to="/profile/setup">
@@ -109,6 +109,15 @@ export function Profile() {
               Zaloguj się
             </Link>
           )}
+          <hr />
+          <h3>Twój krakowski tytuł</h3>
+          <p className="status good">
+            {activity.contributor_title || "Krakowski Odkrywca"}
+          </p>
+          <p className="muted">
+            Tytuł zależy od wiarygodności i liczby ocenionych zgłoszeń. Każde
+            rzetelne zgłoszenie pomaga odkrywać Kraków bez barier.
+          </p>
           <hr />
           <h3>Twoje punkty</h3>
           <p className="points">{activity.points} pkt</p>

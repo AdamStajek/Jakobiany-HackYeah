@@ -25,8 +25,16 @@ export function useLanguage() {
 
 // Stable UI copy shared by the application. Place names and user supplied text stay intact.
 const en: Record<string, string> = Object.fromEntries([
+  ["Twój krakowski tytuł", "Your Kraków title"],
+  ["Krakowski Odkrywca", "Kraków Explorer"],
+  ["Tropiciel Plant", "Planty Trailfinder"],
+  ["Przewodnik po Kazimierzu", "Kazimierz Guide"],
+  ["Strażnik Wawelu", "Wawel Guardian"],
+  ["Legenda Krakowa", "Kraków Legend"],
+  ["Tytuł zależy od wiarygodności i liczby ocenionych zgłoszeń. Każde rzetelne zgłoszenie pomaga odkrywać Kraków bez barier.", "Your title reflects your reliability and number of reviewed contributions. Every reliable contribution helps people explore an accessible Kraków."],
   ["Użyj ustawień z profilu", "Use profile settings"],
-  ["Ustaw preferencje w profilu", "Set your profile preferences"],
+  ["Ustaw preferencje z profilu", "Apply profile preferences"],
+  ["Najpierw zapisz preferencje w profilu", "Save your profile preferences first"],
   ["Zastosowano ustawienia z profilu.", "Profile settings applied."],
   ["Przejdź do treści", "Skip to content"],
   ["Nawigacja główna", "Main navigation"],
@@ -53,7 +61,7 @@ const en: Record<string, string> = Object.fromEntries([
   ["O projekcie", "About"],
   ["Zaloguj się", "Log in"],
   ["Utwórz konto", "Create account"],
-  ["Bo najkrótsza nie musi być twoja", "Because the shortest route may not be yours"],
+  ["Bo najkrótsza nie musi być twoja", "The best route is your own"],
   ["Więcej możliwości. Mniej barier.", "More possibilities. Fewer barriers."],
   ["O danych i projekcie", "About the data and project"],
   ["KRAKÓW DLA KAŻDEGO", "KRAKÓW FOR EVERYONE"],
@@ -94,6 +102,7 @@ const en: Record<string, string> = Object.fromEntries([
   ["Lista", "List"],
   ["Dopasuj do swoich potrzeb", "Match your needs"],
   ["Bez schodów", "Step-free access"],
+  ["Unikaj schodów", "Avoid stairs"],
   ["Toaleta dostępna", "Accessible toilet"],
   ["Szerokie wejście (min. 90 cm)", "Wide entrance (at least 90 cm)"],
   ["Utwardzona nawierzchnia", "Paved surface"],
@@ -245,10 +254,6 @@ const en: Record<string, string> = Object.fromEntries([
     "Check whether the information about this place is still current.",
   ],
   [
-    "Zgłoszenia i zdjęcia trafiają do moderatora. Dane nie zmieniają się przed weryfikacją.",
-    "Reports and photos are sent to a moderator. Information is not changed before review.",
-  ],
-  [
     "Twoje zgłoszenie nie zmienia danych przed weryfikacją.",
     "Your report will not change the data before it has been reviewed.",
   ],
@@ -281,8 +286,8 @@ const en: Record<string, string> = Object.fromEntries([
   ["Dostępność interfejsu", "Interface accessibility"],
   ["Edytuj profil potrzeb", "Edit needs profile"],
   [
-    "Twoje preferencje są aktywne. Możesz je sprawdzić i edytować.",
-    "Your preferences are active. You can review and edit them.",
+    "Twoje preferencje są zapisane. Możesz je sprawdzić i edytować.",
+    "Your preferences are saved. You can review and edit them.",
   ],
   ["Nie określono jeszcze potrzeb.", "No needs have been set yet."],
   [
@@ -640,7 +645,7 @@ const en: Record<string, string> = Object.fromEntries([
   ["Gotowe", "Done"],
   ["Nie udało się zapisać profilu.", "Could not save the profile."],
   ["Profil zapisano na Twoim koncie. Będzie dostępny po ponownym zalogowaniu.", "Your profile was saved to your account. It will be available when you log in again."],
-  ["Ustawienia zastosowano w bieżącej karcie. Zaloguj się, aby zapisać profil na koncie.", "Settings applied in this tab. Log in to save the profile to your account."],
+  ["Profil zapisano w bieżącej karcie. Zaloguj się, aby zapisać profil na koncie.", "Profile saved in this tab. Log in to save the profile to your account."],
   ["Wybierz ", "Choose "],
   ["początek", "starting point"],
   ["cel", "destination"],

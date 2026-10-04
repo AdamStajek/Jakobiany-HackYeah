@@ -316,6 +316,7 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
   const [metricValue, setMetricValue] = useState<Fact["value"]>(null);
   useEffect(() => setMetricValue(null), [placeId, attribute]);
   const [photo, setPhoto] = useState<File | null>(null);
+  const [placeSearchOpen, setPlaceSearchOpen] = useState(false);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -326,7 +327,6 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
         .then((result) => {
           if (!active) return;
           setOptions(result.items);
-          setPlaceId((current) => current || result.items[0]?.id || "");
           setLoadError("");
         })
         .catch((reason: unknown) => {
@@ -352,6 +352,7 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
         .then((result) => {
           if (!active) return;
           setPlace(result);
+          setQuery(result.name);
           setAttribute((current) =>
             result.facts.some((fact) => fact.attribute === current)
               ? current
@@ -373,7 +374,12 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
   }, [placeId]);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!place || busy) return;
+    if (busy) return;
+    if (!place) {
+      setError("Wybierz miejsce z listy wyników wyszukiwania.");
+      document.getElementById("report-place-search")?.focus();
+      return;
+    }
     const fact = place.facts.find((item) => item.attribute === attribute);
     if (!fact) {
       setError("Wybierz informację, której dotyczy zgłoszenie.");
@@ -471,31 +477,46 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
       />
       <form className="panel form-panel" onSubmit={submit}>
         <fieldset disabled={busy} className="form-fields">
-          <label className="field">
-            Szukaj miejsca do zgłoszenia
+          <div className="field">
+            <label htmlFor="report-place-search">Miejsce do zgłoszenia</label>
             <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Wpisz nazwę miejsca"
-            />
-          </label>
-          <label className="field">
-            Miejsce
-            <select
-              value={placeId}
-              onChange={(event) => setPlaceId(event.target.value)}
+              id="report-place-search"
+              aria-invalid={!placeId || undefined}
               required
-            >
-              <option value="" disabled>
-                Wybierz miejsce
-              </option>
-              {available.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              value={query}
+              onFocus={() => setPlaceSearchOpen(true)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPlaceId("");
+                setPlaceSearchOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setPlaceSearchOpen(false);
+              }}
+              placeholder="Wpisz nazwę miejsca"
+              autoComplete="off"
+            />
+            {placeSearchOpen && available.length > 0 && (
+              <div className="search-results">
+                <p>Wyniki wyszukiwania</p>
+                {available.map((item) => (
+                  <button
+                    className="button subtle full"
+                    type="button"
+                    key={item.id}
+                    onClick={() => {
+                      setPlaceId(item.id);
+                      setQuery(item.name);
+                      setPlaceSearchOpen(false);
+                    }}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {placeId && <input type="hidden" name="place" value={placeId} />}
+          </div>
           {loadError && (
             <p className="warning-box" role="alert">
               {loadError}

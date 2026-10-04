@@ -9,7 +9,11 @@ export default function AISearch({
   mode: "places" | "routes";
   onApply: (proposal: SearchProposal) => void;
 }) {
-  const { constraints, setConstraints } = useDemo();
+  const state = useDemo();
+  const constraints =
+    mode === "routes" ? state.routeConstraints : state.constraints;
+  const setConstraints =
+    mode === "routes" ? state.setRouteConstraints : state.setConstraints;
   const [prompt, setPrompt] = useState("");
   const [proposal, setProposal] = useState<SearchProposal | null>(null);
   const [loading, setLoading] = useState(false);

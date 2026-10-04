@@ -6,6 +6,8 @@ export type DemoState = {
   setLocation: (location: { lat: number; lon: number } | null) => void;
   constraints: Constraints;
   setConstraints: (c: Constraints) => void;
+  routeConstraints: Constraints;
+  setRouteConstraints: (c: Constraints) => void;
   saved: string[];
   toggleSave: (id: string) => Promise<void>;
   reports: Report[];

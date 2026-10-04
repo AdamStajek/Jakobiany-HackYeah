@@ -3119,6 +3119,24 @@ strong,
   grid-column: 1 / -1;
 }
 
+.route-information-gaps {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--yellow, #b45309);
+}
+
+.route-information-gaps ul {
+  padding-left: 1.25rem;
+}
+
+.route-information-gaps li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
 /* Missions board. */
 .mission-banner {
   min-height: 170px;
@@ -3493,15 +3511,34 @@ figcaption a,
 .header {
   height: auto;
   min-height: var(--header-height);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  column-gap: 20px;
   row-gap: 12px;
 }
+.header .brand {
+  flex: 0 1 270px;
+  min-width: max-content;
+}
+.header .brand small {
+  white-space: nowrap;
+}
 .desktop-nav {
+  min-width: 0;
+  height: auto;
   flex-wrap: wrap;
+}
+.desktop-nav a {
+  padding-inline: 12px;
 }
 .account-nav {
   min-width: 0;
-  flex-wrap: wrap;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+@media (1100px < width <= 1180px) {
+  .header .brand {
+    flex-basis: 220px;
+  }
 }
 .hero {
   height: auto;
@@ -3523,6 +3560,38 @@ figcaption a,
 }
 main {
   overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .place-card,
+  .mission-card,
+  .toast,
+  .needs-panel,
+  .info-panel,
+  .filters.show,
+  .desktop-nav.open {
+    animation: content-appear 180ms ease-out;
+  }
+
+  .button,
+  .tabs button,
+  .bottom-nav a,
+  .mission-card,
+  .place-card {
+    transition: background-color 160ms ease, border-color 160ms ease,
+      color 160ms ease, box-shadow 160ms ease;
+  }
+
+  @keyframes content-appear {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
 }
 .tabs {
   flex-wrap: wrap;

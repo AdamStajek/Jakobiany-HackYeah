@@ -334,19 +334,22 @@ export function MissionPage() {
         <div className="panel">
           <p>{mission.description}</p>
           <p>
-            <strong>Adres:</strong> {mission.address || "Adres niedostępny"}
+            <strong>{mission.target_type === "segment" ? "Odcinek:" : "Adres:"}</strong>{" "}
+            {mission.target_type === "segment" ? mission.place_name : mission.address || "Adres niedostępny"}
           </p>
           <p>
             <strong>
               Do sprawdzenia: {labels[mission.attribute] || mission.attribute}
             </strong>
           </p>
-          <Link
-            className="button subtle"
-            to={`/place/${encodeURIComponent(mission.place_id)}`}
-          >
-            Zobacz miejsce <MapPin size={18} />
-          </Link>
+          {mission.target_type !== "segment" && (
+            <Link
+              className="button subtle"
+              to={`/place/${encodeURIComponent(mission.place_id)}`}
+            >
+              Zobacz miejsce <MapPin size={18} />
+            </Link>
+          )}
           {!session ? (
             <Link
               className="button primary"

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Link,
   useLocation,
+  useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
@@ -24,6 +25,7 @@ import { FactRow, PageHeading, Status } from "../components/Common";
 import {
   getPlace,
   planRoute,
+  requestRouteVerificationMission,
   searchRoutePoints,
   getMobilityMap,
   type MobilityPoint,
@@ -31,6 +33,7 @@ import {
   type PlannedRoute,
 } from "../data/api";
 import type { Source } from "../data/types";
+import { formatFact, labels } from "../data/mock";
 
 // Quick choices; any catalogue place or point selected on the map is supported.
 const points = [
@@ -214,7 +217,10 @@ function planEndpoints(plan: SavedPlan) {
   if (!coordinates.length) return [];
   return [
     { coordinates: coordinates[0], label: `Start: ${plan.origin}` },
-    { coordinates: coordinates[coordinates.length - 1], label: `Cel: ${plan.destination}` },
+    {
+      coordinates: coordinates[coordinates.length - 1],
+      label: `Cel: ${plan.destination}`,
+    },
   ].map(({ coordinates: [lon, lat], label }) => ({ lat, lon, label }));
 }
 function routeMarkers(route: PlannedRoute): MobilityPoint[] {
@@ -254,14 +260,168 @@ function Warnings({ warnings }: { warnings: string[] }) {
   );
 }
 function RouteNotes({ warnings }: { warnings: string[] }) {
+  const hiddenNotes = new Set([
+    "Trasa oparta na OSM. Brak danych nie oznacza braku bariery; dostępność nie została zweryfikowana w terenie.",
+    "Dojścia od wskazanych punktów do sieci pieszej są orientacyjne i wymagają sprawdzenia.",
+    "Czas przejścia jest orientacyjny. Miejsca odpoczynku i toalety w pobliżu trasy wymagają sprawdzenia dostępności.",
+    "Prognoza dla punktu siatki nie określa stanu konkretnego chodnika.",
+    "Brak sygnału oblodzenia nie wyklucza lodu ani zamarzania wcześniejszych opadów.",
+    "Wartości chwilowe dotyczą początku godziny; opady dotyczą osobnego, poprzedzającego okresu. Ryzyka są heurystyką na kolejną godzinę.",
+    "Dostępność przystanków i pojazdów zależy od danych rozkładowych; brak informacji nie potwierdza dostępu bez stopni.",
+  ]);
+  const visibleWarnings = warnings.filter(
+    (warning) =>
+      !hiddenNotes.has(warning) &&
+      !warning.startsWith("Brak świeżych opóźnień dla danych ZTP:"),
+  );
   return (
     <>
-      {warnings.map((warning, i) => (
+      {visibleWarnings.map((warning, i) => (
         <p className="route-note" key={i}>
           {warning}
         </p>
       ))}
     </>
+  );
+}
+function RouteDifficulties({ route }: { route: PlannedRoute }) {
+  let distance = 0;
+  const sections = route.segments
+    .map((segment, index) => {
+      const start = distance;
+      distance += segment.distance_m;
+      const reasons = segment.assessment.reasons;
+      const factIds = new Set(reasons.flatMap((reason) => reason.fact_ids));
+      const facts = segment.facts.filter(
+        (fact) => factIds.has(fact.id) && fact.value !== null,
+      );
+      const descriptions = [
+        ...new Set([
+          ...facts.map((fact) => {
+            const value =
+              typeof fact.value === "number"
+                ? `${fact.value} ${fact.unit === "percent" ? "%" : fact.unit || ""}`.trim()
+                : typeof fact.value === "boolean"
+                  ? fact.value
+                    ? "Tak"
+                    : "Nie"
+                  : formatFact(fact);
+            return `${labels[fact.attribute] || fact.attribute}: ${value}`;
+          }),
+          ...reasons
+            .filter(
+              (reason) =>
+                !reason.fact_ids.some((id) =>
+                  facts.some((fact) => fact.id === id),
+                ),
+            )
+            .map((reason) => reason.message),
+          ...segment.barriers.map((barrier) => barrier.description),
+          ...(segment.temporary_difficulties || []).map(
+            (difficulty) => difficulty.description,
+          ),
+        ]),
+      ];
+      if (!descriptions.length) return null;
+      return (
+        <li key={segment.id}>
+          <strong>
+            Odcinek {index + 1} · {distanceLabel(start)}–
+            {distanceLabel(distance)} od startu
+          </strong>
+          <p>{segment.instruction}</p>
+          <ul>
+            {descriptions.map((description) => (
+              <li key={description}>{description}</li>
+            ))}
+          </ul>
+        </li>
+      );
+    })
+    .filter((section) => section !== null);
+  return (
+    <div className="route-difficulties">
+      <h3>Niedogodności na najszybszej trasie</h3>
+      {sections.length ? (
+        <ol>{sections}</ol>
+      ) : (
+        <p>Brak zapisanych niedogodności dla wybranych potrzeb.</p>
+      )}
+      {route.assessment.reasons
+        .filter((reason) => !reason.fact_ids.length)
+        .map((reason, index) => (
+          <p key={index}>{reason.message}</p>
+        ))}
+    </div>
+  );
+}
+function RouteInformationGaps({ route }: { route: PlannedRoute }) {
+  const navigate = useNavigate();
+  const { session } = useDemo();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const seen = new Set<string>();
+  const gaps = route.segments.flatMap((segment, index) =>
+    segment.facts
+      .filter((fact) => {
+        if (fact.value !== null || seen.has(fact.id)) return false;
+        seen.add(fact.id);
+        return true;
+      })
+      .map((fact) => ({ segment, index, fact })),
+  );
+  if (!gaps.length) return null;
+  return (
+    <section className="route-information-gaps" aria-label="Braki informacji na trasie">
+      <strong>Braki informacji na trasie: {gaps.length}</strong>
+      <details open>
+        <summary>Pokaż informacje do sprawdzenia</summary>
+        <ul>
+          {gaps.map(({ segment, index, fact }) => {
+            const [lon, lat] = segment.geometry.coordinates[0] || [];
+            return (
+              <li key={fact.id}>
+                <span>Odcinek {index + 1}: {labels[fact.attribute] || fact.attribute}</span>
+                {session ? (
+                  <button
+                    type="button"
+                    className="button subtle"
+                    disabled={busy !== null || lat === undefined || lon === undefined}
+                    onClick={async () => {
+                      if (lat === undefined || lon === undefined) return;
+                      setBusy(fact.id);
+                      setError("");
+                      try {
+                        const mission = await requestRouteVerificationMission({
+                          fact_id: fact.id,
+                          attribute: fact.attribute,
+                          instruction: segment.instruction,
+                          location: { lat, lon },
+                        });
+                        navigate(`/report/success?mission=${encodeURIComponent(mission.id)}`, {
+                          state: { missions: [mission] },
+                        });
+                      } catch (reason) {
+                        setError(reason instanceof Error ? reason.message : "Nie udało się zgłosić braku informacji.");
+                      } finally {
+                        setBusy(null);
+                      }
+                    }}
+                  >
+                    {busy === fact.id ? "Zgłaszanie…" : "Zgłoś"}
+                  </button>
+                ) : (
+                  <Link className="button subtle" to={`/login?next=${encodeURIComponent(`/route/${route.id}/details`)}`}>
+                    Zgłoś
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </details>
+      {error && <p className="warning-box" role="alert">{error}</p>}
+    </section>
   );
 }
 function MissingRoute() {
@@ -286,8 +446,8 @@ export function RoutePage() {
   });
   const [params] = useSearchParams();
   const {
-    constraints,
-    setConstraints,
+    routeConstraints: constraints,
+    setRouteConstraints: setConstraints,
     notify,
     location: userLocation,
   } = useDemo();
@@ -566,9 +726,6 @@ export function RoutePage() {
               />
               <span className="route-mobility-copy">
                 <span>Poruszam się o kulach lub na wózku</span>
-                <span className="small">
-                  Automatycznie unikaj schodów i nachyleń powyżej 5%.
-                </span>
               </span>
             </label>
             <label className="check-field">
@@ -683,7 +840,7 @@ export function RoutePage() {
             </>
           )}
           <div className="profile-settings-control">
-            <ProfileSettingsButton />
+            <ProfileSettingsButton onApply={setConstraints} />
           </div>
           <AISearch
             mode="routes"
@@ -788,26 +945,27 @@ export function RoutePage() {
                 ? [plan.route.parking]
                 : []),
             ]}
+            showMobilityList={mode !== "transit"}
             endpoints={plan ? planEndpoints(plan) : endpoints}
             onSelectPoint={picking ? selectMapPoint : undefined}
             onCancelSelection={finishPicking}
           />
-          {mode === "transit" && (
-            <p className="small route-map-legend">
-              ● Przystanki · 🚌 Bieżące pozycje pojazdów · Zielona trasa:
-              komunikacja · Niebieska: dojście piesze
-            </p>
-          )}
           {mode === "car" && accessibleParking && (
             <p className="small route-map-legend">
               P ♿ Miejskie miejsca postojowe OZN — bez informacji o zajętości.
             </p>
           )}
-          <Warnings warnings={[...mapWarnings, ...vehicleWarnings]} />
+          <Warnings
+            warnings={[
+              ...mapWarnings,
+              ...(mode === "transit" ? [] : vehicleWarnings),
+            ]}
+          />
           <p className="small route-sources">
             {mapSources.map(
               (s) =>
-                s.url && (
+                s.url &&
+                !(mode === "transit" && s.label.startsWith("ZTP Kraków")) && (
                   <a key={s.url} href={s.url} target="_blank" rel="noreferrer">
                     {s.label}
                   </a>
@@ -862,7 +1020,9 @@ export function RoutePage() {
                             {" · "}
                             {distanceLabel(route.distance_m)}
                           </button>
-                          <p>{route.assessment.summary}</p>
+                          {route.variant === "fastest" && (
+                            <RouteDifficulties route={route} />
+                          )}
                         </div>
                       ))}
                     {plan.alternatives?.some(
@@ -894,6 +1054,7 @@ export function RoutePage() {
                   {plan.route.parking &&
                     ` · Parking: ${plan.route.parking.name}`}
                 </p>
+                <RouteInformationGaps route={plan.route} />
                 {plan.route.segments
                   .filter((s) => s.mode === "transit")
                   .map((s) => (
@@ -905,32 +1066,19 @@ export function RoutePage() {
                     </div>
                   ))}
                 <details className="route-steps-preview">
-                  <summary>Krok po kroku · {plan.route.segments.length} odcinków</summary>
+                  <summary>
+                    Krok po kroku · {plan.route.segments.length} odcinków
+                  </summary>
                   <ol>
                     {plan.route.segments.map((segment) => (
                       <li key={segment.id}>
-                        {segment.instruction} <strong>{distanceLabel(segment.distance_m)}</strong>
+                        {segment.instruction}{" "}
+                        <strong>{distanceLabel(segment.distance_m)}</strong>
                       </li>
                     ))}
                   </ol>
                 </details>
-                <Status assessment={plan.route.assessment} />
                 <RouteNotes warnings={plan.warnings} />
-                <RouteSources plan={plan} />
-                <Link
-                  className="button subtle full"
-                  to={`/route/${encodeURIComponent(plan.route.id)}/details`}
-                  state={plan}
-                >
-                  Szczegóły trasy
-                </Link>
-                <Link
-                  className="button primary full"
-                  to={`/navigation?route=${encodeURIComponent(plan.route.id)}`}
-                  state={plan}
-                >
-                  Uruchom podgląd nawigacji
-                </Link>
               </>
             ) : (
               <>
@@ -962,6 +1110,7 @@ export function RouteDetails() {
         description={`${plan.origin} → ${plan.destination} · ${distanceLabel(plan.route.distance_m)} · ${durationLabel(plan.route.estimated_duration_s)}`}
       />
       <RouteNotes warnings={plan.warnings} />
+      <RouteInformationGaps route={plan.route} />
       <RouteSources plan={plan} />
       <MapView
         places={noPlaces}

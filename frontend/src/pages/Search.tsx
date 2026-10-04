@@ -177,7 +177,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
         </label>
       </div>
       <div className="profile-settings-control">
-        <ProfileSettingsButton />
+        <ProfileSettingsButton onApply={setConstraints} />
       </div>
       <AISearch
         mode="places"

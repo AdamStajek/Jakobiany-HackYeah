@@ -420,6 +420,20 @@ def request_verification_mission(
     return missions.request_verification(body)
 
 
+@router.post(
+    "/missions/route-verification-requests",
+    response_model=m.Mission,
+    status_code=201,
+    tags=["missions"],
+)
+def request_route_verification_mission(
+    body: m.RouteMissionRequest, request: Request, response: Response
+) -> m.Mission:
+    response.headers["Cache-Control"] = "no-store"
+    auth.require_csrf(request)
+    return missions.request_route_verification(body)
+
+
 @router.get("/missions/progress", response_model=m.MissionActivity, tags=["missions"])
 def mission_activity(request: Request, response: Response) -> m.MissionActivity:
     response.headers["Cache-Control"] = "no-store"

@@ -360,6 +360,7 @@ export const reviewReport = (
 
 export type Mission = {
   priority: 1 | 2 | 3;
+  target_type?: "place" | "segment";
   description: string;
   location: { lat: number; lon: number } | null;
   available: boolean;
@@ -385,7 +386,11 @@ export type MissionProgress = {
   created_at: string;
   updated_at: string;
 };
-export type MissionActivity = { items: MissionProgress[]; points: number };
+export type MissionActivity = {
+  items: MissionProgress[];
+  points: number;
+  contributor_title?: string;
+};
 export const getMissions = (near?: { lat: number; lon: number }, offset = 0) =>
   api<Mission[]>(
     near
@@ -401,6 +406,16 @@ export const requestVerificationMission = (
   api<Mission[]>("/missions/verification-requests", {
     method: "POST",
     body: JSON.stringify({ place_id, fact_ids }),
+  });
+export const requestRouteVerificationMission = (body: {
+  fact_id: string;
+  attribute: Fact["attribute"];
+  instruction: string;
+  location: { lat: number; lon: number };
+}) =>
+  api<Mission>("/missions/route-verification-requests", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 export const getMissionActivity = () =>
   api<MissionActivity>("/missions/progress");

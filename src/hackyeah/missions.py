@@ -1,4 +1,4 @@
-"""Persistent field missions; photo verification or independent moderator review awards points."""
+"""Persistent field missions; only automated photo verification awards points."""
 
 import json
 from contextlib import closing
@@ -11,7 +11,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from hackyeah import models as m
-from hackyeah import places, reports
+from hackyeah import places, reports, reputation
 from hackyeah.database import Store, atomic
 
 _catalog = Store[str, m.Mission]("missions.catalog")
@@ -184,6 +184,43 @@ def request_verification(body: m.MissionRequest) -> list[m.Mission]:
     return result
 
 
+def request_route_verification(body: m.RouteMissionRequest) -> m.Mission:
+    """Queue a missing route fact for a field check."""
+    if (
+        not body.fact_id.startswith("osm/")
+        or not body.fact_id.endswith(f"/{body.attribute}")
+    ):
+        raise HTTPException(422, "VALIDATION_ERROR")
+    target_id = (
+        body.fact_id.rsplit("/", 1)[0]
+        if "/way/" in body.fact_id or "/node/" in body.fact_id
+        else f"route/{body.location.lat:.5f}/{body.location.lon:.5f}"
+    )
+    mission_id = "mission_" + sha256(
+        f"segment:{target_id}:{body.attribute}".encode()
+    ).hexdigest()[:24]
+    with atomic:
+        previous = _catalog.get(mission_id)
+        if previous is not None:
+            mission = previous.model_copy(update={"priority": 1})
+        else:
+            mission = m.Mission(
+                id=mission_id,
+                target_type="segment",
+                place_id=target_id,
+                place_name=body.instruction,
+                title=f"Sprawdź odcinek trasy: {body.instruction}",
+                fact_id=body.fact_id,
+                attribute=body.attribute,
+                priority=1,
+                location=body.location,
+                points=30,
+                time_minutes=10,
+            )
+        _catalog[mission_id] = mission
+        return mission
+
+
 def get(mission_id: str) -> m.Mission:
     mission = _catalog.get(mission_id)
     if mission is None:
@@ -199,7 +236,9 @@ def activity(user: m.User) -> m.MissionActivity:
     with atomic:
         items = [item for item in _progress.values() if item.user_id == user.id]
         return m.MissionActivity(
-            items=items, points=sum(item.awarded_points for item in items)
+            items=items,
+            points=sum(item.awarded_points for item in items),
+            contributor_title=reputation.title(user.id),
         )
 
 
@@ -266,7 +305,7 @@ def submit(user: m.User, mission_id: str, body: m.MissionSubmit) -> m.MissionPro
     report = reports.prepare(
         user,
         m.ReportCreate(
-            target=m.ReportTarget(type="place", id=mission.place_id),
+            target=m.ReportTarget(type=mission.target_type, id=mission.place_id),
             kind="missing_data",
             fact_id=mission.fact_id,
             description=(
@@ -334,11 +373,4 @@ def sync_review(report: m.Report) -> None:
 def review(user: m.User, progress_id: str, body: m.ReportReview) -> m.MissionProgress:
     if "moderator" not in user.roles:
         raise HTTPException(403, "FORBIDDEN")
-    with atomic:
-        progress = _progress.get(progress_id)
-        if progress is None:
-            raise HTTPException(404, "NOT_FOUND")
-        if progress.report_id is None:
-            raise HTTPException(409, "CONFLICT")
-        reports.review(user, progress.report_id, body)
-        return _progress[progress_id]
+    raise HTTPException(403, "FORBIDDEN")

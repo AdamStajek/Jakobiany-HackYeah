@@ -1,22 +1,24 @@
-import { Link } from "react-router-dom";
 import { useDemo } from "../state/DemoContext";
+import type { Constraints } from "../data/types";
 
-export default function ProfileSettingsButton() {
-  const { profile, setConstraints } = useDemo();
+export default function ProfileSettingsButton({
+  onApply,
+}: {
+  onApply: (constraints: Constraints) => void;
+}) {
+  const { profile } = useDemo();
 
-  return profile ? (
+  return (
     <button
       type="button"
       className="button subtle"
+      disabled={!profile}
+      title={!profile ? "Najpierw zapisz preferencje w profilu" : undefined}
       onClick={() => {
-        setConstraints({ ...profile.constraints });
+        if (profile) onApply({ ...profile.constraints });
       }}
     >
-      Użyj ustawień z profilu
+      Ustaw preferencje z profilu
     </button>
-  ) : (
-    <Link className="button subtle" to="/profile/setup">
-      Ustaw preferencje w profilu
-    </Link>
   );
 }

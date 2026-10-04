@@ -6,11 +6,15 @@ import { PageHeading } from "../components/Common";
 import Numeric from "../components/Numeric";
 import { interpretNeeds } from "../data/api";
 import type { Constraints } from "../data/types";
+import { emptyConstraints } from "../data/types";
 export function NeedsPage() {
-  const { constraints, saveProfile, profile, session } = useDemo();
+  const { saveProfile, profile, session } = useDemo();
   const [step, setStep] = useState(1);
   const [description, setDescription] = useState(profile?.description || "");
-  const [draft, setDraft] = useState<Constraints>({ ...constraints });
+  const [draft, setDraft] = useState<Constraints>({
+    ...emptyConstraints,
+    ...profile?.constraints,
+  });
   const [interpreting, setInterpreting] = useState(false);
   const [interpretError, setInterpretError] = useState("");
   const [summary, setSummary] = useState("");
@@ -164,9 +168,6 @@ export function NeedsPage() {
                 />
                 Poruszam się o kulach lub na wózku
               </label>
-              <p className="small">
-                Automatycznie unikaj schodów i nachyleń powyżej 5%.
-              </p>
               <div className="form-grid">
                 <Numeric
                   label="Maksymalna liczba stopni"
@@ -324,7 +325,7 @@ export function NeedsPage() {
             <p>
               {session
                 ? "Profil zapisano na Twoim koncie. Będzie dostępny po ponownym zalogowaniu."
-                : "Ustawienia zastosowano w bieżącej karcie. Zaloguj się, aby zapisać profil na koncie."}
+                : "Profil zapisano w bieżącej karcie. Zaloguj się, aby zapisać profil na koncie."}
             </p>
             <div className="actions">
               <Link className="button primary" to="/search">

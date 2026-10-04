@@ -652,6 +652,7 @@ class ReportReview(Model):
 
 class Mission(Model):
     priority: Literal[1, 2, 3] = 3
+    target_type: Literal["place", "segment"] = "place"
     location: Coordinates | None = None
     available: bool = True
     id: Id
@@ -668,6 +669,13 @@ class Mission(Model):
 class MissionRequest(Model):
     place_id: Id
     fact_ids: Annotated[list[Id], Field(min_length=1, max_length=30)]
+
+
+class RouteMissionRequest(Model):
+    fact_id: Id
+    attribute: Attribute
+    instruction: Annotated[str, Field(min_length=1, max_length=300)]
+    location: Coordinates
 
 
 class MissionSubmit(Model):
@@ -692,6 +700,7 @@ class MissionProgress(Model):
 class MissionActivity(Model):
     items: list[MissionProgress]
     points: Count
+    contributor_title: str = "Krakowski Odkrywca"
 
 
 class DeclarationRequest(Model):

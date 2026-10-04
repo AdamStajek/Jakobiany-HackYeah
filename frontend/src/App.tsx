@@ -182,6 +182,12 @@ function Layout({
     setMenu(false);
     window.scrollTo(0, 0);
     document.getElementById("content")?.focus({ preventScroll: true });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = document.getElementById("content")?.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 180, easing: "ease-out" },
+    );
+    return () => animation?.cancel();
   }, [location.pathname]);
   useEffect(() => {
     const content = document.getElementById("content");
@@ -401,6 +407,9 @@ export default function App() {
     ...emptyConstraints,
   });
   const [saved, setSaved] = useState<string[]>([]);
+  const [routeConstraints, setRouteConstraints] = useState<Constraints>({
+    ...emptyConstraints,
+  });
   const [reports, setReports] = useState<Report[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<NeedsProfile | null>(null);
@@ -434,6 +443,7 @@ export default function App() {
     setSaved([]);
     setActivity({ items: [], points: 0 });
     setConstraints({ ...emptyConstraints });
+    setRouteConstraints({ ...emptyConstraints });
     if (!next) return;
     const results = await Promise.allSettled([
       listAll<NeedsProfile>("/profiles"),
@@ -450,7 +460,6 @@ export default function App() {
           (item) => item.name === "Mój profil potrzeb",
         ) || profilesResult.value[0];
       setProfile(current || null);
-      if (current) setConstraints(current.constraints);
     }
     if (reportsResult.status === "fulfilled") setReports(reportsResult.value);
     if (savedResult.status === "fulfilled") setSaved(savedResult.value);
@@ -502,6 +511,8 @@ export default function App() {
     setLocation,
     constraints,
     setConstraints,
+    routeConstraints,
+    setRouteConstraints,
     saved,
     toggleSave: async (id) => {
       const version = accountVersion.current;
@@ -546,7 +557,12 @@ export default function App() {
     },
     saveProfile: async (description, nextConstraints) => {
       if (!session) {
-        setConstraints(nextConstraints);
+        setProfile({
+          id: "local",
+          name: "Mój profil potrzeb",
+          description,
+          constraints: nextConstraints,
+        });
         return;
       }
       const version = accountVersion.current;
@@ -563,7 +579,6 @@ export default function App() {
       );
       if (version !== accountVersion.current) return;
       setProfile(updated);
-      setConstraints(updated.constraints);
     },
     activity,
     refreshActivity,

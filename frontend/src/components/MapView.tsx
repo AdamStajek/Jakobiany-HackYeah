@@ -28,6 +28,7 @@ export default function MapView({
   userLocation,
   mobility = noMobility,
   segments,
+  showMobilityList = true,
 }: {
   places: PlaceSummary[];
   selectedPlaceId?: string | null;
@@ -39,6 +40,7 @@ export default function MapView({
   userLocation?: { lat: number; lon: number } | null;
   mobility?: MobilityPoint[];
   segments?: PlannedRoute["segments"];
+  showMobilityList?: boolean;
 }) {
   const language = useLanguage();
   const container = useRef<HTMLDivElement>(null);
@@ -56,7 +58,8 @@ export default function MapView({
   });
   const active = places.find((place) => place.id === selected);
   const variants = routeVariants.filter(
-    (variant) => variant.variant === "fastest" || variant.variant === "constrained",
+    (variant) =>
+      variant.variant === "fastest" || variant.variant === "constrained",
   );
 
   useEffect(() => {
@@ -127,28 +130,22 @@ export default function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    L.tileLayer(
-      language === "en"
-        ? "https://cdn.lima-labs.com/{z}/{x}/{y}.png?api=demo"
-        : "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    const tiles = L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
         maxZoom: 19,
         maxNativeZoom: 19,
         attribution:
-          language === "en"
-            ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://maps.lima-labs.com/">Lima Labs</a>'
-            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       },
     )
       .on("tileerror", () => setTileError(true))
       .on("tileload", () => setTileError(false))
       .addTo(map);
     return () => {
-      map.eachLayer((layer) => {
-        if (layer instanceof L.TileLayer) map.removeLayer(layer);
-      });
+      tiles.remove();
     };
-  }, [language]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -256,7 +253,8 @@ export default function MapView({
         .addTo(layers);
     }
     for (const variant of [...variants].sort(
-      (a, b) => Number(b.variant === "fastest") - Number(a.variant === "fastest"),
+      (a, b) =>
+        Number(b.variant === "fastest") - Number(a.variant === "fastest"),
     )) {
       L.polyline(
         variant.geometry.coordinates.map(
@@ -305,15 +303,18 @@ export default function MapView({
                     : undefined,
               },
             )
-              .bindTooltip(`${segment.instruction} · ${Math.round(segment.distance_m)} m`)
+              .bindTooltip(
+                `${segment.instruction} · ${Math.round(segment.distance_m)} m`,
+              )
               .addTo(layers);
           }
-        } else L.polyline(points, { color: "#1a73e8", weight: 5 }).addTo(layers);
+        } else
+          L.polyline(points, { color: "#1a73e8", weight: 5 }).addTo(layers);
       }
-      for (const [index, point] of (endpoints.length ? [] : [
-        points[0],
-        points[points.length - 1],
-      ]).entries()) {
+      for (const [index, point] of (endpoints.length
+        ? []
+        : [points[0], points[points.length - 1]]
+      ).entries()) {
         L.circleMarker(point, {
           radius: 7,
           color: "white",
@@ -321,7 +322,10 @@ export default function MapView({
           fillColor: index === 0 ? "#1a73e8" : "#ea4335",
           fillOpacity: 1,
         })
-          .bindTooltip(index === 0 ? "Start trasy" : "Cel trasy", { permanent: true, direction: "top" })
+          .bindTooltip(index === 0 ? "Start trasy" : "Cel trasy", {
+            permanent: true,
+            direction: "top",
+          })
           .addTo(layers);
       }
     }
@@ -440,9 +444,9 @@ export default function MapView({
           aria-label="Interaktywna mapa Krakowa"
           aria-describedby={helpId}
           onKeyDown={(event) => {
-          if (event.key === "Escape" && nativePopup.current?.isOpen()) {
-            event.preventDefault();
-            mapRef.current?.closePopup();
+            if (event.key === "Escape" && nativePopup.current?.isOpen()) {
+              event.preventDefault();
+              mapRef.current?.closePopup();
               return;
             }
             if (event.target !== event.currentTarget || !onSelectPoint) return;
@@ -534,7 +538,7 @@ export default function MapView({
           Środek mapy: {mapCenter.lat.toFixed(5)}, {mapCenter.lon.toFixed(5)}
         </p>
       )}
-      {mobility.length > 0 && (
+      {showMobilityList && mobility.length > 0 && (
         <details className="map-data">
           <summary>
             Przystanki, pojazdy i parkingi — lista ({mobility.length})

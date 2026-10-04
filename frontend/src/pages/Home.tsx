@@ -3,17 +3,20 @@ import { Link } from "react-router-dom";
 import {
   UserRound,
   ArrowRight,
-  Coffee,
+  Hotel,
   Landmark,
+  Building2,
+  ShoppingBasket,
+  LibraryBig,
   Settings2,
 } from "lucide-react";
 import { SearchBox } from "../components/Common";
 const categories = [
-  { name: "Hotele", icon: Landmark, key: "Hotele" },
+  { name: "Hotele", icon: Hotel, key: "Hotele" },
   { name: "Muzea", icon: Landmark, key: "Muzea" },
-  { name: "Urzędy", icon: Landmark, key: "Urzędy" },
-  { name: "Sklepy spożywcze", icon: Coffee, key: "Sklepy spożywcze" },
-  { name: "Biblioteki", icon: Landmark, key: "Biblioteki" },
+  { name: "Urzędy", icon: Building2, key: "Urzędy" },
+  { name: "Sklepy spożywcze", icon: ShoppingBasket, key: "Sklepy spożywcze" },
+  { name: "Biblioteki", icon: LibraryBig, key: "Biblioteki" },
   { name: "Kluby seniora", icon: UserRound, key: "Kluby seniora" },
 ];
 export function Home() {

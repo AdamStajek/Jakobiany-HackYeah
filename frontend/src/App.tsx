@@ -123,7 +123,7 @@ function Layout({
     root.childNodes.forEach(apply);
     const observer = new MutationObserver((records) =>
       records.forEach((record) => {
-        if (record.type === "childList") apply(record.target);
+        if (record.type === "childList") record.addedNodes.forEach(apply);
         if (record.type === "characterData" && record.target.parentElement)
           apply(record.target.parentElement);
         if (

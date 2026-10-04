@@ -3726,8 +3726,11 @@ main {
   .bottom-nav a,
   .mission-card,
   .place-card {
-    transition: background-color 160ms ease, border-color 160ms ease,
-      color 160ms ease, box-shadow 160ms ease;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease;
   }
 
   @keyframes content-appear {
@@ -3841,7 +3844,16 @@ main {
 .high-contrast :where(.panel, .card, .mission-card, .map-card) {
   border-color: #000;
 }
-.high-contrast :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+.high-contrast
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]
+  ):focus-visible {
   outline-color: #000;
   box-shadow: 0 0 0 6px #ff0;
 }
@@ -4307,4 +4319,40 @@ footer {
   width: 100%;
   max-width: 400px;
   color-scheme: light;
+}
+
+/* Keep focus and map markers visible in the operating system's color palette. */
+@media (forced-colors: active) {
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]
+  ):focus-visible {
+    outline: 3px solid Highlight;
+  }
+  .place-marker-pin,
+  .mobility-marker {
+    border: 2px solid ButtonText;
+    background: ButtonFace;
+  }
+  .place-marker-selected .place-marker-pin {
+    border-color: Highlight;
+  }
+}
+
+@media (max-width: 720px) {
+  .header {
+    flex-wrap: wrap;
+  }
+  .header .brand {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+  .header .brand small {
+    white-space: normal;
+  }
 }

@@ -22,12 +22,14 @@ const filterOptions = [
   { label: "Bez schodów", key: "require_step_free_access" },
   { label: "Toaleta dostępna", key: "require_accessible_toilet" },
 ] as const;
+const krakowCenter = { lat: 50.061, lon: 19.936 };
 export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [params, setParams] = useSearchParams();
   const { constraints, setConstraints, location } = useDemo();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useState(mapOnly ? "map" : "list");
   const [sort, setSort] = useState("match");
+  const [searchNear, setSearchNear] = useState(krakowCenter);
   const query = params.get("q") || "";
   const category = params.get("category") || "";
   const [results, setResults] = useState<PlaceSummary[]>([]);
@@ -52,7 +54,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       query || category,
       constraints,
       null,
-      location,
+      searchNear,
       10,
       controller.signal,
     )
@@ -78,7 +80,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       active = false;
       controller.abort();
     };
-  }, [query, category, constraints, location]);
+  }, [query, category, constraints, searchNear]);
   async function goToPage(pageNumber: number) {
     if (pageNumber < 1 || pageNumber > Math.ceil(totalCount / 10)) return;
     if (pageNumber * 10 > results.length && nextCursor && !loadingMore) {
@@ -92,7 +94,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             query || category,
             constraints,
             cursor,
-            location,
+            searchNear,
             10,
           );
           loaded = [...loaded, ...page.items];
@@ -145,7 +147,9 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <select
             value={sort}
             onChange={(e) => {
-              setSort(e.target.value);
+              const nextSort = e.target.value;
+              setSort(nextSort);
+              setSearchNear(nextSort === "distance" ? location! : krakowCenter);
               setCurrentPage(1);
               setSelectedPlace(null);
             }}

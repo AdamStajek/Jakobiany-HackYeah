@@ -407,6 +407,12 @@ def search(
             )
             ORDER BY p.id"""
         ).fetchall()
+        categories_by_place: dict[str, list[tuple[str, str]]] = {}
+        for place_id, category_id, label in db.execute(
+            """SELECT pc.place_id, c.id, c.label
+            FROM place_categories pc JOIN categories c ON c.id=pc.category_id"""
+        ):
+            categories_by_place.setdefault(place_id, []).append((category_id, label))
         if body.cursor is not None and not any(
             row["id"] == body.cursor for row in rows
         ):
@@ -435,10 +441,7 @@ def search(
             }
         candidates = []
         for row in rows:
-            categories = db.execute(
-                "SELECT c.id, c.label FROM categories c JOIN place_categories pc ON pc.category_id=c.id WHERE pc.place_id=?",
-                (row["id"],),
-            ).fetchall()
+            categories = categories_by_place.get(row["id"], [])
             if row["id"].startswith("community:"):
                 from hackyeah.place_submissions import submissions
 

@@ -157,6 +157,7 @@ class Source(Model):
     url: str | None
     license: str | None
     retrieved_at: AwareDatetime
+    modified_at: AwareDatetime | None = None
 
 
 class Observation(Model):

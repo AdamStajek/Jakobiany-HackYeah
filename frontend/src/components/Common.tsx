@@ -125,6 +125,8 @@ export function PlaceCard({
   );
 }
 export function FactRow({ fact }: { fact: Fact }) {
+  const osmModifiedAt = fact.sources.find((source) => source.modified_at)
+    ?.modified_at;
   const confidenceLabels = {
     certain: "Pewne",
     probable: "Prawdopodobne",
@@ -151,6 +153,14 @@ export function FactRow({ fact }: { fact: Fact }) {
                 timeZone: "Europe/Warsaw",
               })
             : "Brak daty obserwacji"}{" "}
+          {osmModifiedAt && (
+            <>
+              · Ostatnia edycja w OSM: {new Date(osmModifiedAt).toLocaleDateString(
+                "pl-PL",
+                { timeZone: "Europe/Warsaw" },
+              )}{" "}
+            </>
+          )}
           · Wiarygodność: {confidenceLabels[fact.confidence_level]} (
           {fact.confidence_score.toLocaleString("pl-PL", {
             maximumFractionDigits: 2,

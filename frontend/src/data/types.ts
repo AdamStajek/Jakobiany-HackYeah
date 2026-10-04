@@ -20,6 +20,7 @@ export type Source = {
   url: string | null;
   license: string | null;
   retrieved_at: string;
+  modified_at?: string | null;
 };
 export type Fact = {
   id: string;

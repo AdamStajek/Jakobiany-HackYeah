@@ -148,6 +148,7 @@ def extract_facts(
         url=f"https://www.openstreetmap.org/{object_id}",
         license="ODbL",
         retrieved_at=retrieved_at,
+        modified_at=updated_at,
     )
     return [
         Fact.model_validate(

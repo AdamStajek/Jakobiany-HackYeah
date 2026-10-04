@@ -118,13 +118,16 @@ def assess(facts: list[m.Fact], constraints: m.Constraints | None) -> m.Assessme
     )
 
 
-def source(updated: datetime, url: str | None = None) -> m.Source:
+def source(
+    updated: datetime, url: str | None = None, modified_at: str | None = None
+) -> m.Source:
     return m.Source(
         type="osm",
         label="© OpenStreetMap contributors",
         url=url or "https://www.openstreetmap.org/copyright",
         license="ODbL",
         retrieved_at=updated,
+        modified_at=datetime.fromisoformat(modified_at) if modified_at else None,
     )
 
 
@@ -137,9 +140,9 @@ def _facts(db: sqlite3.Connection, row: sqlite3.Row, updated: datetime) -> list[
         if item["attribute"] not in get_args(m.Attribute):
             continue
         sources = [
-            source(updated, evidence[0])
+            source(updated, evidence[0], evidence[1])
             for evidence in db.execute(
-                "SELECT DISTINCT o.source_url FROM fact_evidence e JOIN osm_objects o ON o.id=e.object_id WHERE e.place_id=? AND e.attribute=?",
+                "SELECT DISTINCT o.source_url, o.modified_at FROM fact_evidence e JOIN osm_objects o ON o.id=e.object_id WHERE e.place_id=? AND e.attribute=?",
                 (row["id"], item["attribute"]),
             )
         ]

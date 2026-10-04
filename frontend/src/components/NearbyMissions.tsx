@@ -119,8 +119,8 @@ export function NearbyMissions() {
           : "Włącz powiadomienia o misjach w pobliżu"}
       </button>
       <p className="muted">
-        W promieniu 150 m, gdy aplikacja jest otwarta. Wymagana zgoda na
-        lokalizację i powiadomienia.
+        Powiadomimy Cię o misji w promieniu 150 m, gdy aplikacja będzie otwarta.
+        Wymagana jest zgoda na lokalizację i powiadomienia.
       </p>
     </div>
   );

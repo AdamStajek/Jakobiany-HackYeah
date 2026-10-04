@@ -702,6 +702,9 @@ export function RoutePage() {
         {mode !== "car" && (
           <section className="panel route-needs">
             <h2>Twoje potrzeby na trasie</h2>
+            <div className="profile-settings-control">
+              <ProfileSettingsButton onApply={setConstraints} />
+            </div>
             <label className="check-field route-mobility-choice">
               <input
                 type="checkbox"
@@ -839,9 +842,6 @@ export function RoutePage() {
               </label>
             </>
           )}
-          <div className="profile-settings-control">
-            <ProfileSettingsButton onApply={setConstraints} />
-          </div>
           <AISearch
             mode="routes"
             onApply={(proposal) => {

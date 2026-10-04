@@ -107,15 +107,6 @@ export default function MapView({
       .querySelector(".leaflet-control-zoom-out")
       ?.setAttribute("aria-label", "Pomniejsz mapę");
     L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      maxNativeZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    })
-      .on("tileerror", () => setTileError(true))
-      .on("tileload", () => setTileError(false))
-      .addTo(map);
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
     return () => {
@@ -124,6 +115,32 @@ export default function MapView({
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    L.tileLayer(
+      language === "en"
+        ? "https://cdn.lima-labs.com/{z}/{x}/{y}.png?api=demo"
+        : "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        attribution:
+          language === "en"
+            ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://maps.lima-labs.com/">Lima Labs</a>'
+            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      },
+    )
+      .on("tileerror", () => setTileError(true))
+      .on("tileload", () => setTileError(false))
+      .addTo(map);
+    return () => {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) map.removeLayer(layer);
+      });
+    };
+  }, [language]);
 
   useEffect(() => {
     const map = mapRef.current;

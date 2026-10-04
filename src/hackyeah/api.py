@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from urllib.error import URLError
@@ -449,11 +450,12 @@ def start_mission(
 @router.post(
     "/missions/{id}/submit", response_model=m.MissionProgress, tags=["missions"]
 )
-def submit_mission(
+async def submit_mission(
     id: ResourceId, body: m.MissionSubmit, request: Request, response: Response
 ) -> m.MissionProgress:
     response.headers["Cache-Control"] = "no-store"
-    return missions.submit(auth.require_csrf(request), id, body)
+    user = auth.require_csrf(request)
+    return await asyncio.to_thread(missions.submit, user, id, body)
 
 
 @router.post(

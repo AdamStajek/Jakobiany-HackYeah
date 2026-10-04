@@ -214,7 +214,15 @@ export function formatFact(f: Fact): string {
     return reasonLabels[f.unconfirmed_reason || "missing"];
   if (f.value === null) return reasonLabels.missing;
   if (f.attribute === "steps_count" && typeof f.value === "number")
-    return f.value < 5 ? "Less than 5" : f.value < 10 ? "5–10" : "10 or more";
+    return `${f.value} ${
+      f.value === 1
+        ? "stopień"
+        : f.value % 10 >= 2 &&
+            f.value % 10 <= 4 &&
+            (f.value % 100 < 12 || f.value % 100 > 14)
+          ? "stopnie"
+          : "stopni"
+    }`;
   if (
     ["threshold_height_cm", "kerb_height_cm"].includes(f.attribute) &&
     typeof f.value === "number"

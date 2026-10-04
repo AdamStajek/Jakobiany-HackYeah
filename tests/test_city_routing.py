@@ -168,6 +168,37 @@ class CityRoutingTests(unittest.TestCase):
             )
         )
 
+    def test_bednarski_kika_demo_returns_two_synthetic_variants(self):
+        from hackyeah.mobility_routing import plan_mobility_route
+
+        request = self.request(max_steps=0, require_step_free_access=True).model_copy(
+            update={
+                "origin": m.PlaceReference(place_id="node/288615790"),
+                "destination": m.PlaceReference(place_id="node/2255629846"),
+            }
+        )
+        result = plan_mobility_route(request)
+        routes = {route.variant: route for route in result.routes}
+
+        self.assertEqual(set(routes), {"fastest", "constrained"})
+        self.assertLess(routes["fastest"].distance_m, routes["constrained"].distance_m)
+        self.assertGreater(len(routes["fastest"].geometry.coordinates), 10)
+        self.assertGreater(len(routes["constrained"].geometry.coordinates), 10)
+        self.assertGreater(len(routes["fastest"].segments), 1)
+        self.assertFalse(any(f.value is None for f in routes["fastest"].facts))
+        self.assertTrue(
+            any(
+                f.attribute == "steps_count" and f.value == 24
+                for f in routes["fastest"].facts
+            )
+        )
+        gaps = [f for f in routes["constrained"].facts if f.value is None]
+        self.assertEqual(
+            [(f.attribute, f.unconfirmed_reason) for f in gaps],
+            [("rest_area_available", "missing")],
+        )
+        self.assertIn("syntetyczne", result.warnings[0])
+
     def test_no_fallback_when_step_free_route_is_missing(self):
         from hackyeah.mobility_routing import plan_mobility_route
 

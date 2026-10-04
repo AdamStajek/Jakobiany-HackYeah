@@ -42,6 +42,8 @@ const points = [
   { id: "wawel", name: "Wawel" },
 ];
 const noPlaces: [] = [];
+const syntheticRouteWarning =
+  "Przebieg tras Pomnik Wojciecha Bednarskiego → Kinokawiarnia Kika oparto na sieci dróg OSM; dane o niedogodnościach są syntetyczne i służą wyłącznie do demo.";
 type Coordinates = { lat: number; lon: number };
 function PointSearch({
   label,
@@ -299,13 +301,23 @@ function RouteDifficulties({ route }: { route: PlannedRoute }) {
         ...new Set([
           ...facts.map((fact) => {
             const value =
-              typeof fact.value === "number"
-                ? `${fact.value} ${fact.unit === "percent" ? "%" : fact.unit || ""}`.trim()
-                : typeof fact.value === "boolean"
-                  ? fact.value
-                    ? "Tak"
-                    : "Nie"
-                  : formatFact(fact);
+              fact.attribute === "steps_count" && typeof fact.value === "number"
+                ? `${fact.value} ${
+                    fact.value === 1
+                      ? "stopień"
+                      : fact.value % 10 >= 2 &&
+                          fact.value % 10 <= 4 &&
+                          (fact.value % 100 < 12 || fact.value % 100 > 14)
+                        ? "stopnie"
+                        : "stopni"
+                  }`
+                : typeof fact.value === "number"
+                  ? `${fact.value} ${fact.unit === "percent" ? "%" : fact.unit || ""}`.trim()
+                  : typeof fact.value === "boolean"
+                    ? fact.value
+                      ? "Tak"
+                      : "Nie"
+                    : formatFact(fact);
             return `${labels[fact.attribute] || fact.attribute}: ${value}`;
           }),
           ...reasons
@@ -358,7 +370,7 @@ function RouteDifficulties({ route }: { route: PlannedRoute }) {
 function RouteInformationGaps({ route }: { route: PlannedRoute }) {
   const navigate = useNavigate();
   const { session } = useDemo();
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const seen = new Set<string>();
   const gaps = route.segments.flatMap((segment, index) =>
@@ -371,56 +383,78 @@ function RouteInformationGaps({ route }: { route: PlannedRoute }) {
       .map((fact) => ({ segment, index, fact })),
   );
   if (!gaps.length) return null;
+  const canSubmit = gaps.every(({ segment }) => {
+    const [lon, lat] = segment.geometry.coordinates[0] || [];
+    return lat !== undefined && lon !== undefined;
+  });
   return (
-    <section className="route-information-gaps" aria-label="Braki informacji na trasie">
-      <strong>Braki informacji na trasie: {gaps.length}</strong>
+    <section
+      className="route-information-gaps"
+      aria-label="Niepewności na trasie"
+    >
+      <strong>Niepewności na trasie</strong>
       <details open>
-        <summary>Pokaż informacje do sprawdzenia</summary>
+        <summary>Informacje do sprawdzenia</summary>
         <ul>
-          {gaps.map(({ segment, index, fact }) => {
-            const [lon, lat] = segment.geometry.coordinates[0] || [];
-            return (
-              <li key={fact.id}>
-                <span>Odcinek {index + 1}: {labels[fact.attribute] || fact.attribute}</span>
-                {session ? (
-                  <button
-                    type="button"
-                    className="button subtle"
-                    disabled={busy !== null || lat === undefined || lon === undefined}
-                    onClick={async () => {
-                      if (lat === undefined || lon === undefined) return;
-                      setBusy(fact.id);
-                      setError("");
-                      try {
-                        const mission = await requestRouteVerificationMission({
-                          fact_id: fact.id,
-                          attribute: fact.attribute,
-                          instruction: segment.instruction,
-                          location: { lat, lon },
-                        });
-                        navigate(`/report/success?mission=${encodeURIComponent(mission.id)}`, {
-                          state: { missions: [mission] },
-                        });
-                      } catch (reason) {
-                        setError(reason instanceof Error ? reason.message : "Nie udało się zgłosić braku informacji.");
-                      } finally {
-                        setBusy(null);
-                      }
-                    }}
-                  >
-                    {busy === fact.id ? "Zgłaszanie…" : "Zgłoś"}
-                  </button>
-                ) : (
-                  <Link className="button subtle" to={`/login?next=${encodeURIComponent(`/route/${route.id}/details`)}`}>
-                    Zgłoś
-                  </Link>
-                )}
-              </li>
-            );
-          })}
+          {gaps.map(({ index, fact }) => (
+            <li key={fact.id}>
+              Odcinek {index + 1}: {labels[fact.attribute] || fact.attribute}
+            </li>
+          ))}
         </ul>
       </details>
-      {error && <p className="warning-box" role="alert">{error}</p>}
+      {session ? (
+        <button
+          type="button"
+          className="button subtle"
+          disabled={busy || !canSubmit}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              const missions = await Promise.all(
+                gaps.map(({ segment, fact }) => {
+                  const [lon, lat] = segment.geometry.coordinates[0]!;
+                  return requestRouteVerificationMission({
+                    fact_id: fact.id,
+                    attribute: fact.attribute,
+                    instruction: segment.instruction,
+                    location: { lat, lon },
+                  });
+                }),
+              );
+              navigate(
+                `/report/success?mission=${encodeURIComponent(missions[0].id)}`,
+                {
+                  state: { missions },
+                },
+              );
+            } catch (reason) {
+              setError(
+                reason instanceof Error
+                  ? reason.message
+                  : "Nie udało się zgłosić niepewności na trasie.",
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Zgłaszanie…" : "Zgłoś do weryfikacji wszystkie niepewności"}
+        </button>
+      ) : (
+        <Link
+          className="button subtle"
+          to={`/login?next=${encodeURIComponent(`/route/${route.id}/details`)}`}
+        >
+          Zgłoś do weryfikacji wszystkie niepewności
+        </Link>
+      )}
+      {error && (
+        <p className="warning-box" role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }
@@ -462,6 +496,10 @@ export function RoutePage() {
     );
   const [destinationCoordinates, setDestinationCoordinates] =
     useState<Coordinates | null>(null);
+  const [originSearchCoordinates, setOriginSearchCoordinates] =
+    useState<Coordinates | null>(null);
+  const [destinationSearchCoordinates, setDestinationSearchCoordinates] =
+    useState<Coordinates | null>(null);
   const [picking, setPicking] = useState<"origin" | "destination" | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const [destinationName, setDestinationName] = useState("Wybrane miejsce");
@@ -479,17 +517,22 @@ export function RoutePage() {
   const [vehicleWarnings, setVehicleWarnings] = useState<string[]>([]);
   const [mapSources, setMapSources] = useState<Source[]>([]);
   const request = useRef<AbortController | null>(null);
-  const endpoints = useMemo(
-    () => [
-      ...(originCoordinates
-        ? [{ ...originCoordinates, label: "Początek trasy" }]
+  const endpoints = useMemo(() => {
+    const originPoint = originCoordinates || originSearchCoordinates;
+    const destinationPoint =
+      destinationCoordinates || destinationSearchCoordinates;
+    return [
+      ...(originPoint ? [{ ...originPoint, label: "Początek trasy" }] : []),
+      ...(destinationPoint
+        ? [{ ...destinationPoint, label: "Cel trasy" }]
         : []),
-      ...(destinationCoordinates
-        ? [{ ...destinationCoordinates, label: "Cel trasy" }]
-        : []),
-    ],
-    [originCoordinates, destinationCoordinates],
-  );
+    ];
+  }, [
+    originCoordinates,
+    destinationCoordinates,
+    originSearchCoordinates,
+    destinationSearchCoordinates,
+  ]);
   const knownDestination = points.some((point) => point.id === destination);
 
   useEffect(() => {
@@ -632,7 +675,9 @@ export function RoutePage() {
       );
       if (controller.signal.aborted) return;
       setWarnings(response.warnings);
-      const route = response.routes[0];
+      const route =
+        response.routes.find((candidate) => candidate.variant === "constrained") ||
+        response.routes[0];
       if (!route) {
         setError("Nie znaleziono trasy spełniającej Twoje wymagania.");
         return;
@@ -683,10 +728,12 @@ export function RoutePage() {
       setOrigin("map-origin");
       setOriginName(name);
       setOriginCoordinates(point);
+      setOriginSearchCoordinates(null);
     } else {
       setDestination("map-destination");
       setDestinationName(name);
       setDestinationCoordinates(point);
+      setDestinationSearchCoordinates(null);
     }
     finishPicking();
   }
@@ -868,6 +915,7 @@ export function RoutePage() {
               setOrigin(point.id);
               setOriginName(point.name);
               setOriginCoordinates(null);
+              setOriginSearchCoordinates(point.location);
             }}
           />
           <button
@@ -892,6 +940,7 @@ export function RoutePage() {
               setDestination(point.id);
               setDestinationName(point.name);
               setDestinationCoordinates(null);
+              setDestinationSearchCoordinates(point.location);
             }}
           />
           <button
@@ -985,6 +1034,9 @@ export function RoutePage() {
               <>
                 {plan.route.mode !== "car" && plan.route.mode !== "transit" && (
                   <div aria-label="Warianty trasy pieszej">
+                    {plan.warnings.includes(syntheticRouteWarning) && (
+                      <p className="warning-box">{syntheticRouteWarning}</p>
+                    )}
                     {[...(plan.alternatives || [])]
                       .sort(
                         (a, b) =>

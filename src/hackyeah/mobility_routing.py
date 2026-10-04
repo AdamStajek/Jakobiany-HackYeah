@@ -25,6 +25,9 @@ from hackyeah.mobility_data import (
 )
 
 WARSAW = ZoneInfo("Europe/Warsaw")
+BEDNARSKI = "node/288615790"
+KIKA = "node/2255629846"
+SYNTHETIC_ROUTE_WARNING = "Przebieg tras Pomnik Wojciecha Bednarskiego → Kinokawiarnia Kika oparto na sieci dróg OSM; dane o niedogodnościach są syntetyczne i służą wyłącznie do demo."
 
 
 def uncertain(summary):
@@ -82,6 +85,179 @@ def combined_route(segments, mode, duration, parking=None):
         facts=[f for s in segments for f in s.facts],
         computed_at=datetime.now(UTC),
         parking=parking,
+    )
+
+
+def bednarski_kika_demo(request, graph):
+    if not (
+        isinstance(request.origin, m.PlaceReference)
+        and isinstance(request.destination, m.PlaceReference)
+        and request.origin.place_id == BEDNARSKI
+        and request.destination.place_id == KIKA
+    ):
+        return None
+    now = datetime.now(UTC)
+    source = m.Source(
+        type="other",
+        label="Syntetyczny scenariusz demonstracyjny",
+        url=None,
+        license=None,
+        retrieved_at=now,
+    )
+
+    def demo_facts(identifier, *, steps=0, rest_known=True):
+        values = {
+            "steps_count": steps,
+            "steps_present": steps > 0,
+            "threshold_height_cm": 0,
+            "kerb_height_cm": 0,
+            "raised_kerb": False,
+            "ramp_available": steps == 0,
+            "surface": "paved",
+            "smoothness": "good",
+            "lighting_available": True,
+        }
+        facts = []
+        for attribute, value in values.items():
+            facts.append(
+                m.Fact(
+                    id=f"synthetic/{identifier}/{attribute}",
+                    attribute=attribute,
+                    value=value,
+                    unit="count"
+                    if attribute == "steps_count"
+                    else "cm"
+                    if attribute.endswith("_cm")
+                    else None,
+                    status="confirmed",
+                    confidence_score=100,
+                    confidence_level="certain",
+                    confidence_calculated_at=now,
+                    confidence_percent=100,
+                    observed_at=now,
+                    updated_at=now,
+                    valid_until=None,
+                    sources=[source],
+                    unconfirmed_reason=None,
+                )
+            )
+        if not rest_known:
+            facts.append(
+                m.Fact(
+                    id=f"synthetic/{identifier}/rest_area_available",
+                    attribute="rest_area_available",
+                    value=None,
+                    unit=None,
+                    status="unconfirmed",
+                    confidence_percent=None,
+                    observed_at=None,
+                    updated_at=now,
+                    valid_until=None,
+                    sources=[],
+                    unconfirmed_reason="missing",
+                )
+            )
+        return facts
+
+    empty_constraints = m.Constraints.model_validate(
+        {field: None for field in m.Constraints.model_fields}
+    )
+    fastest = plan_city_route(
+        request.model_copy(update={"constraints": empty_constraints}),
+        graph,
+        fastest=True,
+    )
+    step_free = empty_constraints.model_copy(
+        update={"max_steps": 0, "require_step_free_access": True}
+    )
+    constrained = plan_city_route(
+        request.model_copy(update={"constraints": step_free}), graph
+    )
+    if not fastest.routes or not constrained.routes:
+        return None
+
+    short = fastest.routes[0]
+    stair_segments = [
+        index
+        for index, segment in enumerate(short.segments)
+        if "schody" in segment.instruction.casefold()
+    ]
+    if not stair_segments:
+        return None
+    stair_index = max(
+        stair_segments, key=lambda index: short.segments[index].distance_m
+    )
+    for index, segment in enumerate(short.segments):
+        steps = 24 if index == stair_index else 0
+        segment.id = f"bednarski-kika-stairs-{index}"
+        segment.facts = demo_facts(segment.id, steps=steps)
+        segment.assessment = m.Assessment(
+            status="does_not_meet_requirements" if steps else "meets_requirements",
+            summary="Syntetyczne dane: schody, 24 stopnie."
+            if steps
+            else "Brak zarejestrowanych niedogodności.",
+            reasons=[
+                m.AssessmentReason(
+                    code="SYNTHETIC_STAIRS",
+                    message="Schody: 24 stopnie.",
+                    fact_ids=[f"synthetic/{segment.id}/steps_count"],
+                )
+            ]
+            if steps
+            else [],
+        )
+    short.id = "demo-bednarski-kika-stairs"
+    short.variant = "fastest"
+    short.facts = [fact for segment in short.segments for fact in segment.facts]
+    short.assessment = m.Assessment(
+        status="does_not_meet_requirements",
+        summary="Krótszy wariant prowadzi prawdziwymi drogami i obejmuje schody.",
+        reasons=[
+            reason
+            for segment in short.segments
+            for reason in segment.assessment.reasons
+        ],
+    )
+
+    long = constrained.routes[0]
+    gap_index = len(long.segments) // 2
+    for index, segment in enumerate(long.segments):
+        rest_known = index != gap_index
+        segment.id = f"bednarski-kika-detour-{index}"
+        segment.facts = demo_facts(segment.id, rest_known=rest_known)
+        segment.assessment = m.Assessment(
+            status="meets_requirements" if rest_known else "uncertain",
+            summary="Brak zarejestrowanych niedogodności."
+            if rest_known
+            else "Nie potwierdzono obecności miejsca odpoczynku.",
+            reasons=[]
+            if rest_known
+            else [
+                m.AssessmentReason(
+                    code="SYNTHETIC_MISSING_REST_AREA",
+                    message="Niepewność: brak potwierdzenia miejsca odpoczynku.",
+                    fact_ids=[f"synthetic/{segment.id}/rest_area_available"],
+                )
+            ],
+        )
+    long.id = "demo-bednarski-kika-detour"
+    long.variant = "constrained"
+    long.facts = [fact for segment in long.segments for fact in segment.facts]
+    long.assessment = m.Assessment(
+        status="uncertain",
+        summary="Dłuższy wariant omija schody; nie potwierdzono miejsca odpoczynku.",
+        reasons=[
+            reason for segment in long.segments for reason in segment.assessment.reasons
+        ],
+    )
+
+    return m.RoutePlanResponse(
+        routes=[
+            short,
+            long,
+        ],
+        warnings=[SYNTHETIC_ROUTE_WARNING],
+        attribution=[*fastest.attribution, source],
     )
 
 
@@ -754,6 +930,9 @@ def plan_transit(request):
 def plan_mobility_route(request):
     if request.mode == "walk":
         graph = get_graph()
+        demo = bednarski_kika_demo(request, graph)
+        if demo is not None:
+            return demo
         response = plan_city_route(request, graph)
         if not response.routes:
             return response

@@ -570,21 +570,23 @@ def search(
 
 
 def route_points(query: str) -> m.Page[m.PlaceSummary]:
-    """Named places/addresses for endpoint selection, without accessibility filtering."""
+    """Named places and mapped addresses for route endpoint selection."""
     with closing(_connect()) as db:
         rows = db.execute(
-            f"SELECT id,name,lat,lon,street,housenumber FROM {catalogue_table(db)} WHERE name IS NOT NULL ORDER BY name"
+            f"SELECT id,name,lat,lon,street,housenumber FROM {catalogue_table(db)} "
+            "WHERE name IS NOT NULL OR street IS NOT NULL OR housenumber IS NOT NULL "
+            "ORDER BY name,street,housenumber"
         ).fetchall()
     needle = query.strip().casefold()
     items = []
     for row in rows:
         address = " ".join(filter(None, (row["street"], row["housenumber"])))
-        if needle not in f"{row['name']} {address}".casefold():
+        if needle not in f"{row['name'] or ''} {address}".casefold():
             continue
         items.append(
             m.PlaceSummary(
                 id=row["id"],
-                name=row["name"],
+                name=row["name"] or address,
                 category="Punkt trasy",
                 assessment=m.Assessment(
                     status="uncertain",

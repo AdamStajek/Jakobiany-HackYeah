@@ -95,6 +95,16 @@ function Layout({
     document.documentElement.lang = language;
     const root = document.getElementById("root");
     if (!root) return;
+    const updateTextLanguage = (node: HTMLElement) => {
+    const copy = Array.from(node.childNodes)
+      .filter((child) => child.nodeType === Node.TEXT_NODE)
+      .map((child) => child.textContent || "");
+    for (const attr of ["aria-label", "title", "alt"]) {
+      const value = node.getAttribute(attr);
+      if (value) copy.push(value);
+    }
+    node.lang = textLanguage(copy);
+    };
     const apply = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE && node.textContent) {
         const translated = translate(node.textContent);
@@ -113,22 +123,18 @@ function Layout({
         }
         if (!(node instanceof HTMLTextAreaElement))
           node.childNodes.forEach(apply);
-        const copy = Array.from(node.childNodes)
-          .filter((child) => child.nodeType === Node.TEXT_NODE)
-          .map((child) => child.textContent || "");
-        for (const attr of ["aria-label", "title", "alt"]) {
-          const value = node.getAttribute(attr);
-          if (value) copy.push(value);
-        }
-        node.lang = textLanguage(copy);
+        updateTextLanguage(node);
       }
     };
     root.childNodes.forEach(apply);
-    const observer = new MutationObserver((records) =>
+    const observer = new MutationObserver((records) => {
+      const parents = new Set<HTMLElement>();
       records.forEach((record) => {
         if (record.type === "childList") record.addedNodes.forEach(apply);
-        if (record.type === "characterData" && record.target.parentElement)
-          apply(record.target.parentElement);
+        if (record.type === "characterData" && record.target.parentElement) {
+          apply(record.target);
+          parents.add(record.target.parentElement);
+        }
         if (
           record.type === "attributes" &&
           record.target instanceof HTMLElement
@@ -141,8 +147,9 @@ function Layout({
               record.target.setAttribute(attr, translated);
           }
         }
-      }),
-    );
+      });
+      parents.forEach(updateTextLanguage);
+    });
     observer.observe(root, {
       subtree: true,
       childList: true,

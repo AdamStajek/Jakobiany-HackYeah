@@ -39,6 +39,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [error, setError] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<PlaceSummary | null>(null);
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
     setSelectedPlace(null);
     setLoading(true);
@@ -47,7 +48,14 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
     setTotalCount(0);
     setCurrentPage(1);
     setNextCursor(null);
-    searchPlaces(query || category, constraints, null, location, 10)
+    searchPlaces(
+      query || category,
+      constraints,
+      null,
+      location,
+      10,
+      controller.signal,
+    )
       .then((page) => {
         if (active) {
           setResults(page.items);
@@ -68,6 +76,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [query, category, constraints, location]);
   async function goToPage(pageNumber: number) {

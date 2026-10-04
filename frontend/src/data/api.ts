@@ -184,6 +184,7 @@ export async function searchPlaces(
   cursor?: string | null,
   near?: { lat: number; lon: number } | null,
   limit = 50,
+  signal?: AbortSignal,
 ): Promise<PlacePage> {
   return api("/places/search", {
     method: "POST",
@@ -195,6 +196,7 @@ export async function searchPlaces(
       cursor,
       ...(near ? { near, radius_m: 20000 } : {}),
     }),
+    signal,
   });
 }
 

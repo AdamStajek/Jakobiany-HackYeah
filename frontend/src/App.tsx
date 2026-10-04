@@ -15,6 +15,7 @@ import {
   Star,
   UserRound,
   LogOut,
+  Settings as SettingsIcon,
   Menu,
   X,
 } from "lucide-react";
@@ -49,6 +50,7 @@ import {
 import { MissionsPage, MissionPage } from "./pages/Missions";
 import { NearbyMissions } from "./components/NearbyMissions";
 import { Profile } from "./pages/Profile";
+import { Settings } from "./pages/Settings";
 import { ReviewPage } from "./pages/Review";
 import { Auth, About, NotFound } from "./pages/Info";
 import { PublicData, Privacy, DataQuality } from "./pages/DataPolicies";
@@ -57,6 +59,7 @@ const nav = [
   { to: "/route", label: "Trasy", icon: RouteIcon },
   { to: "/report", label: "Zgłoś", icon: Flag },
   { to: "/missions", label: "Misje", icon: Star },
+  { to: "/settings", label: "Ustawienia", icon: SettingsIcon },
 ];
 function Layout({
   children,
@@ -574,6 +577,7 @@ export default function App() {
             <Route path="/place/:id" element={<PlacePage />} />
             <Route path="/profile/setup" element={<NeedsPage />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/route" element={<RoutePage />} />
             <Route path="/route/:id/details" element={<RouteDetails />} />

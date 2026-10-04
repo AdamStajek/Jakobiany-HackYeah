@@ -18,21 +18,9 @@ export function Profile() {
     activity,
     refreshActivity,
   } = useDemo();
-  const [large, setLarge] = useState(
-    document.documentElement.classList.contains("large-text"),
-  );
-  const [contrast, setContrast] = useState(
-    document.documentElement.classList.contains("high-contrast"),
-  );
   const [names, setNames] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    document.documentElement.classList.toggle("large-text", large);
-  }, [large]);
-  useEffect(() => {
-    document.documentElement.classList.toggle("high-contrast", contrast);
-  }, [contrast]);
   useEffect(() => {
     let active = true;
     const ids = [
@@ -112,24 +100,6 @@ export function Profile() {
           <Link className="button primary" to="/profile/setup">
             Edytuj profil potrzeb
           </Link>
-          <hr />
-          <h3>Dostępność interfejsu</h3>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={large}
-              onChange={(event) => setLarge(event.target.checked)}
-            />
-            Większy tekst
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={contrast}
-              onChange={(event) => setContrast(event.target.checked)}
-            />
-            Zwiększony kontrast
-          </label>
           {session ? (
             <button className="button subtle" disabled={busy} onClick={logOut}>
               {busy ? "Wylogowywanie…" : "Wyloguj się"}

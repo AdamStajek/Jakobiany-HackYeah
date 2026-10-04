@@ -1,5 +1,5 @@
 import { translate } from "../i18n";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -52,6 +52,7 @@ export function MissionsPage() {
   );
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeOrigin, setPlaceOrigin] = useState<PlaceSummary | null>(null);
+  const placeSearchInput = useRef<HTMLInputElement>(null);
   const [placeResults, setPlaceResults] = useState<PlaceSummary[]>([]);
   const [placeSearching, setPlaceSearching] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState("");
@@ -232,6 +233,7 @@ export function MissionsPage() {
         <label className="field search-sort">
           Szukaj miejsca
           <input
+            ref={placeSearchInput}
             type="search"
             value={placeQuery}
             placeholder="Np. Rynek Główny"
@@ -282,7 +284,10 @@ export function MissionsPage() {
           <button
             type="button"
             className="text-button"
-            onClick={() => setPlaceOrigin(null)}
+            onClick={() => {
+              setPlaceOrigin(null);
+              placeSearchInput.current?.focus();
+            }}
           >
             Wyczyść wybór
           </button>
@@ -318,6 +323,7 @@ export function MissionsPage() {
                 type="button"
                 onClick={() => {
                   setPlaceOrigin(place);
+                  placeSearchInput.current?.focus();
                   setPlaceQuery("");
                   setPlaceResults([]);
                   setPlaceSearching(false);

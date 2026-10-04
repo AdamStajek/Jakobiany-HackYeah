@@ -29,6 +29,7 @@ export function NewPlacePage() {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [invalidLocation, setInvalidLocation] = useState(false);
   const [success, setSuccess] = useState("");
   const [coordinates, setCoordinates] = useState({ lat: "", lon: "" });
   const [picking, setPicking] = useState(false);
@@ -69,6 +70,12 @@ export function NewPlacePage() {
     event.preventDefault();
     const form = event.currentTarget;
     const values = new FormData(form);
+    setInvalidLocation(false);
+    const locationError = (message: string, field: string) => {
+      setError(message);
+      setInvalidLocation(true);
+      form.querySelector<HTMLInputElement>(`[name="${field}"]`)?.focus();
+    };
     const address = String(values.get("address")).trim();
     const latValue = String(values.get("lat")).trim();
     const lonValue = String(values.get("lon")).trim();
@@ -76,19 +83,29 @@ export function NewPlacePage() {
     const lat = Number(latValue);
     const lon = Number(lonValue);
     if (!address && !hasCoordinates) {
-      setError("Podaj adres albo obie współrzędne miejsca.");
+      locationError("Podaj adres albo obie współrzędne miejsca.", "address");
       return;
     }
     if ((latValue === "") !== (lonValue === "")) {
-      setError("Podaj obie współrzędne albo usuń je i wpisz adres.");
+      locationError(
+        "Podaj obie współrzędne albo usuń je i wpisz adres.",
+        latValue === "" ? "lat" : "lon",
+      );
       return;
     }
     if (
       hasCoordinates &&
-      (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
-        !Number.isFinite(lon) || lon < -180 || lon > 180)
+      (!Number.isFinite(lat) ||
+        lat < -90 ||
+        lat > 90 ||
+        !Number.isFinite(lon) ||
+        lon < -180 ||
+        lon > 180)
     ) {
-      setError("Współrzędne muszą mieścić się w poprawnym zakresie.");
+      locationError(
+        "Współrzędne muszą mieścić się w poprawnym zakresie.",
+        "lat",
+      );
       return;
     }
     setBusy(true);
@@ -129,7 +146,7 @@ export function NewPlacePage() {
         description="Podaj dane miejsca. Administrator zweryfikuje zgłoszenie przed publikacją w katalogu."
       />
       {error && (
-        <p role="alert" className="warning-box">
+        <p id="new-place-error" role="alert" className="warning-box">
           {error}
         </p>
       )}
@@ -147,13 +164,19 @@ export function NewPlacePage() {
       ) : (
         <>
           <form className="panel" onSubmit={submit}>
+            <p>Nazwa miejsca i kategoria są wymagane.</p>
             <label className="field">
               Nazwa miejsca
               <input name="name" required maxLength={100} />
             </label>
             <label className="field">
-              Kategoria
-              <select name="category" required defaultValue="">
+              <span id="new-place-category-label">Kategoria</span>
+              <select
+                aria-labelledby="new-place-category-label"
+                name="category"
+                required
+                defaultValue=""
+              >
                 <option value="" disabled>
                   Wybierz kategorię
                 </option>
@@ -166,9 +189,17 @@ export function NewPlacePage() {
             </label>
             <label className="field">
               Adres
-              <input name="address" maxLength={300} />
+              <input
+                name="address"
+                maxLength={300}
+                aria-invalid={invalidLocation || undefined}
+                aria-describedby={`new-place-location-help${invalidLocation ? " new-place-error" : ""}`}
+              />
             </label>
-            <p>Podaj poprawny adres albo współrzędne. Przy samym adresie moderator wskaże miejsce na mapie przed zatwierdzeniem.</p>
+            <p id="new-place-location-help">
+              Podaj poprawny adres albo współrzędne. Przy samym adresie
+              moderator wskaże miejsce na mapie przed zatwierdzeniem.
+            </p>
             <button
               type="button"
               className="button subtle"
@@ -205,6 +236,8 @@ export function NewPlacePage() {
             <label className="field">
               Szerokość geograficzna
               <input
+                aria-invalid={invalidLocation || undefined}
+                aria-describedby={`new-place-location-help${invalidLocation ? " new-place-error" : ""}`}
                 name="lat"
                 id="new-place-lat"
                 type="number"
@@ -220,6 +253,8 @@ export function NewPlacePage() {
             <label className="field">
               Długość geograficzna
               <input
+                aria-invalid={invalidLocation || undefined}
+                aria-describedby={`new-place-location-help${invalidLocation ? " new-place-error" : ""}`}
                 name="lon"
                 type="number"
                 step="any"

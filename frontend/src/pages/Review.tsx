@@ -1,13 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeading } from "../components/Common";
 import MapView from "../components/MapView";
 import { useDemo } from "../state/DemoContext";
-import {
-  api,
-  type PlaceSubmission,
-  listAll,
-} from "../data/api";
+import { api, type PlaceSubmission, listAll } from "../data/api";
 import type { PlaceSummary } from "../data/types";
 
 const noPlaces: PlaceSummary[] = [];
@@ -24,16 +20,23 @@ function PlaceSubmissionCard({
   const [error, setError] = useState("");
   const [location, setLocation] = useState(item.location);
   const [pickingLocation, setPickingLocation] = useState(false);
+  const mapId = useId();
+  const mapButton = useRef<HTMLButtonElement>(null);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pickingLocation)
+      mapContainer.current?.querySelector<HTMLElement>(".map-canvas")?.focus();
+  }, [pickingLocation]);
+  const closeMap = () => {
+    setPickingLocation(false);
+    mapButton.current?.focus();
+  };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const decision = (event.nativeEvent as SubmitEvent).submitter?.getAttribute(
       "value",
     );
-    if (
-      !comment.trim() ||
-      !decision ||
-      (decision === "accepted" && !location)
-    )
+    if (!comment.trim() || !decision || (decision === "accepted" && !location))
       return;
     setBusy(true);
     setError("");
@@ -66,12 +69,16 @@ function PlaceSubmissionCard({
       </p>
       {location ? (
         <>
-          <p>Współrzędne: {location.lat}, {location.lon}</p>
+          <p>
+            Współrzędne: {location.lat}, {location.lon}
+          </p>
           <a
             href={`https://www.openstreetmap.org/?mlat=${location.lat}&mlon=${location.lon}#map=18/${location.lat}/${location.lon}`}
             target="_blank"
             rel="noreferrer"
-          >Sprawdź na mapie</a>
+          >
+            Sprawdź na mapie
+          </a>
         </>
       ) : (
         <p>Przed zatwierdzeniem wskaż położenie miejsca na mapie.</p>
@@ -79,19 +86,28 @@ function PlaceSubmissionCard({
       <button
         type="button"
         className="button subtle"
+        ref={mapButton}
+        aria-expanded={pickingLocation}
+        aria-controls={mapId}
         onClick={() => setPickingLocation(!pickingLocation)}
       >
-        {pickingLocation ? "Zamknij mapę" : location ? "Zmień położenie na mapie" : "Wskaż położenie na mapie"}
+        {pickingLocation
+          ? "Zamknij mapę"
+          : location
+            ? "Zmień położenie na mapie"
+            : "Wskaż położenie na mapie"}
       </button>
       {pickingLocation && (
-        <MapView
-          places={noPlaces}
-          onSelectPoint={(point) => {
-            setLocation(point);
-            setPickingLocation(false);
-          }}
-          onCancelSelection={() => setPickingLocation(false)}
-        />
+        <div id={mapId} ref={mapContainer}>
+          <MapView
+            places={noPlaces}
+            onSelectPoint={(point) => {
+              setLocation(point);
+              closeMap();
+            }}
+            onCancelSelection={closeMap}
+          />
+        </div>
       )}
       {item.description && <p>{item.description}</p>}
       <form onSubmit={submit}>
@@ -129,7 +145,7 @@ function PlaceSubmissionCard({
 }
 
 export function ReviewPage() {
-  const { session } = useDemo();
+  const { session, notify } = useDemo();
   const [places, setPlaces] = useState<PlaceSubmission[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -138,7 +154,8 @@ export function ReviewPage() {
     setLoading(true);
     setError("");
     try {
-      const pendingPlaces = await listAll<PlaceSubmission>("/place-submissions");
+      const pendingPlaces =
+        await listAll<PlaceSubmission>("/place-submissions");
       setPlaces(
         pendingPlaces.filter((item) => item.author_id !== session?.user.id),
       );
@@ -187,17 +204,19 @@ export function ReviewPage() {
       )}
       {loading && <p role="status">Pobieranie kolejki…</p>}
       {!loading && !error && !places.length && (
-        <p>Brak miejsc oczekujących na weryfikację.</p>
+        <p role="status">Brak miejsc oczekujących na weryfikację.</p>
       )}
       {places.map((item) => (
         <PlaceSubmissionCard
           key={item.id}
           item={item}
-          done={() =>
+          done={() => {
             setPlaces((current) =>
               current.filter((value) => value.id !== item.id),
-            )
-          }
+            );
+            notify("Rozpatrzono zgłoszenie miejsca.");
+            document.querySelector<HTMLElement>("#content h1")?.focus();
+          }}
         />
       ))}
     </div>

@@ -473,7 +473,15 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
             <label htmlFor="report-place-search">Miejsce do zgłoszenia</label>
             <input
               id="report-place-search"
-              aria-invalid={!placeId || undefined}
+              aria-invalid={
+                error === "Wybierz miejsce z listy wyników wyszukiwania." ||
+                undefined
+              }
+              aria-describedby={
+                error === "Wybierz miejsce z listy wyników wyszukiwania."
+                  ? "report-error"
+                  : undefined
+              }
               required
               value={query}
               onFocus={() => setPlaceSearchOpen(true)}
@@ -499,6 +507,7 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
                     onClick={() => {
                       setPlaceId(item.id);
                       setQuery(item.name);
+                      document.getElementById("report-place-search")?.focus();
                       setPlaceSearchOpen(false);
                     }}
                   >

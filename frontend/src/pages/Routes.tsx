@@ -73,7 +73,11 @@ function PointSearch({
   >([]);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => setQuery(selectedName || initialQuery), [selectedName, initialQuery]);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(
+    () => setQuery(selectedName || initialQuery),
+    [selectedName, initialQuery],
+  );
   useEffect(() => {
     const controller = new AbortController();
     setResults([]);
@@ -99,14 +103,25 @@ function PointSearch({
     };
   }, [query, selectedName]);
   return (
-    <div className="route-point-search">
+    <div
+      className="route-point-search"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          setDismissed(true);
+          input.current?.focus();
+        }
+      }}
+    >
       <label className="field">
         <span className="sr-only">{label}</span>
         <input
           ref={input}
           value={query}
           placeholder="Nazwa miejsca lub adres"
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setDismissed(false);
+          }}
           autoComplete="off"
         />
       </label>
@@ -115,7 +130,12 @@ function PointSearch({
           {error}
         </p>
       )}
-      {query !== selectedName && results.length > 0 && (
+      <p role="status" className="sr-only">
+        {!dismissed && query !== selectedName && results.length > 0
+          ? `Znaleziono ${results.length} punktów. Przejdź do wyników klawiszem Tab.`
+          : ""}
+      </p>
+      {!dismissed && query !== selectedName && results.length > 0 && (
         <ul className="route-point-results" aria-label={`Wyniki: ${label}`}>
           {results.map((point) => (
             <li key={point.id}>
@@ -395,7 +415,9 @@ function RouteInformationGaps({ route }: { route: PlannedRoute }) {
         setVerifiedFacts(
           new Set(
             reports.flatMap((report) =>
-              report.status === "accepted" && report.fact_id ? [report.fact_id] : [],
+              report.status === "accepted" && report.fact_id
+                ? [report.fact_id]
+                : [],
             ),
           ),
         );
@@ -417,7 +439,11 @@ function RouteInformationGaps({ route }: { route: PlannedRoute }) {
     if (route.mode === "transit" && segment.mode !== "walk") return [];
     return segment.facts
       .filter((fact) => {
-        if (fact.value !== null || seen.has(fact.id) || verifiedFacts.has(fact.id))
+        if (
+          fact.value !== null ||
+          seen.has(fact.id) ||
+          verifiedFacts.has(fact.id)
+        )
           return false;
         seen.add(fact.id);
         return true;
@@ -718,8 +744,9 @@ export function RoutePage() {
       if (controller.signal.aborted) return;
       setWarnings(response.warnings);
       const route =
-        response.routes.find((candidate) => candidate.variant === "constrained") ||
-        response.routes[0];
+        response.routes.find(
+          (candidate) => candidate.variant === "constrained",
+        ) || response.routes[0];
       if (!route) {
         setError("Nie znaleziono trasy spełniającej Twoje wymagania.");
         return;
@@ -955,7 +982,8 @@ export function RoutePage() {
             label="Skąd"
             selectedName={
               origin || originCoordinates
-                ? points.find((point) => point.id === origin)?.name || originName
+                ? points.find((point) => point.id === origin)?.name ||
+                  originName
                 : ""
             }
             onSelect={(point) => {
@@ -1035,7 +1063,6 @@ export function RoutePage() {
                 ? [plan.route.parking]
                 : []),
             ]}
-            showMobilityList={mode !== "transit"}
             endpoints={plan ? planEndpoints(plan) : endpoints}
             onSelectPoint={picking ? selectMapPoint : undefined}
             onCancelSelection={finishPicking}
@@ -1172,6 +1199,13 @@ export function RoutePage() {
                   </ol>
                 </details>
                 <RouteNotes warnings={plan.warnings} />
+                <Link
+                  className="button primary"
+                  to={`/route/${encodeURIComponent(plan.route.id)}/details`}
+                  state={plan}
+                >
+                  Szczegóły trasy
+                </Link>
               </>
             ) : (
               <>

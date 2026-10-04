@@ -25,6 +25,9 @@ export function useLanguage() {
 
 // Stable UI copy shared by the application. Place names and user supplied text stay intact.
 const en: Record<string, string> = Object.fromEntries([
+  ["Użyj ustawień z profilu", "Use profile settings"],
+  ["Ustaw preferencje w profilu", "Set your profile preferences"],
+  ["Zastosowano ustawienia z profilu.", "Profile settings applied."],
   ["Przejdź do treści", "Skip to content"],
   ["Nawigacja główna", "Main navigation"],
   ["Szukaj", "Search"],

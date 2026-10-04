@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { interpretSearch, type SearchProposal } from "../data/api";
 import { useDemo } from "../state/DemoContext";
 
@@ -9,7 +10,7 @@ export default function AISearch({
   mode: "places" | "routes";
   onApply: (proposal: SearchProposal) => void;
 }) {
-  const { constraints, setConstraints } = useDemo();
+  const { constraints, setConstraints, profile, notify } = useDemo();
   const [prompt, setPrompt] = useState("");
   const [proposal, setProposal] = useState<SearchProposal | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,23 @@ export default function AISearch({
 
   return (
     <section className="panel" aria-label="Wyszukiwanie AI">
+      {profile ? (
+        <button
+          type="button"
+          className="button subtle"
+          onClick={() => {
+            setConstraints({ ...profile.constraints });
+            setProposal(null);
+            notify("Zastosowano ustawienia z profilu.");
+          }}
+        >
+          Użyj ustawień z profilu
+        </button>
+      ) : (
+        <Link className="button subtle" to="/profile/setup">
+          Ustaw preferencje w profilu
+        </Link>
+      )}
       <h2>Wyszukiwanie AI</h2>
       <label className="field">
         Opisz, czego szukasz

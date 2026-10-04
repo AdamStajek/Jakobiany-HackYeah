@@ -48,10 +48,12 @@ type Coordinates = { lat: number; lon: number };
 function PointSearch({
   label,
   initialQuery = "",
+  selectedName,
   onSelect,
 }: {
   label: string;
   initialQuery?: string;
+  selectedName: string;
   onSelect: (point: {
     id: string;
     name: string;
@@ -69,11 +71,12 @@ function PointSearch({
   >([]);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  useEffect(() => setQuery(selectedName || initialQuery), [selectedName, initialQuery]);
   useEffect(() => {
     const controller = new AbortController();
     setResults([]);
     setError("");
-    if (query.trim().length < 2) return;
+    if (query === selectedName || query.trim().length < 2) return;
     const timer = setTimeout(
       () =>
         searchRoutePoints(query.trim(), controller.signal)
@@ -92,11 +95,11 @@ function PointSearch({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, selectedName]);
   return (
     <div className="route-point-search">
       <label className="field">
-        {label}
+        <span className="sr-only">{label}</span>
         <input
           ref={input}
           value={query}
@@ -110,7 +113,7 @@ function PointSearch({
           {error}
         </p>
       )}
-      {results.length > 0 && (
+      {query !== selectedName && results.length > 0 && (
         <ul className="route-point-results" aria-label={`Wyniki: ${label}`}>
           {results.map((point) => (
             <li key={point.id}>
@@ -118,7 +121,7 @@ function PointSearch({
                 type="button"
                 onClick={() => {
                   onSelect(point);
-                  setQuery("");
+                  setQuery(point.name);
                   setResults([]);
                   input.current?.focus();
                 }}
@@ -372,16 +375,18 @@ function RouteInformationGaps({ route }: { route: PlannedRoute }) {
   const { session } = useDemo();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  if (route.mode === "car") return null;
   const seen = new Set<string>();
-  const gaps = route.segments.flatMap((segment, index) =>
-    segment.facts
+  const gaps = route.segments.flatMap((segment, index) => {
+    if (route.mode === "transit" && segment.mode !== "walk") return [];
+    return segment.facts
       .filter((fact) => {
         if (fact.value !== null || seen.has(fact.id)) return false;
         seen.add(fact.id);
         return true;
       })
-      .map((fact) => ({ segment, index, fact })),
-  );
+      .map((fact) => ({ segment, index, fact }));
+  });
   if (!gaps.length) return null;
   const canSubmit = gaps.every(({ segment }) => {
     const [lon, lat] = segment.geometry.coordinates[0] || [];
@@ -911,6 +916,11 @@ export function RoutePage() {
             key={`origin-${aiPoints.revision}`}
             initialQuery={aiPoints.origin}
             label="Skąd"
+            selectedName={
+              origin || originCoordinates
+                ? points.find((point) => point.id === origin)?.name || originName
+                : ""
+            }
             onSelect={(point) => {
               setOrigin(point.id);
               setOriginName(point.name);
@@ -927,15 +937,16 @@ export function RoutePage() {
           >
             Wskaż początek na mapie
           </button>
-          <p role="status" className="small route-selected-point">
-            Skąd:{" "}
-            {points.find((p) => p.id === origin)?.name ||
-              (origin || originCoordinates ? originName : "Wybierz punkt")}
-          </p>
           <PointSearch
             key={`destination-${aiPoints.revision}`}
             initialQuery={aiPoints.destination}
             label="Dokąd"
+            selectedName={
+              destination || destinationCoordinates
+                ? points.find((point) => point.id === destination)?.name ||
+                  destinationName
+                : ""
+            }
             onSelect={(point) => {
               setDestination(point.id);
               setDestinationName(point.name);
@@ -952,13 +963,6 @@ export function RoutePage() {
           >
             Wskaż cel na mapie
           </button>
-          <p role="status" className="small route-selected-point">
-            Dokąd:{" "}
-            {points.find((p) => p.id === destination)?.name ||
-              (destination || destinationCoordinates
-                ? destinationName
-                : "Wybierz punkt")}
-          </p>
           {picking && (
             <p role="status" className="route-picking-status">
               Wybierz {picking === "origin" ? "początek" : "cel"} trasy

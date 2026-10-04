@@ -24,7 +24,11 @@ class ReportAITests(unittest.TestCase):
         self.user = m.User(id="user_test", display_name="Test", roles=[])
         output = BytesIO()
         Image.new("RGB", (32, 32)).save(output, format="PNG")
-        self.photo = photos.create(self.user.id, output.getvalue()).id
+        with (
+            patch("hackyeah.photo_privacy.detect_regions", return_value=[]),
+            patch.object(report_ai, "describe_photo", return_value=("Schody", False)),
+        ):
+            self.photo = photos.create(self.user.id, output.getvalue()).id
         self.body = m.ReportCreate(
             target=m.ReportTarget(type="place", id="node/1"),
             kind="missing_data",

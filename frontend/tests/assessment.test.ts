@@ -13,14 +13,14 @@ describe("Dopasowanie demonstracyjne", () => {
     expect(assess(places[2], c).status).toBe("meets_requirements");
     expect(
       formatFact(places[0].facts.find((f) => f.attribute === "steps_count")!),
-    ).toBe("Less than 5");
+    ).toBe("0 stopni");
     expect(
       formatFact(
         places[0].facts.find((f) => f.attribute === "elevator_available")!,
       ),
     ).toBe("Nie");
   });
-  it("ukrywa dokładne liczby stopni i wymiary za etykietami", () => {
+  it("pokazuje dokładną liczbę stopni i opisuje dostępność wymiarów", () => {
     const fact = (
       attribute:
         | "steps_count"
@@ -29,9 +29,12 @@ describe("Dopasowanie demonstracyjne", () => {
         | "entrance_width_cm",
       value: number,
     ) => ({ ...places[0].facts[0], attribute, value });
-    expect(formatFact(fact("steps_count", 4))).toBe("Less than 5");
-    expect(formatFact(fact("steps_count", 5))).toBe("5–10");
-    expect(formatFact(fact("steps_count", 10))).toBe("10 or more");
+    expect(formatFact(fact("steps_count", 1))).toBe("1 stopień");
+    expect(formatFact(fact("steps_count", 4))).toBe("4 stopnie");
+    expect(formatFact(fact("steps_count", 5))).toBe("5 stopni");
+    expect(formatFact(fact("steps_count", 10))).toBe("10 stopni");
+    expect(formatFact(fact("steps_count", 12))).toBe("12 stopni");
+    expect(formatFact(fact("steps_count", 22))).toBe("22 stopnie");
     expect(formatFact(fact("threshold_height_cm", 2))).toBe(
       "Accessible for wheelchairs",
     );

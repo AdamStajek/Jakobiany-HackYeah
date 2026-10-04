@@ -1,7 +1,16 @@
 import { translate } from "../i18n";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowRight, Star, Flag, MapPin, ChevronLeft } from "lucide-react";
+import {
+  ArrowRight,
+  Star,
+  Flag,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { PageHeading } from "../components/Common";
 import {
@@ -16,6 +25,7 @@ import {
 import { MetricInput } from "../components/MetricInput";
 import type { Fact } from "../data/types";
 import { labels } from "../data/mock";
+import { missionDistance, sortMissions } from "../data/missionSorting";
 
 export const missionStatus = {
   in_progress: "W trakcie",
@@ -23,8 +33,16 @@ export const missionStatus = {
   accepted: "Zaakceptowano",
   rejected: "Odrzucono",
 };
+const missionTitle = (mission: Mission) =>
+  mission.target_type === "segment"
+    ? mission.title
+    : `Sprawdź: ${mission.place_name}`;
 export function MissionsPage() {
-  const { activity, session, refreshActivity } = useDemo();
+  const { activity, session, refreshActivity, location, setLocation } =
+    useDemo();
+  const [sort, setSort] = useState<"points" | "distance">("points");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [locationError, setLocationError] = useState("");
   const [offset, setOffset] = useState(0);
   const [more, setMore] = useState(true);
   const [tab, setTab] = useState("available");
@@ -63,7 +81,8 @@ export function MissionsPage() {
       active = false;
     };
   }, [session?.user.id]);
-  const shown = missions.filter(
+  useEffect(() => setCurrentPage(1), [tab, sort, location?.lat, location?.lon]);
+  const filtered = missions.filter(
     (mission) =>
       (tab === "available" &&
         mission.available &&
@@ -80,6 +99,32 @@ export function MissionsPage() {
       (tab === "progress" &&
         activity.items.some((item) => item.mission_id === mission.id)),
   );
+  const shown = sortMissions(filtered, sort, location);
+  const totalPages = Math.max(1, Math.ceil(shown.length / 10));
+  const page = Math.min(currentPage, totalPages);
+  const pageWindowStart = Math.floor((page - 1) / 5) * 5 + 1;
+  const visiblePages = Array.from(
+    { length: Math.min(5, totalPages - pageWindowStart + 1) },
+    (_, index) => pageWindowStart + index,
+  );
+  function selectSort(value: "points" | "distance") {
+    setSort(value);
+    setLocationError("");
+    if (value !== "distance" || location) return;
+    if (!navigator.geolocation) {
+      setLocationError("Przeglądarka nie obsługuje lokalizacji.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) =>
+        setLocation({ lat: coords.latitude, lon: coords.longitude }),
+      () =>
+        setLocationError(
+          "Udostępnij lokalizację, aby sortować misje według odległości.",
+        ),
+      { timeout: 10000, maximumAge: 60000 },
+    );
+  }
   return (
     <div className="page narrow">
       <PageHeading
@@ -118,16 +163,34 @@ export function MissionsPage() {
           Wykonane misje
         </button>
       </div>
+      <label className="field search-sort">
+        Sortuj misje
+        <select
+          value={sort}
+          onChange={(event) =>
+            selectSort(event.target.value as "points" | "distance")
+          }
+        >
+          <option value="points">Punkty: od największej liczby</option>
+          <option value="distance">Odległość: od najbliższej</option>
+        </select>
+      </label>
+      {sort === "distance" && !location && (
+        <p className="muted" role="status">
+          {locationError || "Oczekiwanie na lokalizację…"}
+        </p>
+      )}
       {error && (
         <p className="warning-box" role="alert">
           {error}
         </p>
       )}
       {loading && <p role="status">Pobieranie misji…</p>}
-      {shown.map((mission) => {
+      {shown.slice((page - 1) * 10, page * 10).map((mission) => {
         const progress = activity.items.find(
           (item) => item.mission_id === mission.id,
         );
+        const distance = missionDistance(mission, location);
         return (
           <Link
             className="panel mission-card"
@@ -138,7 +201,7 @@ export function MissionsPage() {
               <MapPin />
             </span>
             <div>
-              <h2>{mission.title}</h2>
+              <h2>{missionTitle(mission)}</h2>
               <p>
                 {labels[mission.attribute] || mission.attribute} ·{" "}
                 {
@@ -153,6 +216,14 @@ export function MissionsPage() {
                 Około {mission.time_minutes} minut ·{" "}
                 {progress ? missionStatus[progress.status] : "Dostępna"}
               </p>
+              {sort === "distance" && Number.isFinite(distance) && (
+                <p className="muted">
+                  Odległość:{" "}
+                  {distance < 1000
+                    ? `${Math.round(distance)} m`
+                    : `${(distance / 1000).toFixed(1)} km`}
+                </p>
+              )}
               <strong className="points">
                 {progress?.status === "accepted"
                   ? `${progress.awarded_points} pkt przyznano`
@@ -163,6 +234,54 @@ export function MissionsPage() {
           </Link>
         );
       })}
+      {totalPages > 1 && (
+        <nav className="results-pagination" aria-label="Strony misji">
+          <button
+            className="button subtle"
+            aria-label="Pierwsza strona"
+            onClick={() => setCurrentPage(1)}
+            disabled={page === 1}
+          >
+            <ChevronsLeft size={18} />
+          </button>
+          <button
+            className="button subtle"
+            aria-label="Poprzednie 5 stron"
+            onClick={() => setCurrentPage(Math.max(1, pageWindowStart - 5))}
+            disabled={pageWindowStart === 1}
+          >
+            <ChevronLeft size={18} />
+          </button>
+          {visiblePages.map((number) => (
+            <button
+              key={number}
+              className={`button subtle ${number === page ? "active" : ""}`}
+              aria-current={number === page ? "page" : undefined}
+              onClick={() => setCurrentPage(number)}
+            >
+              {number}
+            </button>
+          ))}
+          <button
+            className="button subtle"
+            aria-label="Następne 5 stron"
+            onClick={() =>
+              setCurrentPage(Math.min(totalPages, pageWindowStart + 5))
+            }
+            disabled={pageWindowStart + 5 > totalPages}
+          >
+            <ChevronRight size={18} />
+          </button>
+          <button
+            className="button subtle"
+            aria-label="Ostatnia strona"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={page === totalPages}
+          >
+            <ChevronsRight size={18} />
+          </button>
+        </nav>
+      )}
       {tab === "available" && more && (
         <button
           className="button subtle"
@@ -186,7 +305,7 @@ export function MissionsPage() {
             }
           }}
         >
-          Wczytaj kolejne miejsca
+          Wczytaj kolejne misje
         </button>
       )}
       {!loading && !shown.length && (
@@ -316,7 +435,7 @@ export function MissionPage() {
       </Link>
       <PageHeading
         title={
-          mission?.title ||
+          (mission && missionTitle(mission)) ||
           (error ? "Nie udało się pobrać misji" : "Pobieranie misji…")
         }
         description={
@@ -334,8 +453,12 @@ export function MissionPage() {
         <div className="panel">
           <p>{mission.description}</p>
           <p>
-            <strong>{mission.target_type === "segment" ? "Odcinek:" : "Adres:"}</strong>{" "}
-            {mission.target_type === "segment" ? mission.place_name : mission.address || "Adres niedostępny"}
+            <strong>
+              {mission.target_type === "segment" ? "Odcinek:" : "Adres:"}
+            </strong>{" "}
+            {mission.target_type === "segment"
+              ? mission.place_name
+              : mission.address || "Adres niedostępny"}
           </p>
           <p>
             <strong>

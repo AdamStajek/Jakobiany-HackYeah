@@ -222,6 +222,18 @@ Wyniki, komendy, zasady dopasowania i możliwości Google Places:
 
 ## Automatyczna weryfikacja zdjęć zgłoszeń
 
+Upload zdjęć najpierw uruchamia lokalny detektor
+[Grounding DINO Tiny](https://huggingface.co/IDEA-Research/grounding-dino-tiny).
+Wykryte prostokąty ludzi, twarzy, tablic rejestracyjnych, dokumentów, ekranów
+i tekstu są zamazywane jednolitym kolorem. Tekst jest traktowany ostrożnościowo
+jako potencjalne dane osobowe, bez rozpoznawania jego treści. Wszystkie piksele
+poza prostokątami pozostają niezmienione po uwzględnieniu orientacji EXIF;
+wynik jest zapisywany bezstratnie w PNG bez metadanych.
+`PHOTO_PRIVACY_MODEL` pozwala wskazać kompatybilny model lub lokalny katalog.
+Wagi są pobierane przy pierwszym uploadzie; zdjęcia nie opuszczają serwera.
+Awaria detektora zwraca `503 PHOTO_ANALYSIS_UNAVAILABLE` bez zapisu zdjęcia.
+Detekcja może przeoczyć obiekt; nie stanowi gwarancji usunięcia wszystkich danych.
+
 Zgłoszenia zawierające zdjęcia i `observations` są weryfikowane automatycznie
 przy utworzeniu i edycji. Lokalny [SmolVLM-256M-Instruct](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct)
 otrzymuje zdjęcia i prompt z nazwą oraz typem metryki, bez wartości użytkownika

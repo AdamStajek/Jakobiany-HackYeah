@@ -23,6 +23,26 @@ const filterOptions = [
   { label: "Bez schodów", key: "require_step_free_access" },
   { label: "Toaleta dostępna", key: "require_accessible_toilet" },
 ] as const;
+const categories = [
+  ["toilets", "Toalety publiczne"],
+  ["rest_point", "Miejsca odpoczynku"],
+  ["elevator", "Windy"],
+  ["hotel", "Hotele"],
+  ["museum", "Muzea"],
+  ["government", "Urzędy"],
+  ["grocery", "Sklepy spożywcze"],
+  ["post_office", "Poczty"],
+  ["bank", "Banki"],
+  ["historic", "Zabytki"],
+  ["viewpoint", "Punkty widokowe"],
+  ["library", "Biblioteki"],
+  ["cinema", "Kina"],
+  ["theatre", "Teatry"],
+  ["community_centre", "Domy kultury"],
+  ["senior_club", "Kluby seniora"],
+  ["parcel_locker", "Paczkomaty"],
+  ["church", "Kościoły"],
+] as const;
 const krakowCenter = { lat: 50.061, lon: 19.936 };
 export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [params, setParams] = useSearchParams();
@@ -33,6 +53,10 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [searchNear, setSearchNear] = useState(krakowCenter);
   const query = params.get("q") || "";
   const category = params.get("category") || "";
+  const selectedCategory = categories.find(
+    ([id, label]) => id === category || label === category,
+  );
+  const categoryLabel = selectedCategory?.[1] || category;
   const [results, setResults] = useState<PlaceSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -221,6 +245,25 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           aria-label="Filtry wyszukiwania"
         >
           <h2>Dopasuj do swoich potrzeb</h2>
+          <label className="field category-filter">
+            Kategoria
+            <select
+              value={selectedCategory?.[0] || ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setParams(value ? { category: value } : {});
+                setCurrentPage(1);
+                setSelectedPlace(null);
+              }}
+            >
+              <option value="">Wszystkie kategorie</option>
+              {categories.map(([id, label]) => (
+                <option value={id} key={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
           {filterOptions.map((o) => (
             <label className="check-field" key={o.key}>
               <input
@@ -270,7 +313,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           </div>
           <hr />
           <button
-            className="text-button"
+            className="text-button filters-clear"
             onClick={() => {
               setConstraints({ ...emptyConstraints });
               setParams({});
@@ -284,7 +327,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           aria-label="Lista miejsc"
         >
           <div className="results-heading">
-            <h2>{category || query || "Miejsca w Krakowie"}</h2>
+            <h2>{categoryLabel || query || "Miejsca w Krakowie"}</h2>
             <span aria-live="polite">
               {loading
                 ? "Pobieranie…"

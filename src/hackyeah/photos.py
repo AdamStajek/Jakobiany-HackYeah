@@ -1,9 +1,9 @@
 """Private SQLite-backed uploads with decoding and metadata removal."""
 
-from datetime import UTC, datetime
-from io import BytesIO
 import logging
 import os
+from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -12,6 +12,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from hackyeah import models as m
 from hackyeah.database import Store, atomic
+from hackyeah.photo_privacy import anonymize
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,11 @@ def create(
                 else "RGB"
             )
             image.info.clear()
+            try:
+                image = anonymize(image)
+            except Exception as exc:
+                logger.exception("Photo privacy detection failed")
+                raise HTTPException(503, "PHOTO_ANALYSIS_UNAVAILABLE") from exc
             output = BytesIO()
             image.save(output, format="PNG")
             sanitized = output.getvalue()
@@ -71,20 +77,11 @@ def create(
 
     error_code = None
     try:
-        description, sensitive = describe_photo(sanitized)
+        description, _ = describe_photo(sanitized)
     except Exception:
-        logger.exception("Photo analysis failed; anonymizing the entire image")
-        description, sensitive = "Zdjęcie do ręcznej weryfikacji", True
+        logger.exception("Photo description failed")
+        description = "Zdjęcie do ręcznej weryfikacji"
         error_code = "PHOTO_ANALYSIS_UNAVAILABLE"
-    if sensitive:
-        with Image.open(BytesIO(sanitized)) as image:
-            size = image.size
-            image = image.convert("RGB")
-            image.thumbnail((16, 16))
-            image = image.resize(size, Image.Resampling.NEAREST)
-            output = BytesIO()
-            image.save(output, format="PNG")
-            sanitized = output.getvalue()
     photo_id = f"photo_{uuid4().hex}"
     photo = m.Photo(
         id=photo_id,

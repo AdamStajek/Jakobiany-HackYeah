@@ -2998,6 +2998,19 @@ strong,
   margin: 0;
 }
 
+.filters .category-filter {
+  flex: 1 1 100%;
+  max-width: 320px;
+  margin: 0;
+}
+
+.filters .filters-clear {
+  flex-basis: 100%;
+  width: max-content;
+  margin-top: 4px;
+  text-align: left;
+}
+
 .filters hr {
   display: none;
 }

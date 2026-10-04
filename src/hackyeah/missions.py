@@ -169,7 +169,7 @@ def request_verification(body: m.MissionRequest) -> list[m.Mission]:
                     id=mission_id,
                     place_id=place.id,
                     place_name=place.name,
-                    title=f"Sprawdź: {place.name} — {fact.attribute}",
+                    title=f"Sprawdź: {place.name}",
                     fact_id=fact.id,
                     attribute=fact.attribute,
                     points=30,

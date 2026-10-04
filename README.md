@@ -45,11 +45,22 @@ Compose tworzy wolumen `backend_data`, początkowo wypełniony kopią
 `data/krakow.sqlite3` z obrazu. Restart, ponowny build i `docker compose down`
 zachowują dane; `docker compose down -v` usuwa wolumen. Późniejsze zmiany
 hostowego pliku nie zastępują działającej bazy w wolumenie. Nie uruchamiaj
-przebudowy OSM równolegle z backendem; importer zachowuje tabele backendu,
+przebudowy OSM równolegle z backendem; importer zachowuje starsze tabele backendu,
 lecz wymiana całego pliku wymaga zatrzymania API.
 
-Lokalnie backend domyślnie korzysta z `data/krakow.sqlite3`; ścieżkę można
-zmienić zmienną `DATABASE_PATH`. Plik musi istnieć. Compose wczytuje opcjonalny
+Backend przechowuje rekordy aplikacji w `data/application.sqlite3` (`DATABASE_PATH`),
+a katalog i fakty OSM w `data/krakow.sqlite3` (`OSM_DATABASE_PATH`). API podłącza OSM
+wyłącznie do odczytu. Pierwszy start kopiuje istniejące rekordy aplikacji do nowej
+bazy w jednej transakcji; ponowienie nie duplikuje danych. Oryginały pozostają
+w starej bazie. Importery nadal aktualizują katalog OSM, bez wymiany bazy aplikacji.
+Dla własnych ścieżek ustaw obie zmienne. Samo `DATABASE_PATH` zachowuje starszy
+tryb wspólnej bazy. Powrót: zatrzymaj API i użyj wcześniejszej kopii wspólnej bazy;
+nowe zapisy z bazy aplikacji wymagają osobnego przeniesienia.
+
+Rozdzielenie plików nie oznacza, że wszystkie rekordy aplikacji nadają się do
+sprzedaży: zapisane podsumowania miejsc, fakty i oceny mogą zawierać dane lub
+pochodne OSM. Eksport musi uwzględniać pochodzenie i licencje źródeł.
+Compose wczytuje opcjonalny
 plik `.env` i dla lokalnego HTTP ustawia `SESSION_COOKIE_SECURE=false`.
 Przy HTTPS ustaw `SESSION_COOKIE_SECURE=true`. Poza Compose bezpieczne cookie
 jest domyślnie włączone. Rola właściciela/moderatora i przypisania obiektów

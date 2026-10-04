@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from hackyeah import models as m
 from hackyeah.confidence import get as get_confidence
-from hackyeah.database import database_path
+from hackyeah.database import connect
 from hackyeah.place_enrichment import accessibility_facts, enrichment
 
 
@@ -128,9 +128,7 @@ def source(updated: datetime, url: str | None = None) -> m.Source:
     )
 
 
-def _facts(
-    db: sqlite3.Connection, row: sqlite3.Row, updated: datetime
-) -> list[m.Fact]:
+def _facts(db: sqlite3.Connection, row: sqlite3.Row, updated: datetime) -> list[m.Fact]:
     facts = []
     for item in db.execute(
         "SELECT * FROM accessibility_facts WHERE place_id=? ORDER BY attribute",
@@ -146,9 +144,7 @@ def _facts(
             )
         ]
         raw_value = (
-            json.loads(item["value_json"])
-            if item["value_json"] is not None
-            else None
+            json.loads(item["value_json"]) if item["value_json"] is not None else None
         )
         score, confidence_level, calculated_at = get_confidence(
             db, "place", row["id"], item["attribute"], raw_value
@@ -200,6 +196,38 @@ def _details(
         )
     )
     facts = _facts(db, row, updated)
+    community = None
+    if row["id"].startswith("community:"):
+        from hackyeah.place_submissions import submissions
+
+        community = submissions[row["id"]]
+        updated = community.reviewed_at or community.created_at
+        facts = [
+            *facts,
+            *[
+                m.Fact(
+                    id=f"{row['id']}:{attribute}",
+                    attribute=attribute,
+                    value=None,
+                    unit=None,
+                    status="unconfirmed",
+                    confidence_percent=None,
+                    observed_at=None,
+                    updated_at=updated,
+                    valid_until=None,
+                    sources=[],
+                    unconfirmed_reason="missing",
+                )
+                for attribute in (
+                    "steps_count",
+                    "threshold_height_cm",
+                    "elevator_available",
+                    "entrance_width_cm",
+                    "accessible_toilet",
+                )
+                if attribute not in {fact.attribute for fact in facts}
+            ],
+        ]
     categories = [
         item[0]
         for item in db.execute(
@@ -238,7 +266,7 @@ def _details(
     return m.PlaceDetails(
         id=row["id"],
         name=row["name"] or "Miejsce bez nazwy",
-        category=", ".join(categories),
+        category=community.category if community else ", ".join(categories),
         address=address,
         address_is_nearest=address_is_nearest,
         location=m.Coordinates(lat=row["lat"], lon=row["lon"]),
@@ -285,7 +313,15 @@ def _details(
         ],
         updated_at=updated,
         attribution=[
-            source(updated),
+            m.Source(
+                type="other",
+                label="Zgłoszenie społeczności zatwierdzone przez administratora",
+                url=None,
+                license=None,
+                retrieved_at=updated,
+            )
+            if community
+            else source(updated),
             *[
                 m.Source(
                     type="other",
@@ -312,7 +348,7 @@ def _details(
         access=row["access"],
         website_title=web["title"] if web else None,
         website_description=(web["description"] if web else None)
-        or extra.get("description"),
+        or (community.description if community else extra.get("description")),
         website_telephone=web["telephone"] if web else None,
         website_opening_hours=web["opening_hours"] if web else None,
         accessibility_summary=(web["accessibility_summary"] if web else None)
@@ -332,14 +368,24 @@ def _details(
 
 
 def _connect() -> sqlite3.Connection:
-    db = sqlite3.connect(database_path().as_uri() + "?mode=ro", uri=True)
+    db = connect(readonly=True)
     db.row_factory = sqlite3.Row
     return db
 
 
+def catalogue_table(db: sqlite3.Connection) -> str:
+    if db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='community_places'"
+    ).fetchone():
+        return "(SELECT * FROM places UNION ALL SELECT * FROM community_places)"
+    return "places"
+
+
 def get(place_id: str, constraints: m.Constraints | None = None) -> m.PlaceDetails:
     with closing(_connect()) as db:
-        row = db.execute("SELECT * FROM places WHERE id=?", (place_id,)).fetchone()
+        row = db.execute(
+            f"SELECT * FROM {catalogue_table(db)} WHERE id=?", (place_id,)
+        ).fetchone()
         if row is None:
             raise HTTPException(404, "NOT_FOUND")
         return _details(db, row, constraints)
@@ -350,8 +396,8 @@ def search(
 ) -> m.PlaceSearchResponse:
     with closing(_connect()) as db:
         rows = db.execute(
-            """SELECT p.* FROM places p
-            WHERE EXISTS (
+            f"""SELECT p.* FROM {catalogue_table(db)} p
+            WHERE p.id LIKE 'community:%' OR EXISTS (
                 SELECT 1 FROM place_categories pc
                 WHERE pc.place_id = p.id
                 AND pc.category_id NOT IN ('rest_point', 'steps', 'kerb')
@@ -373,7 +419,7 @@ def search(
         }
         external_data = {}
         if db.execute(
-            "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+            "SELECT 1 FROM pragma_table_list WHERE name='external_place_data'"
         ).fetchone():
             external_data = {
                 row[0]: (row[1], row[2])
@@ -390,6 +436,10 @@ def search(
                 "SELECT c.id, c.label FROM categories c JOIN place_categories pc ON pc.category_id=c.id WHERE pc.place_id=?",
                 (row["id"],),
             ).fetchall()
+            if row["id"].startswith("community:"):
+                from hackyeah.place_submissions import submissions
+
+                categories = [("community", submissions[row["id"]].category)]
             text = " ".join(
                 str(value or "")
                 for value in (
@@ -466,7 +516,8 @@ def search(
                     fact.attribute == attribute
                     and fact.value is not None
                     and predicate(fact.value)
-                    for fact in facts)
+                    for fact in facts
+                )
                 for attribute, predicate in checks
             ):
                 continue
@@ -516,7 +567,7 @@ def route_points(query: str) -> m.Page[m.PlaceSummary]:
     """Named places/addresses for endpoint selection, without accessibility filtering."""
     with closing(_connect()) as db:
         rows = db.execute(
-            "SELECT id,name,lat,lon,street,housenumber FROM places WHERE name IS NOT NULL ORDER BY name"
+            f"SELECT id,name,lat,lon,street,housenumber FROM {catalogue_table(db)} WHERE name IS NOT NULL ORDER BY name"
         ).fetchall()
     needle = query.strip().casefold()
     items = []

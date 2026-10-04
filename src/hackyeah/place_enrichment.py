@@ -33,7 +33,7 @@ def distance_m(lat: float, lon: float, other_lat: float, other_lon: float) -> fl
 
 def enrichment(db: sqlite3.Connection, place_id: str) -> tuple[dict, list[dict]]:
     if not db.execute(
-        "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+        "SELECT 1 FROM pragma_table_list WHERE name='external_place_data'"
     ).fetchone():
         return {}, []
     values, sources = {}, []
@@ -119,7 +119,7 @@ def accessibility_facts(
     from datetime import datetime
 
     if not db.execute(
-        "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+        "SELECT 1 FROM pragma_table_list WHERE name='external_place_data'"
     ).fetchone():
         return facts
     by_attribute = {f.attribute: f for f in facts}
@@ -173,7 +173,7 @@ def preserve_enrichment(previous: Path, target: sqlite3.Connection) -> None:
         sqlite3.connect(previous.resolve().as_uri() + "?mode=ro", uri=True)
     ) as source:
         if not source.execute(
-            "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+            "SELECT 1 FROM pragma_table_list WHERE name='external_place_data'"
         ).fetchone():
             return
         for row in source.execute("SELECT * FROM external_place_data"):

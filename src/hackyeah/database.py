@@ -24,6 +24,7 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS backend_records (
 _models = {
     model.__name__: model
     for model in (
+        m.PlaceSubmission,
         m.User,
         m.Session,
         m.Profile,
@@ -45,9 +46,42 @@ def database_path() -> Path:
     return Path(
         os.environ.get(
             "DATABASE_PATH",
-            str(Path(__file__).resolve().parents[2] / "data/krakow.sqlite3"),
+            str(Path(__file__).resolve().parents[2] / "data/application.sqlite3"),
         )
     ).resolve()
+
+
+def osm_database_path() -> Path:
+    return Path(
+        os.environ.get(
+            "OSM_DATABASE_PATH",
+            os.environ.get(
+                "DATABASE_PATH",
+                str(Path(__file__).resolve().parents[2] / "data/krakow.sqlite3"),
+            ),
+        )
+    ).resolve()
+
+
+def connect(*, readonly: bool = False) -> sqlite3.Connection:
+    path = database_path()
+    if not readonly:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(
+        path.as_uri() + ("?mode=ro" if readonly else "?mode=rwc"),
+        uri=True,
+        timeout=30,
+        isolation_level=None,
+    )
+    try:
+        if path != osm_database_path():
+            connection.execute(
+                "ATTACH DATABASE ? AS osm", (osm_database_path().as_uri() + "?mode=ro",)
+            )
+        return connection
+    except BaseException:
+        connection.close()
+        raise
 
 
 def _encode(value: Any) -> Any:
@@ -84,12 +118,7 @@ class Atomic:
 
     def __enter__(self) -> sqlite3.Connection:
         if getattr(_state, "connection", None) is None:
-            connection = sqlite3.connect(
-                database_path().as_uri() + "?mode=rw",
-                uri=True,
-                timeout=30,
-                isolation_level=None,
-            )
+            connection = connect()
             try:
                 connection.execute("PRAGMA foreign_keys = ON")
                 connection.execute("BEGIN IMMEDIATE")
@@ -119,11 +148,33 @@ atomic = Atomic()
 
 
 def initialize() -> None:
-    """Require the existing file and add backend tables."""
+    """Create application storage and copy legacy records once, transactionally."""
     with atomic:
+        connection = _state.connection
+        if database_path() != osm_database_path():
+            if connection.execute("PRAGMA main.user_version").fetchone()[0] == 0:
+                for table in (
+                    "backend_records",
+                    "community_places",
+                    "place_web_data",
+                    "fact_confidence",
+                ):
+                    row = connection.execute(
+                        "SELECT sql FROM osm.sqlite_master WHERE type='table' AND name=?",
+                        (table,),
+                    ).fetchone()
+                    if row:
+                        if table != "backend_records":
+                            connection.execute(
+                                row[0].replace("REFERENCES places(id)", "")
+                            )
+                        connection.execute(
+                            f'INSERT INTO main."{table}" SELECT * FROM osm."{table}"'
+                        )
+                connection.execute("PRAGMA main.user_version = 1")
         _state.connection.execute(
             """CREATE TABLE IF NOT EXISTS place_web_data (
-                place_id TEXT PRIMARY KEY REFERENCES places(id),
+                place_id TEXT PRIMARY KEY,
                 source_url TEXT NOT NULL,
                 retrieved_at TEXT NOT NULL,
                 title TEXT,
@@ -132,6 +183,9 @@ def initialize() -> None:
                 opening_hours TEXT,
                 accessibility_summary TEXT
             )"""
+        )
+        _state.connection.execute(
+            "CREATE TABLE IF NOT EXISTS community_places AS SELECT * FROM places WHERE 0"
         )
         from hackyeah.confidence import ensure_schema
 
@@ -212,11 +266,23 @@ def preserve_backend_data(previous: Path, target: sqlite3.Connection) -> None:
                 source.execute("SELECT * FROM backend_records"),
             )
         if source.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='community_places'"
+        ).fetchone():
+            target.execute(
+                "CREATE TABLE IF NOT EXISTS community_places AS SELECT * FROM places WHERE 0"
+            )
+            target.executemany(
+                "INSERT INTO community_places VALUES ("
+                + ",".join("?" for _ in range(14))
+                + ")",
+                source.execute("SELECT * FROM community_places"),
+            )
+        if source.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='place_web_data'"
         ).fetchone():
             target.execute(
                 """CREATE TABLE IF NOT EXISTS place_web_data (
-                    place_id TEXT PRIMARY KEY REFERENCES places(id),
+                    place_id TEXT PRIMARY KEY,
                     source_url TEXT NOT NULL, retrieved_at TEXT NOT NULL,
                     title TEXT, description TEXT, telephone TEXT,
                     opening_hours TEXT, accessibility_summary TEXT

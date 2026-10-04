@@ -21,7 +21,7 @@ ENV ROUTE_GRAPH_PATH=/app/routes/city.sqlite3
 
 RUN useradd --uid 10001 --create-home app
 RUN chown -R app:app /app/data
-ENV DATABASE_PATH=/app/data/krakow.sqlite3
+ENV DATABASE_PATH=/app/data/application.sqlite3 OSM_DATABASE_PATH=/app/data/krakow.sqlite3
 VOLUME ["/app/data"]
 USER app
 

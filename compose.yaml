@@ -7,7 +7,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_PATH: /app/data/krakow.sqlite3
+      DATABASE_PATH: /app/data/application.sqlite3
+      OSM_DATABASE_PATH: /app/data/krakow.sqlite3
       # Local HTTP only. Set true behind HTTPS in a deployment.
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
     volumes:

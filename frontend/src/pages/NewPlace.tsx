@@ -8,6 +8,15 @@ import type { PlaceSummary } from "../data/types";
 
 const noPlaces: PlaceSummary[] = [];
 
+const placeCategories = [
+  "Hotele",
+  "Muzea",
+  "Urzędy",
+  "Sklepy spożywcze",
+  "Biblioteki",
+  "Kluby seniora",
+];
+
 const statuses = {
   pending: "Oczekuje na weryfikację",
   accepted: "Zaakceptowano",
@@ -120,12 +129,16 @@ export function NewPlacePage() {
             </label>
             <label className="field">
               Kategoria
-              <input
-                name="category"
-                required
-                maxLength={100}
-                placeholder="np. restauracja, muzeum, biblioteka"
-              />
+              <select name="category" required defaultValue="">
+                <option value="" disabled>
+                  Wybierz kategorię
+                </option>
+                {placeCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="field">
               Adres

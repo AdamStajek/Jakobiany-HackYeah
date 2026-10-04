@@ -3,6 +3,7 @@ import type { Constraints, Report } from "../data/types";
 import type { Session, Profile, MissionActivity } from "../data/api";
 export type DemoState = {
   location: { lat: number; lon: number } | null;
+  setLocation: (location: { lat: number; lon: number } | null) => void;
   constraints: Constraints;
   setConstraints: (c: Constraints) => void;
   saved: string[];

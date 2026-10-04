@@ -499,6 +499,7 @@ export default function App() {
   }
   const value: DemoState = {
     location,
+    setLocation,
     constraints,
     setConstraints,
     saved,

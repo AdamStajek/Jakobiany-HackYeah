@@ -8,7 +8,7 @@ const notificationKey = (userId: string, missionId: string) =>
   `nearby-mission-notified:${userId}:${missionId}`;
 
 export function NearbyMissions() {
-  const { session, location, activity, notify } = useDemo();
+  const { session, location, setLocation, activity, notify } = useDemo();
   const route = useLocation();
   const navigate = useNavigate();
   const [enabled, setEnabled] = useState(false);
@@ -123,7 +123,10 @@ export function NearbyMissions() {
               return;
             }
             navigator.geolocation.getCurrentPosition(
-              () => setEnabled(true),
+              ({ coords }) => {
+                setLocation({ lat: coords.latitude, lon: coords.longitude });
+                setEnabled(true);
+              },
               () => {
                 notify("Udostępnij lokalizację, aby wykrywać misje w pobliżu.");
               },

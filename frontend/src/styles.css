@@ -917,11 +917,14 @@ footer {
   place-items: center;
   width: 34px;
   height: 34px;
-  background: #ea4335;
+  background: #1a73e8;
   border: 2px solid white;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   box-shadow: 0 2px 5px #20212450;
+}
+.place-marker-selected .place-marker-pin {
+  background: #ea4335;
 }
 .place-marker:focus-visible {
   outline: 3px solid #1a73e8;

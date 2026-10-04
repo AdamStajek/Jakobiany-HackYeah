@@ -18,6 +18,7 @@ const noMobility: MobilityPoint[] = [];
 const center: L.LatLngTuple = [50.061, 19.936];
 export default function MapView({
   places,
+  selectedPlaceId,
   route,
   onSelectPoint,
   onCancelSelection,
@@ -27,6 +28,7 @@ export default function MapView({
   segments,
 }: {
   places: PlaceSummary[];
+  selectedPlaceId?: string | null;
   route?: RouteGeometry;
   onSelectPoint?: (point: { lat: number; lon: number }) => void;
   onCancelSelection?: () => void;
@@ -180,7 +182,9 @@ export default function MapView({
       )
         continue;
       const icon = L.divIcon({
-        className: "place-marker",
+        className: `place-marker${
+          place.id === selectedPlaceId ? " place-marker-selected" : ""
+        }`,
         html: '<span class="place-marker-pin" aria-hidden="true"></span>',
         iconSize: [36, 44],
         iconAnchor: [18, 44],
@@ -203,6 +207,11 @@ export default function MapView({
           },
         )
         .on("click", () => {
+          layers.eachLayer((layer) => {
+            if (layer instanceof L.Marker && layer !== marker)
+              layer.getElement()?.classList.remove("place-marker-selected");
+          });
+          marker.getElement()?.classList.add("place-marker-selected");
           markerTrigger.current = marker.getElement() || null;
           setSelected(place.id);
         })
@@ -290,7 +299,7 @@ export default function MapView({
     return () => {
       layers.remove();
     };
-  }, [places, route, endpoints, userLocation, segments]);
+  }, [places, selectedPlaceId, route, endpoints, userLocation, segments]);
 
   useEffect(() => {
     const map = mapRef.current;

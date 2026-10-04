@@ -381,6 +381,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
             </button>
           )}
           <MapView
+            selectedPlaceId={selectedPlace?.id}
             places={
               selectedPlace
                 ? [selectedPlace]

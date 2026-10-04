@@ -771,9 +771,18 @@ footer {
 }
 .results-pagination {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 4px 4px 8px;
   margin-top: 14px;
+}
+.results-pagination .button {
+  flex: 0 0 auto;
+  min-width: 36px;
+  min-height: 40px;
+  padding: 6px 9px;
 }
 .results-pagination .active {
   background: var(--green);

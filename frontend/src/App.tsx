@@ -48,7 +48,6 @@ import {
   VerificationRequestForm,
 } from "./pages/Reports";
 import { MissionsPage, MissionPage } from "./pages/Missions";
-import { NearbyMissions } from "./components/NearbyMissions";
 import { Profile } from "./pages/Profile";
 import { Settings } from "./pages/Settings";
 import { ReviewPage } from "./pages/Review";
@@ -370,7 +369,6 @@ function Layout({
             </div>
           )}
         </div>
-        <NearbyMissions />
         {children}
       </main>
       {!navigating && (

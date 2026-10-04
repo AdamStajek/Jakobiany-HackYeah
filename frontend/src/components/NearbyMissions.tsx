@@ -1,6 +1,6 @@
 import { translate } from "../i18n";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getMissions, type Mission } from "../data/api";
 import { useDemo } from "../state/DemoContext";
 
@@ -9,7 +9,6 @@ const notificationKey = (userId: string, missionId: string) =>
 
 export function NearbyMissions() {
   const { session, location, setLocation, activity, notify } = useDemo();
-  const route = useLocation();
   const navigate = useNavigate();
   const [enabled, setEnabled] = useState(false);
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -99,9 +98,9 @@ export function NearbyMissions() {
       );
     }
   }, [session, enabled, location, missions, activity.items, navigate]);
-  if (!session || route.pathname !== "/missions") return null;
+  if (!session) return null;
   return (
-    <div className="page narrow nearby-missions">
+    <div className="nearby-missions">
       <button
         className="button subtle"
         aria-pressed={enabled}

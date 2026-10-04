@@ -17,7 +17,9 @@ import { useDemo } from "../state/DemoContext";
 import { PageHeading } from "../components/Common";
 import {
   getMission,
+  getReport,
   getMissions,
+  searchPlaces,
   startMission,
   submitMission,
   withPhoto,
@@ -25,7 +27,7 @@ import {
   type MissionProgress,
 } from "../data/api";
 import { MetricInput } from "../components/MetricInput";
-import type { Fact } from "../data/types";
+import { emptyConstraints, type Fact, type PlaceSummary } from "../data/types";
 import { labels } from "../data/mock";
 import { missionDistance, sortMissions } from "../data/missionSorting";
 import MapView from "../components/MapView";
@@ -36,6 +38,7 @@ export const missionStatus = {
   accepted: "Zaakceptowano",
   rejected: "Odrzucono",
 };
+const missionSearchCenter = { lat: 50.061, lon: 19.936 };
 const missionTitle = (mission: Mission) =>
   mission.target_type === "segment"
     ? mission.title.replace(/^Sprawdź(?: odcinek trasy)?:\s*/i, "")
@@ -43,7 +46,16 @@ const missionTitle = (mission: Mission) =>
 export function MissionsPage() {
   const { activity, session, refreshActivity, location, setLocation } =
     useDemo();
-  const [sort, setSort] = useState<"points" | "distance">("points");
+  const [sort, setSort] = useState<"points" | "distance">("distance");
+  const [attribute, setAttribute] = useState<Mission["attribute"] | "all">(
+    "all",
+  );
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeOrigin, setPlaceOrigin] = useState<PlaceSummary | null>(null);
+  const [placeResults, setPlaceResults] = useState<PlaceSummary[]>([]);
+  const [placeSearching, setPlaceSearching] = useState(false);
+  const [placeSearchError, setPlaceSearchError] = useState("");
+  const [searchedPlaceQuery, setSearchedPlaceQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [locationError, setLocationError] = useState("");
   const [tab, setTab] = useState("available");
@@ -80,36 +92,12 @@ export function MissionsPage() {
       active = false;
     };
   }, [session?.user.id]);
-  useEffect(() => setCurrentPage(1), [tab, sort, location?.lat, location?.lon]);
-  const filtered = missions.filter(
-    (mission) =>
-      (tab === "available" &&
-        mission.available &&
-        !activity.items.some(
-          (item) =>
-            item.mission_id === mission.id &&
-            ["pending", "accepted"].includes(item.status),
-        )) ||
-      (tab === "completed" &&
-        activity.items.some(
-          (item) =>
-            item.mission_id === mission.id && item.status === "accepted",
-        )) ||
-      (tab === "progress" &&
-        activity.items.some((item) => item.mission_id === mission.id)),
+  useEffect(
+    () => setCurrentPage(1),
+    [tab, sort, attribute, location?.lat, location?.lon],
   );
-  const shown = sortMissions(filtered, sort, location);
-  const totalPages = Math.max(1, Math.ceil(shown.length / 10));
-  const page = Math.min(currentPage, totalPages);
-  const pageWindowStart = Math.floor((page - 1) / 5) * 5 + 1;
-  const visiblePages = Array.from(
-    { length: Math.min(5, totalPages - pageWindowStart + 1) },
-    (_, index) => pageWindowStart + index,
-  );
-  function selectSort(value: "points" | "distance") {
-    setSort(value);
-    setLocationError("");
-    if (value !== "distance" || location) return;
+  useEffect(() => {
+    if (sort !== "distance" || location) return;
     if (!navigator.geolocation) {
       setLocationError("Przeglądarka nie obsługuje lokalizacji.");
       return;
@@ -123,6 +111,84 @@ export function MissionsPage() {
         ),
       { timeout: 10000, maximumAge: 60000 },
     );
+  }, [sort, location, setLocation]);
+  useEffect(() => {
+    const query = placeQuery.trim();
+    if (query.length < 2) {
+      setPlaceResults([]);
+      setPlaceSearchError("");
+      setPlaceSearching(false);
+      return;
+    }
+    setPlaceResults([]);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPlaceSearching(true);
+      setPlaceSearchError("");
+      searchPlaces(
+        query,
+        emptyConstraints,
+        null,
+        missionSearchCenter,
+        8,
+        controller.signal,
+      )
+        .then((page) => {
+          setPlaceResults(page.items);
+          setSearchedPlaceQuery(query);
+        })
+        .catch((reason: unknown) => {
+          if (!controller.signal.aborted)
+            setPlaceSearchError(
+              reason instanceof Error
+                ? reason.message
+                : "Nie udało się wyszukać miejsca.",
+            );
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setPlaceSearching(false);
+        });
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [placeQuery]);
+  const filtered = missions.filter((mission) => {
+    const matchesTab =
+      (tab === "available" &&
+        mission.available &&
+        !activity.items.some(
+          (item) =>
+            item.mission_id === mission.id &&
+            ["pending", "accepted"].includes(item.status),
+        )) ||
+      (tab === "completed" &&
+        activity.items.some(
+          (item) =>
+            item.mission_id === mission.id && item.status === "accepted",
+        )) ||
+      (tab === "progress" &&
+        activity.items.some((item) => item.mission_id === mission.id));
+    return (
+      matchesTab && (attribute === "all" || mission.attribute === attribute)
+    );
+  });
+  const missionAttributes = [
+    ...new Set(missions.map((item) => item.attribute)),
+  ].sort((a, b) => (labels[a] || a).localeCompare(labels[b] || b, "pl"));
+  const sortOrigin = placeOrigin?.location || location;
+  const shown = sortMissions(filtered, sort, sortOrigin);
+  const totalPages = Math.max(1, Math.ceil(shown.length / 10));
+  const page = Math.min(currentPage, totalPages);
+  const pageWindowStart = Math.floor((page - 1) / 5) * 5 + 1;
+  const visiblePages = Array.from(
+    { length: Math.min(5, totalPages - pageWindowStart + 1) },
+    (_, index) => pageWindowStart + index,
+  );
+  function selectSort(value: "points" | "distance") {
+    setSort(value);
+    setLocationError("");
   }
   return (
     <div className="page narrow">
@@ -162,19 +228,110 @@ export function MissionsPage() {
           Wykonane misje
         </button>
       </div>
-      <label className="field search-sort">
-        Sortuj misje
-        <select
-          value={sort}
-          onChange={(event) =>
-            selectSort(event.target.value as "points" | "distance")
-          }
+      <div className="mission-controls">
+        <label className="field search-sort">
+          Szukaj miejsca
+          <input
+            type="search"
+            value={placeQuery}
+            placeholder="Np. Rynek Główny"
+            onChange={(event) => {
+              setPlaceOrigin(null);
+              setPlaceQuery(event.target.value);
+              setSort("distance");
+            }}
+          />
+        </label>
+        <label className="field search-sort">
+          Typ brakujących danych
+          <select
+            value={attribute}
+            onChange={(event) =>
+              setAttribute(event.target.value as Mission["attribute"] | "all")
+            }
+          >
+            <option value="all">Wszystkie typy danych</option>
+            {missionAttributes.map((item) => (
+              <option key={item} value={item}>
+                {labels[item] || item}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field search-sort">
+          Sortuj misje
+          <select
+            value={sort}
+            onChange={(event) =>
+              selectSort(event.target.value as "points" | "distance")
+            }
+          >
+            <option value="points">Punkty: od największej liczby</option>
+            <option value="distance">
+              {placeOrigin
+                ? "Odległość od wybranego miejsca"
+                : "Odległość: od najbliższej"}
+            </option>
+          </select>
+        </label>
+      </div>
+      {placeOrigin && (
+        <p className="mission-place-selected">
+          Najbliżej: <strong>{placeOrigin.name}</strong>
+          {placeOrigin.address && ` · ${placeOrigin.address}`}{" "}
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setPlaceOrigin(null)}
+          >
+            Wyczyść wybór
+          </button>
+        </p>
+      )}
+      {placeSearching && (
+        <p className="muted" role="status">
+          Szukanie miejsc…
+        </p>
+      )}
+      {placeSearchError && (
+        <p className="warning-box" role="alert">
+          {placeSearchError}
+        </p>
+      )}
+      {!placeSearching &&
+        !placeSearchError &&
+        placeQuery.trim().length >= 2 &&
+        searchedPlaceQuery === placeQuery.trim() &&
+        placeResults.length === 0 && (
+          <p className="muted" role="status">
+            Nie znaleziono miejsc. Spróbuj innej nazwy.
+          </p>
+        )}
+      {placeResults.length > 0 && (
+        <ul
+          className="mission-place-results"
+          aria-label="Wyniki wyszukiwania miejsc"
         >
-          <option value="points">Punkty: od największej liczby</option>
-          <option value="distance">Odległość: od najbliższej</option>
-        </select>
-      </label>
-      {sort === "distance" && !location && (
+          {placeResults.map((place) => (
+            <li key={place.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlaceOrigin(place);
+                  setPlaceQuery("");
+                  setPlaceResults([]);
+                  setPlaceSearching(false);
+                  setSort("distance");
+                }}
+              >
+                <strong>{place.name}</strong>
+                {place.address && <span>{place.address}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {sort === "distance" && !location && !placeOrigin && (
         <p className="muted" role="status">
           {locationError || "Oczekiwanie na lokalizację…"}
         </p>
@@ -189,7 +346,7 @@ export function MissionsPage() {
         const progress = activity.items.find(
           (item) => item.mission_id === mission.id,
         );
-        const distance = missionDistance(mission, location);
+        const distance = missionDistance(mission, sortOrigin);
         return (
           <Link
             className="panel mission-card"
@@ -225,8 +382,8 @@ export function MissionsPage() {
               {Number.isFinite(distance) && (
                 <p className="muted mission-distance">
                   {distance < 1000
-                    ? `${Math.round(distance)} m od Ciebie`
-                    : `${(distance / 1000).toFixed(1)} km od Ciebie`}
+                    ? `${Math.round(distance)} m ${placeOrigin ? "od wybranego miejsca" : "od Ciebie"}`
+                    : `${(distance / 1000).toFixed(1)} km ${placeOrigin ? "od wybranego miejsca" : "od Ciebie"}`}
                 </p>
               )}
               <strong className="points">
@@ -292,7 +449,9 @@ export function MissionsPage() {
           <Flag />
           <h2>
             {tab === "available"
-              ? "Brak dostępnych misji"
+              ? attribute === "all"
+                ? "Brak dostępnych misji"
+                : "Brak misji dla wybranego typu danych"
               : "Tu pojawią się Twoje misje"}
           </h2>
           <p>Wybierz zadanie z zakładki „Dostępne misje”.</p>
@@ -370,6 +529,30 @@ export function MissionPage() {
       activity.items.find((item) => item.mission_id === id) || null;
     setCurrent(progress);
   }, [id, activity.items]);
+  useEffect(() => {
+    if (!session || current?.status !== "pending" || !current.report_id) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const reportId = current.report_id;
+    const refresh = async () => {
+      try {
+        const report = await getReport(reportId);
+        if (!active) return;
+        if (report.ai_status !== "pending") {
+          await refreshActivity();
+          return;
+        }
+      } catch {
+        // Retry a temporary connection failure while the analysis is pending.
+      }
+      if (active) timer = setTimeout(refresh, 3000);
+    };
+    timer = setTimeout(refresh, 3000);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [session?.user.id, current?.status, current?.report_id]);
   async function start() {
     if (!mission || busy) return;
     setBusy(true);
@@ -407,6 +590,7 @@ export function MissionPage() {
           {
             address: mission.address || mission.place_name,
             metric: mission.attribute,
+            mission_verification: true,
           },
         ),
       );
@@ -548,8 +732,12 @@ export function MissionPage() {
                 className={`status ${current.status === "accepted" ? "good" : "warning"}`}
                 role="status"
               >
-                {missionStatus[current.status]} · {current.awarded_points}{" "}
-                naliczonych punktów
+                {current.ai_status === "pending"
+                  ? "Przetwarzanie"
+                  : current.ai_status === "failed"
+                    ? "Analiza nie powiodła się"
+                    : missionStatus[current.status]}{" "}
+                · {current.awarded_points} naliczonych punktów
               </p>
               {current.answer && <p>Twoja odpowiedź: {current.answer}</p>}
               <p className="muted">
@@ -559,14 +747,16 @@ export function MissionPage() {
               {current.review_comment && (
                 <p>Wynik weryfikacji: {current.review_comment}</p>
               )}
-              {current.status === "pending" && (
-                <p>
-                  Odpowiedź wysłano do weryfikacji. Po akceptacji otrzymasz{" "}
-                  {mission.points} punktów.
-                </p>
-              )}
+              {current.status === "pending" &&
+                current.ai_status !== "failed" && (
+                  <p>
+                    Odpowiedź wysłano do weryfikacji. Po akceptacji otrzymasz{" "}
+                    {mission.points} punktów.
+                  </p>
+                )}
               {(current.status === "in_progress" ||
-                current.status === "rejected") && (
+                current.status === "rejected" ||
+                current.ai_status === "failed") && (
                 <form onSubmit={submit}>
                   <fieldset disabled={busy} className="form-fields">
                     <MetricInput
@@ -575,11 +765,12 @@ export function MissionPage() {
                       onChange={setMetricValue}
                     />
                     <label className="field">
-                      Zdjęcie (opcjonalne)
+                      Zdjęcie (wymagane)
                       <input
                         type="file"
-                        aria-label="Zdjęcie (opcjonalne)"
+                        aria-label="Zdjęcie (wymagane)"
                         aria-describedby="mission-photo-help"
+                        required
                         accept="image/jpeg,image/png,image/webp"
                         onChange={(event) =>
                           setPhoto(event.target.files?.[0] || null)

@@ -4,6 +4,7 @@ import { Bookmark, ArrowRight } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { PageHeading } from "../components/Common";
 import { EvidencePhotos } from "../components/EvidencePhotos";
+import { NearbyMissions } from "../components/NearbyMissions";
 import { getPlace } from "../data/api";
 import { reportStatus } from "./Reports";
 
@@ -124,6 +125,7 @@ export function Profile() {
           <Link className="button subtle" to="/missions">
             Moje misje
           </Link>
+          <NearbyMissions />
           {session?.user.roles.includes("moderator") && (
             <>
               <hr />

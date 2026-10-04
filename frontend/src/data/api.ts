@@ -50,7 +50,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
         : body.error?.code === "MISSION_CATALOGUE_UNAVAILABLE"
           ? "Katalog misji jest chwilowo niedostępny. Spróbuj ponownie później."
           : body.error?.message ||
-              `Żądanie nie powiodło się (${response.status}).`,
+            `Żądanie nie powiodło się (${response.status}).`,
       response.status,
       body.error?.code || "REQUEST_FAILED",
     );
@@ -301,7 +301,11 @@ export type Photo = {
 };
 export async function uploadPhoto(
   file: File,
-  metadata: { address?: string | null; metric?: string | null } = {},
+  metadata: {
+    address?: string | null;
+    metric?: string | null;
+    mission_verification?: boolean;
+  } = {},
 ): Promise<string> {
   if (
     !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
@@ -312,6 +316,8 @@ export async function uploadPhoto(
   data.append("file", file);
   if (metadata.address) data.append("address", metadata.address);
   if (metadata.metric) data.append("metric", metadata.metric);
+  if (metadata.mission_verification)
+    data.append("mission_verification", "true");
   const created = await api<{ id: string; status: "ready" | "processing" }>(
     "/photos",
     { method: "POST", body: data },
@@ -322,7 +328,11 @@ export async function uploadPhoto(
 export async function withPhoto<T>(
   file: File | null,
   submit: (ids: string[]) => Promise<T>,
-  metadata: { address?: string | null; metric?: string | null } = {},
+  metadata: {
+    address?: string | null;
+    metric?: string | null;
+    mission_verification?: boolean;
+  } = {},
 ): Promise<T> {
   const id = file ? await uploadPhoto(file, metadata) : null;
   try {
@@ -380,6 +390,7 @@ export type MissionProgress = {
   mission_id: string;
   user_id: string;
   status: "in_progress" | "pending" | "accepted" | "rejected";
+  ai_status?: "not_requested" | "pending" | "completed" | "failed";
   report_id: string | null;
   answer: string;
   awarded_points: number;

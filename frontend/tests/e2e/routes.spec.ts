@@ -6,6 +6,69 @@ const assessment = {
   summary: "Spełnia ograniczenia na danych demonstracyjnych.",
   reasons: [],
 };
+
+test("zaakceptowana misja usuwa niepewność z panelu i po odświeżeniu", async ({
+  page,
+}) => {
+  let accepted = false;
+  const plan = response();
+  const factId = "synthetic/segment-0/rest_area_available";
+  plan.routes[0].segments[0].facts = [
+    {
+      id: factId,
+      attribute: "rest_area_available",
+      value: null,
+      unit: null,
+      status: "unconfirmed",
+      confidence_score: 0,
+      confidence_level: "uncertain",
+      confidence_calculated_at: null,
+      confidence_percent: null,
+      observed_at: null,
+      updated_at: "2026-10-04T10:00:00Z",
+      valid_until: null,
+      sources: [],
+      unconfirmed_reason: "missing",
+    },
+  ];
+  await page.route("**/api/v1/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let json: unknown = { items: [], next_cursor: null };
+    if (path.endsWith("/auth/session"))
+      json = {
+        user: { id: "user_test", display_name: "Test", roles: [] },
+        csrf_token: "test",
+      };
+    else if (path.endsWith("/bookmarks")) json = [];
+    else if (path.endsWith("/routes/plan")) json = plan;
+    else if (path.endsWith("/missions/progress"))
+      json = {
+        points: accepted ? 30 : 0,
+        items: [
+          {
+            status: accepted ? "accepted" : "pending",
+            report_id: "report_test",
+          },
+        ],
+      };
+    else if (path.endsWith("/reports/report_test"))
+      json = { id: "report_test", status: "accepted", fact_id: factId };
+    await route.fulfill({ json });
+  });
+  await page.goto("/route");
+  await page.getByRole("button", { name: "Pokaż trasę" }).click();
+  const gaps = page.getByRole("region", { name: "Niepewności na trasie" });
+  await expect(gaps).toBeVisible();
+  accepted = true;
+  await expect(gaps).toHaveCount(0, { timeout: 10000 });
+  await page.goto("/route/calculated-route/details");
+  await expect(gaps).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Idź do Wawelu.", exact: true }),
+  ).toBeVisible();
+  await expect(gaps).toHaveCount(0);
+});
 function response(stepFree = false): RoutePlan {
   const coordinates: [number, number][] = stepFree
     ? [

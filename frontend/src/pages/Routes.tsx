@@ -24,6 +24,8 @@ import ProfileSettingsButton from "../components/ProfileSettingsButton";
 import { FactRow, PageHeading, Status } from "../components/Common";
 import {
   getPlace,
+  getMissionActivity,
+  getReport,
   planRoute,
   requestRouteVerificationMission,
   searchRoutePoints,
@@ -375,13 +377,48 @@ function RouteInformationGaps({ route }: { route: PlannedRoute }) {
   const { session } = useDemo();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [verifiedFacts, setVerifiedFacts] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    setVerifiedFacts(new Set());
+    if (!session || route.mode === "car") return;
+    const refresh = async () => {
+      try {
+        const activity = await getMissionActivity();
+        const reports = await Promise.all(
+          activity.items
+            .filter((item) => item.status === "accepted" && item.report_id)
+            .map((item) => getReport(item.report_id!)),
+        );
+        if (!active) return;
+        setVerifiedFacts(
+          new Set(
+            reports.flatMap((report) =>
+              report.status === "accepted" && report.fact_id ? [report.fact_id] : [],
+            ),
+          ),
+        );
+        if (activity.items.some((item) => item.status === "pending"))
+          timer = setTimeout(refresh, 3000);
+      } catch {
+        if (active) timer = setTimeout(refresh, 3000);
+      }
+    };
+    void refresh();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [session?.user.id, route.id, route.mode]);
   if (route.mode === "car") return null;
   const seen = new Set<string>();
   const gaps = route.segments.flatMap((segment, index) => {
     if (route.mode === "transit" && segment.mode !== "walk") return [];
     return segment.facts
       .filter((fact) => {
-        if (fact.value !== null || seen.has(fact.id)) return false;
+        if (fact.value !== null || seen.has(fact.id) || verifiedFacts.has(fact.id))
+          return false;
         seen.add(fact.id);
         return true;
       })

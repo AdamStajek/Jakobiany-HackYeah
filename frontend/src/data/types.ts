@@ -106,6 +106,7 @@ export type Place = PlaceSummary & {
   website_source?: Source | null;
 };
 export type Report = {
+  ai_status?: "not_requested" | "pending" | "completed" | "failed";
   id: string;
   author_id: string;
   target: { type: "place" | "segment"; id: string };

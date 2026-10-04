@@ -139,7 +139,7 @@ class CityRoutingTests(unittest.TestCase):
             )
         )
 
-    def test_fastest_still_available_when_step_free_route_is_missing(self):
+    def test_no_fallback_when_step_free_route_is_missing(self):
         from hackyeah.mobility_routing import plan_mobility_route
 
         graph = self.graph(
@@ -148,7 +148,10 @@ class CityRoutingTests(unittest.TestCase):
         )
         with patch("hackyeah.mobility_routing.get_graph", return_value=graph):
             result = plan_mobility_route(self.request(max_steps=0))
-        self.assertEqual([route.variant for route in result.routes], ["fastest"])
+        self.assertEqual(result.routes, [])
+        self.assertTrue(
+            any("spełniającej Twoje wymagania" in w for w in result.warnings)
+        )
 
     def test_step_free_slope_limit_excludes_steep_ways_and_nodes(self):
         request = self.request(
@@ -203,20 +206,28 @@ class CityRoutingTests(unittest.TestCase):
                 )
                 self.assertIn(self.nodes[4], result.routes[0].geometry.coordinates)
 
+    def test_unavoidable_requirements_return_no_route(self):
+        for tags, constraints in [
+            ({"lit": "no"}, {"require_lighting": True}),
+            ({"smoothness": "bad"}, {"allowed_smoothness": ["good"]}),
+            ({"incline": "12%"}, {"max_slope_percent": 3}),
+            ({"width": "0.5"}, {"min_entrance_width_cm": 100}),
+            ({"highway": "steps", "step_count": "6"}, {"max_steps": 2}),
+            ({}, {"max_distance_without_rest_m": 50}),
+            ({}, {"require_accessible_toilet": True}),
+        ]:
+            with self.subTest(constraints=constraints):
+                graph = self.graph(direct=tags, detour=tags)
+                self.assertEqual(
+                    plan_city_route(self.request(**constraints), graph).routes, []
+                )
+
     def test_unknowns_allow_uncertain_route_and_unavoidable_inconvenience_is_reported(
         self,
     ):
         graph = self.graph(direct={"surface": "gravel"}, detour={"surface": "gravel"})
-        route = plan_city_route(
-            self.request(allowed_surfaces=["asphalt"]), graph
-        ).routes[0]
-        self.assertEqual(route.assessment.status, "does_not_meet_requirements")
-        self.assertTrue(
-            any(
-                reason.code == "OSM_INCONVENIENCE"
-                for reason in route.assessment.reasons
-            )
-        )
+        result = plan_city_route(self.request(allowed_surfaces=["asphalt"]), graph)
+        self.assertEqual(result.routes, [])
         unknown = self.graph(
             direct={"surface": "", "incline": "up"},
             detour={"surface": "", "incline": "up"},

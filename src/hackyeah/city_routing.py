@@ -385,7 +385,9 @@ def edge_cost(edge, graph, constraints, checks, fastest=False):
         )
     for attribute, predicate in checks:
         value = data.get(attribute)
-        multiplier += 0.15 if value is None else 15 if not predicate(value) else 0
+        if value is not None and not predicate(value):
+            return None
+        multiplier += 0.15 if value is None else 0
     if step_free and data["steps_present"] is None:
         multiplier += 0.1
     node_penalty = 0
@@ -419,7 +421,7 @@ def edge_cost(edge, graph, constraints, checks, fastest=False):
             for attribute, predicate in checks:
                 value = node_values.get(attribute)
                 if value is not None and not predicate(value):
-                    node_penalty += 1200
+                    return None
     steps = edge.steps + node_steps
     if fastest:
         return walking_time(edge, graph), steps
@@ -594,23 +596,24 @@ def plan_city_route(
             cost, steps = result
             next_steps = label.steps + steps
             if constraints.max_steps is not None:
-                cost += max(0, next_steps - constraints.max_steps) * 120
-                next_steps = min(next_steps, constraints.max_steps)
+                if next_steps > constraints.max_steps:
+                    continue
             else:
                 next_steps = 0
             unrested = label.unrested + edge.distance
             if constraints.max_distance_without_rest_m is not None:
                 limit = constraints.max_distance_without_rest_m
-                cost += max(0, unrested - limit) * 8
+                if unrested > limit:
+                    continue
                 # Conservative 10 m resource buckets keep city-scale label search finite.
-                unrested = min(limit, math.ceil(unrested / 10) * 10)
+                unrested = math.ceil(unrested / 10) * 10
                 if edge.b in graph.rests:
                     unrested = 0
             else:
                 unrested = 0
             missing = label.toilet_missing and edge.b not in graph.toilets
             if edge.b == -2 and missing:
-                cost += 1800
+                continue
             new = Label(
                 edge.b, label.cost + cost, next_steps, unrested, missing, index, edge
             )
@@ -634,7 +637,7 @@ def plan_city_route(
             heappush(queue, (new.cost + heuristic, next(serial), next_index))
     if answer is None:
         return empty(
-            "Brak połączenia w sieci pieszej po wykluczeniu schodów, nieprzejezdnych odcinków i zakazów dostępu. Zmień punkty lub wymagania."
+            "Nie znaleziono trasy spełniającej Twoje wymagania w dostępnej sieci pieszej. Zmień punkty lub wymagania."
         )
     path = []
     cursor = answer

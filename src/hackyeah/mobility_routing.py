@@ -755,6 +755,8 @@ def plan_mobility_route(request):
     if request.mode == "walk":
         graph = get_graph()
         response = plan_city_route(request, graph)
+        if not response.routes:
+            return response
         fastest = plan_city_route(request, graph, fastest=True)
         for route in response.routes:
             route.variant = "constrained"

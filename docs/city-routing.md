@@ -62,34 +62,24 @@ pieszy są odrzucane podczas importu.
   punktowe, przeszkody takie jak stile/turnstile oraz `wheelchair=no`.
 - `smoothness=impassable`, ściany, ogrodzenia, blokady i jawne zakazy
   dostępu na węzłach wykluczają przejście.
-- Zbyt duże nachylenie, krawężnik lub próg, za wąskie przejście, niepożądana
-  nawierzchnia, nierówności i brak oświetlenia podnoszą koszt trasy.
-- Dodatni limit liczby stopni podnosi koszt po przekroczeniu sumy stopni;
+- Znane naruszenia limitów nachylenia, krawężnika, progu i szerokości,
+  niedozwolone nawierzchnie, nierówności i wymagany brak oświetlenia wykluczają odcinek.
+- Limit stopni i odległości bez odpoczynku nie może zostać przekroczony.
   `step_count` całej drogi nie jest mnożony przez liczbę jej fragmentów.
-- Miejsca odpoczynku i dostępne toalety zmapowane do 25 m od węzłów wpływają
-  na wybór wariantu; rzeczywiste dojście i prawo dostępu wymagają sprawdzenia.
+- Wymagana dostępna toaleta musi być zmapowana przy wybranej trasie.
+  Miejsca odpoczynku i toalety są przypisywane do węzłów w promieniu 25 m;
+  rzeczywiste dojście i prawo dostępu wymagają sprawdzenia.
 
-Znane nieprzejezdne odcinki są wykluczane. Dla pozostałych preferencji
-możliwy jest wariant kompromisowy, gdy pełne ominięcie niedogodności byłoby
-zbyt kosztowne lub niemożliwe. Naruszenia wg OSM są wypisane w ostrzeżeniach,
-ocenie trasy i ocenach poszczególnych odcinków. Nie pokazujemy ich jako
-`spełnia wymagania`. Brak zmapowanej toalety lub ławki oznacza niepewność,
-a nie potwierdzony brak takiego obiektu w terenie.
-
-Wagi są heurystyczne, nie skalibrowane klinicznie: naruszenie parametru drogi
-zwiększa mnożnik kosztu o 15, naruszenie punktowe dodaje 1200 sekund kosztu,
-każdy stopień ponad dodatni limit dodaje 120 sekund, nadmiar odległości bez
-zmapowanego odpoczynku kosztuje 8 sekund na metr, a brak zmapowanej dostępnej
-toalety 1800 sekund. Nieznany aktywny parametr dodaje mniejszą karę (0,15
-mnożnika); brak informacji o stopniach przy profilu bez stopni dodaje 0,1.
-Koszty wyboru nie są prezentowane jako czas przejścia. Czas jest osobnym
+Jeśli nie ma trasy spełniającej wymagania, odpowiedź zawiera pustą listę tras
+oraz komunikat dla użytkownika. Nie zwracamy wtedy zastępczej najszybszej trasy.
+Nieznane parametry nadal oznaczają niepewność, a nie potwierdzoną dostępność.
+Nieznany aktywny parametr dodaje 0,15 mnożnika kosztu; brak informacji
+o stopniach przy profilu bez stopni dodaje 0,1. Czas przejścia jest osobnym
 szacunkiem prędkości 1,2 m/s, nawierzchni, nachylenia i zmapowanych stopni.
 
-Etykiety A* przechowują również liczbę stopni, odległość od odpoczynku i
-obecność toalety; dominowane stany są odrzucane. Odległość bez odpoczynku
-jest konserwatywnie zaokrąglana do 10 m i ograniczana do progu podczas
-wyszukiwania, aby liczba stanów pozostała skończona. Wynik pokazuje długości
-rzeczywistej geometrii, bez tego zaokrąglenia.
+Etykiety A* przechowują liczbę stopni, odległość od odpoczynku i obecność toalety;
+dominowane stany są odrzucane. Odległość bez odpoczynku jest konserwatywnie
+zaokrąglana do 10 m. Wynik pokazuje długości rzeczywistej geometrii.
 
 ## Wiarygodność i zakres
 

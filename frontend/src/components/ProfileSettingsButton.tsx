@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useDemo } from "../state/DemoContext";
 
 export default function ProfileSettingsButton() {
-  const { profile, setConstraints, notify } = useDemo();
+  const { profile, setConstraints } = useDemo();
 
   return profile ? (
     <button
@@ -10,7 +10,6 @@ export default function ProfileSettingsButton() {
       className="button subtle"
       onClick={() => {
         setConstraints({ ...profile.constraints });
-        notify("Zastosowano ustawienia z profilu.");
       }}
     >
       Użyj ustawień z profilu

@@ -258,7 +258,10 @@ def plan_routes(body: m.RoutePlanRequest, request: Request) -> m.RoutePlanRespon
         return response
     lon, lat = response.routes[0].geometry.coordinates[0]
     try:
-        response.weather = get_weather(m.Coordinates(lat=lat, lon=lon), days=7)
+        # Route calculation should not wait up to the weather fetch's 45 s import timeout.
+        response.weather = get_weather(
+            m.Coordinates(lat=lat, lon=lon), days=7, timeout=3
+        )
     except (OSError, URLError, ValueError, KeyError, TypeError, ValidationError):
         response.warnings.append(
             "Nie udało się pobrać aktualnej pogody; ryzyka pogodowe pozostają nieznane."

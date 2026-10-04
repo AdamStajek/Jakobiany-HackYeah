@@ -29,9 +29,9 @@ VARIABLES = (
 KML = {"k": "http://www.opengis.net/kml/2.2"}
 
 
-def fetch(url: str) -> bytes:
+def fetch(url: str, timeout: float = 45) -> bytes:
     request = Request(url, headers={"User-Agent": "hackyeah-route-conditions/0.1"})
-    with urlopen(request, timeout=45) as response:
+    with urlopen(request, timeout=timeout) as response:
         data = response.read(10 * 1024 * 1024 + 1)
         expected = response.headers.get("Content-Length")
         if expected and len(data) != int(expected):
@@ -323,11 +323,13 @@ def parse_construction(data: bytes, retrieved_at: datetime) -> m.TemporaryDataSn
 
 
 def get_weather(
-    location: m.Coordinates, days: int = 3, heat_c: float = 30
+    location: m.Coordinates, days: int = 3, heat_c: float = 30, timeout: float = 45
 ) -> m.TemporaryDataSnapshot:
     """Fetch a fresh forecast per call; no disk cache or database writes."""
     url = forecast_url(location, days)
-    return parse_weather(json.loads(fetch(url)), datetime.now(UTC), url, heat_c)
+    return parse_weather(
+        json.loads(fetch(url, timeout)), datetime.now(UTC), url, heat_c
+    )
 
 
 def main(source: str | None = None) -> None:

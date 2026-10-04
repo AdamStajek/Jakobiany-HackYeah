@@ -24,14 +24,17 @@ _accepted_observations = Store[str, list[m.Observation]](
 
 
 def _refresh_confidence(report: m.Report) -> None:
+    refresh_author_confidence(report.author_id)
+
+
+def refresh_author_confidence(author_id: str) -> None:
     from hackyeah.confidence import recalculate_all
 
     targets = {
         (item.target.type, item.target.id)
         for item in _reports.values()
-        if item.author_id == report.author_id
+        if item.author_id == author_id
     }
-    targets.add((report.target.type, report.target.id))
     for target in targets:
         recalculate_all(target=target)
 

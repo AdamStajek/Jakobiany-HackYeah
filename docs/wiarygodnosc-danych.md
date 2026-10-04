@@ -24,6 +24,10 @@ pobrania danych mapowych. Każdy dowód starzeje się osobno.
 `x` to wiarygodność autora wyliczona z historii jego rozpatrzonych zgłoszeń,
 w zakresie od `0` do `1`: liczba przyjętych zgłoszeń podzielona przez liczbę
 wszystkich rozpatrzonych zgłoszeń. Użytkownik bez historii otrzymuje `x = 0.5`.
+Historia obejmuje też rozpatrzone propozycje nowych miejsc. Każda sugestia
+liczy się raz; edycja do stanu oczekującego zachowuje jej ostatnią ocenę do
+ponownej weryfikacji. Odrzucenie obniża wagę również wcześniejszych przyjętych
+zgłoszeń autora. Ocena jest wewnętrzna: nie trafia do profilu, sesji ani API.
 `y = 1`, gdy zgłoszenie zawiera zdjęcie, a analiza AI potwierdziła zgłaszaną
 wartość; w każdym innym przypadku `y = 0.25`.
 

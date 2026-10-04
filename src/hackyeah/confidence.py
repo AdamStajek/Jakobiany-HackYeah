@@ -52,7 +52,7 @@ def recalculate_all(
     now: datetime | None = None, target: tuple[str, str] | None = None
 ) -> None:
     """Idempotently rebuild scores from the evidence currently stored in SQLite."""
-    from hackyeah import owner, reports
+    from hackyeah import owner, reports, reputation
 
     now = now or datetime.now(UTC)
     scores: dict[tuple[str, str, str, str], float] = {}
@@ -114,15 +114,7 @@ def recalculate_all(
                     )
 
         all_reports = list(reports._reports.values())
-        reviewed: dict[str, list[bool]] = {}
-        for report in all_reports:
-            if report.status != "pending":
-                reviewed.setdefault(report.author_id, []).append(
-                    report.status == "accepted"
-                )
-        reliability = {
-            author: sum(results) / len(results) for author, results in reviewed.items()
-        }
+        reliability = reputation.scores()
         for report in all_reports:
             if report.status != "accepted":
                 continue

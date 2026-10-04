@@ -36,13 +36,21 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: "same-origin",
   });
   if (response.status === 204) return undefined as T;
-  const body = await response.json();
+  const body = await response.json().catch(() => {
+    throw new ApiError(
+      `Nie udało się pobrać danych (${response.status}). Spróbuj ponownie później.`,
+      response.status,
+      "INVALID_RESPONSE",
+    );
+  });
   if (!response.ok)
     throw new ApiError(
       body.error?.code === "INVALID_CREDENTIALS"
         ? "Nieprawidłowy e-mail lub hasło."
-        : body.error?.message ||
-            `Żądanie nie powiodło się (${response.status}).`,
+        : body.error?.code === "MISSION_CATALOGUE_UNAVAILABLE"
+          ? "Katalog misji jest chwilowo niedostępny. Spróbuj ponownie później."
+          : body.error?.message ||
+              `Żądanie nie powiodło się (${response.status}).`,
       response.status,
       body.error?.code || "REQUEST_FAILED",
     );

@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from urllib.error import URLError
@@ -397,7 +399,11 @@ def list_missions(
     near = (
         m.Coordinates(lat=lat, lon=lon) if lat is not None and lon is not None else None
     )
-    return missions.catalog(near, offset)
+    try:
+        return missions.catalog(near, offset)
+    except (sqlite3.Error, ValidationError) as error:
+        logging.getLogger(__name__).exception("Could not load mission catalogue")
+        raise HTTPException(503, "MISSION_CATALOGUE_UNAVAILABLE") from error
 
 
 @router.post(

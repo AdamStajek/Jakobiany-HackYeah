@@ -120,6 +120,7 @@ async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
         "INVALID_REQUEST",
         "RATE_LIMITED",
         "DEPENDENCY_UNAVAILABLE",
+        "MISSION_CATALOGUE_UNAVAILABLE",
         "NOT_FOUND",
         "INVALID_PHOTO",
         "INVALID_PHOTO_DIMENSIONS",

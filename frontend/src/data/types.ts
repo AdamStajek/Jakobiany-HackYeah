@@ -64,6 +64,7 @@ export type Assessment = {
 };
 export type PlaceSummary = {
   id: string;
+  is_example?: boolean;
   name: string;
   category: string;
   address: string | null;

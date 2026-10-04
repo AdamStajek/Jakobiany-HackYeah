@@ -111,6 +111,7 @@ const en: Record<string, string> = Object.fromEntries([
   ["Nazwa miejsca", "Place name"],
   ["Wyczyść filtry", "Clear filters"],
   ["Miejsca w Krakowie", "Places in Kraków"],
+  ["Przykład — dane poglądowe, niezweryfikowane", "Example — illustrative, unverified data"],
   ["Pobieranie…", "Loading…"],
   ["wyników", "results"],
   ["Nie znaleźliśmy miejsc", "No places found"],

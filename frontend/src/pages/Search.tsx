@@ -16,6 +16,7 @@ import AISearch from "../components/AISearch";
 import ProfileSettingsButton from "../components/ProfileSettingsButton";
 import { SearchBox, PlaceCard } from "../components/Common";
 import { searchPlaces } from "../data/api";
+import { places as examplePlaces } from "../data/mock";
 import type { PlaceSummary } from "../data/types";
 import { emptyConstraints } from "../data/types";
 const filterOptions = [
@@ -40,6 +41,12 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<PlaceSummary | null>(null);
+  const isDefaultBrowse =
+    !query &&
+    !category &&
+    Object.values(constraints).every((value) => value === null) &&
+    searchNear.lat === krakowCenter.lat &&
+    searchNear.lon === krakowCenter.lon;
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -60,9 +67,16 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
     )
       .then((page) => {
         if (active) {
-          setResults(page.items);
+          const isSample = !page.items.length && isDefaultBrowse;
+          const items = isSample
+            ? examplePlaces.slice(0, 4).map((place) => ({
+                ...place,
+                is_example: true,
+              }))
+            : page.items;
+          setResults(items);
           setNextCursor(page.next_cursor);
-          setTotalCount(page.total_count ?? page.items.length);
+          setTotalCount(isSample ? items.length : page.total_count ?? items.length);
         }
       })
       .catch((reason: unknown) => {
@@ -80,7 +94,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
       active = false;
       controller.abort();
     };
-  }, [query, category, constraints, searchNear]);
+  }, [query, category, constraints, searchNear, isDefaultBrowse]);
   async function goToPage(pageNumber: number) {
     if (pageNumber < 1 || pageNumber > Math.ceil(totalCount / 10)) return;
     if (pageNumber * 10 > results.length && nextCursor && !loadingMore) {

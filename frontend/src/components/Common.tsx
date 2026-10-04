@@ -68,30 +68,49 @@ export function PlaceCard({
 }) {
   const navigate = useNavigate();
   const { location } = useDemo();
+  const image = place.photos?.[0] ? (
+    <img
+      src={place.photos[0].url}
+      alt={`${place.name} — ${place.photos[0].description?.trim() || place.photos[0].title}`}
+      loading="lazy"
+    />
+  ) : (
+    <MapPin size={34} aria-hidden="true" />
+  );
   return (
     <article className="place-card">
-      <Link
-        to={`/place/${encodeURIComponent(place.id)}`}
-        className="place-image"
-        aria-label={place.name}
-        data-no-translate
-      >
-        {place.photos?.[0] ? (
-          <img
-            src={place.photos[0].url}
-            alt={`${place.name} — ${place.photos[0].description?.trim() || place.photos[0].title}`}
-            loading="lazy"
-          />
-        ) : (
-          <MapPin size={34} aria-hidden="true" />
-        )}
-      </Link>
+      {place.is_example ? (
+        <div className="place-image" aria-hidden="true">
+          {image}
+        </div>
+      ) : (
+        <Link
+          to={`/place/${encodeURIComponent(place.id)}`}
+          className="place-image"
+          aria-label={place.name}
+          data-no-translate
+        >
+          {image}
+        </Link>
+      )}
       <div className="place-card-body">
+        {place.is_example && (
+          <p className="example-badge">
+            Przykład — dane poglądowe, niezweryfikowane
+          </p>
+        )}
         <p className="eyebrow">{place.category}</p>
         <h3>
-          <Link to={`/place/${encodeURIComponent(place.id)}`} data-no-translate>
-            {place.name}
-          </Link>
+          {place.is_example ? (
+            <span>{place.name}</span>
+          ) : (
+            <Link
+              to={`/place/${encodeURIComponent(place.id)}`}
+              data-no-translate
+            >
+              {place.name}
+            </Link>
+          )}
         </h3>
         <p className="muted location">
           <MapPin size={15} />
@@ -108,17 +127,19 @@ export function PlaceCard({
               Pokaż na mapie
             </button>
           )}
-          <button
-            className="button subtle place-route-button"
-            onClick={() =>
-              navigate(
-                `/route?to=${encodeURIComponent(place.id)}&from=${location ? "location" : "empty"}`,
-              )
-            }
-          >
-            <RouteIcon size={17} />
-            Wyznacz trasę
-          </button>
+          {!place.is_example && (
+            <button
+              className="button subtle place-route-button"
+              onClick={() =>
+                navigate(
+                  `/route?to=${encodeURIComponent(place.id)}&from=${location ? "location" : "empty"}`,
+                )
+              }
+            >
+              <RouteIcon size={17} />
+              Wyznacz trasę
+            </button>
+          )}
         </div>
       </div>
     </article>

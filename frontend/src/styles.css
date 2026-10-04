@@ -824,6 +824,16 @@ footer {
   margin-bottom: 4px;
   padding-right: 28px;
 }
+.example-badge {
+  width: fit-content;
+  margin: 0 0 6px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #fff0cf;
+  color: #654500;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
 .place-card h3 {
   font-size: 1.05rem;
   margin-bottom: 7px;

@@ -17,7 +17,14 @@ async def lifespan(app: FastAPI):
     from hackyeah.confidence import recalculate_all
 
     recalculate_all()
-    yield
+    from hackyeah.photo_worker import start
+
+    stopped, worker = start()
+    try:
+        yield
+    finally:
+        stopped.set()
+        worker.join(timeout=4)
 
 
 app = FastAPI(

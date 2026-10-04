@@ -195,6 +195,37 @@ assert photos.content(session.user, {photo_id!r}).startswith(b"\\x89PNG")
             "accepted",
         )
 
+    def test_route_verification_accepts_osm_and_synthetic_gaps(self):
+        for fact_id in (
+            "osm/way/123/rest_area_available",
+            "synthetic/bednarski-kika/rest_area_available",
+        ):
+            with self.subTest(fact_id=fact_id):
+                body = {
+                    "fact_id": fact_id,
+                    "attribute": "rest_area_available",
+                    "instruction": "Sprawdź miejsce odpoczynku na odcinku.",
+                    "location": {"lat": 50.043, "lon": 19.95},
+                }
+                response = self.user.post(
+                    "/api/v1/missions/route-verification-requests", json=body
+                )
+                self.assertEqual(response.status_code, 201, response.text)
+                mission = response.json()
+                self.assertEqual(mission["fact_id"], fact_id)
+                self.assertEqual(mission["target_type"], "segment")
+                self.assertEqual(mission["priority"], 1)
+                repeated = self.user.post(
+                    "/api/v1/missions/route-verification-requests", json=body
+                )
+                self.assertEqual(repeated.json()["id"], mission["id"])
+        for fact_id in ("unknown/rest_area_available", "synthetic/demo/surface"):
+            body["fact_id"] = fact_id
+            response = self.user.post(
+                "/api/v1/missions/route-verification-requests", json=body
+            )
+            self.assertEqual(response.status_code, 422, response.text)
+
     def test_automatic_mission_priorities_refresh_and_guest_access(self):
         import sqlite3
         from contextlib import closing

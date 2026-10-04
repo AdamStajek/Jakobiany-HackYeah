@@ -54,6 +54,7 @@ def prepare(
     body: m.ReportCreate,
     *,
     verification_attribute: m.Attribute | None = None,
+    defer_processing: bool = False,
 ) -> m.Report:
     now = datetime.now(UTC)
     if body.observed_at is None:
@@ -69,13 +70,23 @@ def prepare(
         created_at=now,
         updated_at=now,
     )
+    if defer_processing:
+        items = photos.validate_owned(user, report.photo_ids)
+        if any(item.status == "rejected" for item in items):
+            raise HTTPException(409, "PHOTO_REJECTED")
+        if items and (report.observations or verification_attribute is not None):
+            report.ai_status = "pending"
+            report.review_comment = "Przetwarzanie zdjęcia i weryfikacja w tle."
+        return report
     images = photos.owned_contents(user, report.photo_ids)
     if any(
         photos.get(user, photo_id).error_code == "PHOTO_ANALYSIS_UNAVAILABLE"
         for photo_id in report.photo_ids
     ):
         report.ai_status = "failed"
-        report.review_comment = "Analiza zdjęcia jest niedostępna; wymagana ręczna weryfikacja."
+        report.review_comment = (
+            "Analiza zdjęcia jest niedostępna; wymagana ręczna weryfikacja."
+        )
     else:
         report_ai.verify(report, images, verification_attribute)
     return report
@@ -92,8 +103,107 @@ def save(user: m.User, report: m.Report) -> m.Report:
     return report.model_copy(deep=True)
 
 
-def create(user: m.User, body: m.ReportCreate) -> m.Report:
-    return save(user, prepare(user, body))
+def create(
+    user: m.User, body: m.ReportCreate, *, defer_processing: bool = False
+) -> m.Report:
+    return save(user, prepare(user, body, defer_processing=defer_processing))
+
+
+def process(report_id: str) -> None:
+    """Verify outside a transaction and discard results if the report changed."""
+    from hackyeah import missions
+
+    with _lock:
+        original = _reports.get(report_id)
+        if original is None or original.ai_status != "pending":
+            return
+        report = original.model_copy(deep=True)
+        progress = missions.linked_progress(report_id)
+        if progress is not None:
+            return
+    user = m.User(id=report.author_id, display_name="Background verification", roles=[])
+    items = photos.validate_owned(user, report.photo_ids)
+    processing = any(item.status == "processing" for item in items)
+    if processing and progress is None:
+        return
+    if any(
+        item.status == "rejected"
+        or item.error_code not in {None, "PHOTO_DESCRIPTION_UNAVAILABLE"}
+        for item in items
+    ):
+        report.ai_status = "failed"
+        report.review_comment = (
+            "Analiza zdjęcia jest niedostępna. Wyślij zdjęcie ponownie."
+        )
+    else:
+        images = (
+            photos.verification_contents(user, report.photo_ids)
+            if progress and processing
+            else photos.owned_contents(user, report.photo_ids)
+        )
+        if progress and processing:
+            for photo_id, item in zip(report.photo_ids, items, strict=True):
+                if item.status == "processing":
+                    photos.process(photo_id)
+            items = photos.validate_owned(user, report.photo_ids)
+            if any(item.status == "rejected" for item in items):
+                report.ai_status = "failed"
+                report.review_comment = (
+                    "Nie udało się zanonimizować zdjęcia przed jego zapisaniem."
+                )
+        if report.ai_status != "failed":
+            attribute = missions.get(progress.mission_id).attribute if progress else None
+            report_ai.verify(report, images, attribute)
+    report.updated_at = datetime.now(UTC)
+    with _lock:
+        if _reports.get(report_id) != original:
+            return
+        _reports[report_id] = report
+        if report.status == "accepted":
+            _accepted_observations[report_id] = report.observations
+        missions.sync_review(report)
+        _refresh_confidence(report)
+
+
+def accept_due_missions() -> None:
+    """Temporary demo acceptance, five seconds after mission submission."""
+    from hackyeah import missions
+
+    now = datetime.now(UTC)
+    with _lock:
+        for report in _reports.values():
+            progress = missions.linked_progress(report.id)
+            if (
+                report.status != "pending"
+                or progress is None
+                or progress.report_id != report.id
+                or (now - report.created_at).total_seconds() < 5
+            ):
+                continue
+            report.status = "accepted"
+            report.ai_status = "not_requested"
+            report.review_comment = (
+                "Automatycznie zaakceptowano w trybie demonstracyjnym."
+            )
+            report.updated_at = now
+            _reports[report.id] = report
+            _accepted_observations[report.id] = report.observations
+            missions.sync_review(report)
+            _refresh_confidence(report)
+
+
+def fail_processing(original: m.Report, message: str) -> None:
+    from hackyeah import missions
+
+    with _lock:
+        if _reports.get(original.id) != original:
+            return
+        report = original.model_copy(deep=True)
+        report.ai_status = "failed"
+        report.review_comment = message
+        report.updated_at = datetime.now(UTC)
+        _reports[report.id] = report
+        missions.sync_review(report)
 
 
 def list_page(
@@ -152,7 +262,9 @@ def list_page(
         )
 
 
-def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
+def update(
+    user: m.User, report_id: str, body: m.ReportPatch, *, defer_processing: bool = False
+) -> m.Report:
     from hackyeah import missions
 
     with _lock:
@@ -169,7 +281,7 @@ def update(user: m.User, report_id: str, body: m.ReportPatch) -> m.Report:
             )
         except ValueError:
             raise HTTPException(422, "VALIDATION_ERROR") from None
-    updated = prepare(user, content)
+    updated = prepare(user, content, defer_processing=defer_processing)
     updated.id = report.id
     updated.created_at = report.created_at
     with _lock:

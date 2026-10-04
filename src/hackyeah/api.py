@@ -318,6 +318,7 @@ def upload_photo(
     ],
     address: Annotated[str | None, Form(max_length=300)] = None,
     metric: Annotated[str | None, Form(max_length=100)] = None,
+    mission_verification: Annotated[bool, Form()] = False,
 ) -> m.PhotoCreated:
     user = auth.require_csrf(request)
     try:
@@ -326,13 +327,16 @@ def upload_photo(
             file.file.read(photos.MAX_BYTES + 1),
             address=address,
             metric=metric,
+            mission_verification=mission_verification,
+            defer_processing=True,
         )
     finally:
         file.file.close()
 
 
 @router.get("/photos/{id}", response_model=m.Photo, tags=["photos"])
-def get_photo(id: ResourceId, request: Request) -> m.Photo:
+def get_photo(id: ResourceId, request: Request, response: Response) -> m.Photo:
+    response.headers["Cache-Control"] = "private, no-store"
     return photos.get(auth.require_session(request), id)
 
 
@@ -475,7 +479,9 @@ async def submit_mission(
 ) -> m.MissionProgress:
     response.headers["Cache-Control"] = "no-store"
     user = auth.require_csrf(request)
-    return await asyncio.to_thread(missions.submit, user, id, body)
+    return await asyncio.to_thread(
+        missions.submit, user, id, body, defer_processing=True
+    )
 
 
 @router.post(
@@ -498,7 +504,7 @@ def create_report(
 
     user = auth.require_csrf(request)
     response.headers["Cache-Control"] = "no-store"
-    return reports.create(user, body)
+    return reports.create(user, body, defer_processing=True)
 
 
 @router.get("/reports", response_model=m.Page[m.Report], tags=["reports"])
@@ -532,7 +538,7 @@ def update_report(
 
     user = auth.require_csrf(request)
     response.headers["Cache-Control"] = "no-store"
-    return reports.update(user, id, body)
+    return reports.update(user, id, body, defer_processing=True)
 
 
 @router.post("/reports/{id}/review", response_model=m.Report, tags=["reports"])

@@ -194,9 +194,8 @@ def request_verification(body: m.MissionRequest) -> list[m.Mission]:
 
 def request_route_verification(body: m.RouteMissionRequest) -> m.Mission:
     """Queue a missing route fact for a field check."""
-    if (
-        not body.fact_id.startswith("osm/")
-        or not body.fact_id.endswith(f"/{body.attribute}")
+    if not body.fact_id.startswith(("osm/", "synthetic/")) or not body.fact_id.endswith(
+        f"/{body.attribute}"
     ):
         raise HTTPException(422, "VALIDATION_ERROR")
     target_id = (
@@ -204,9 +203,10 @@ def request_route_verification(body: m.RouteMissionRequest) -> m.Mission:
         if "/way/" in body.fact_id or "/node/" in body.fact_id
         else f"route/{body.location.lat:.5f}/{body.location.lon:.5f}"
     )
-    mission_id = "mission_" + sha256(
-        f"segment:{target_id}:{body.attribute}".encode()
-    ).hexdigest()[:24]
+    mission_id = (
+        "mission_"
+        + sha256(f"segment:{target_id}:{body.attribute}".encode()).hexdigest()[:24]
+    )
     with atomic:
         previous = _catalog.get(mission_id)
         if previous is not None:
@@ -243,6 +243,10 @@ def activity(user: m.User) -> m.MissionActivity:
     # ponytail: scans progress records; add indexed SQL when account volume grows.
     with atomic:
         items = [item for item in _progress.values() if item.user_id == user.id]
+        for index, item in enumerate(items):
+            report = reports._reports.get(item.report_id) if item.report_id else None
+            if report is not None:
+                items[index] = item.model_copy(update={"ai_status": report.ai_status})
         return m.MissionActivity(
             items=items,
             points=sum(item.awarded_points for item in items),
@@ -296,7 +300,13 @@ def start(user: m.User, mission_id: str) -> m.MissionProgress:
         return progress
 
 
-def submit(user: m.User, mission_id: str, body: m.MissionSubmit) -> m.MissionProgress:
+def submit(
+    user: m.User,
+    mission_id: str,
+    body: m.MissionSubmit,
+    *,
+    defer_processing: bool = False,
+) -> m.MissionProgress:
     mission = get(mission_id)
     if any(
         observation.attribute != mission.attribute for observation in body.observations
@@ -305,10 +315,7 @@ def submit(user: m.User, mission_id: str, body: m.MissionSubmit) -> m.MissionPro
     # Validate enrollment before inference and again before committing.
     with atomic:
         enrollment = _enrollments.get((user.id, mission_id))
-        if enrollment is None or _progress[enrollment].status not in (
-            "in_progress",
-            "rejected",
-        ):
+        if enrollment is None or not can_submit(_progress[enrollment]):
             raise HTTPException(409, "CONFLICT")
     report = reports.prepare(
         user,
@@ -326,13 +333,14 @@ def submit(user: m.User, mission_id: str, body: m.MissionSubmit) -> m.MissionPro
             photo_ids=body.photo_ids,
         ),
         verification_attribute=mission.attribute,
+        defer_processing=defer_processing,
     )
     with atomic:
         enrollment = _enrollments.get((user.id, mission_id))
         if enrollment is None:
             raise HTTPException(409, "CONFLICT")
         progress = _progress[enrollment]
-        if progress.status not in ("in_progress", "rejected"):
+        if not can_submit(progress):
             raise HTTPException(409, "CONFLICT")
         reports.save(user, report)
         progress = progress.model_copy(
@@ -355,6 +363,15 @@ def linked_progress(report_id: str) -> m.MissionProgress | None:
     return _progress[progress_id] if progress_id is not None else None
 
 
+def can_submit(progress: m.MissionProgress) -> bool:
+    report = reports._reports.get(progress.report_id) if progress.report_id else None
+    return progress.status in {"in_progress", "rejected"} or (
+        progress.status == "pending"
+        and report is not None
+        and report.ai_status == "failed"
+    )
+
+
 def check_review(user: m.User, report_id: str) -> None:
     progress = linked_progress(report_id)
     if progress is not None:
@@ -371,6 +388,7 @@ def sync_review(report: m.Report) -> None:
         _progress[progress.id] = progress.model_copy(
             update={
                 "status": report.status,
+                "ai_status": report.ai_status,
                 "review_comment": report.review_comment,
                 "awarded_points": mission.points if report.status == "accepted" else 0,
                 "updated_at": report.updated_at,

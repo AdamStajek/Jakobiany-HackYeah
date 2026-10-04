@@ -682,7 +682,7 @@ class RouteMissionRequest(Model):
 class MissionSubmit(Model):
     description: Annotated[str, Field(max_length=4000)] | None = None
     observations: list[Observation] = Field(default_factory=list)
-    photo_ids: Annotated[list[Id], Field(max_length=5)] = Field(default_factory=list)
+    photo_ids: Annotated[list[Id], Field(min_length=1, max_length=5)]
 
 
 class MissionProgress(Model):
@@ -690,6 +690,9 @@ class MissionProgress(Model):
     mission_id: Id
     user_id: Id
     status: Literal["in_progress", "pending", "accepted", "rejected"]
+    ai_status: Literal["not_requested", "pending", "completed", "failed"] = (
+        "not_requested"
+    )
     report_id: Id | None
     answer: str
     awarded_points: Count

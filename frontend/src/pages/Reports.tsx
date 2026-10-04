@@ -49,6 +49,13 @@ export function ReportHub() {
         description="Zgłoś zauważony problem albo poproś o sprawdzenie niepewnej informacji."
       />
       <div className="report-options">
+        <Link className="panel" to="/places/new">
+          <h2>Dodaj nowe miejsce</h2>
+          <p>Zgłoś miejsce do weryfikacji przez administratora.</p>
+          <span className="button subtle">
+            Dodaj <ArrowRight size={18} />
+          </span>
+        </Link>
         <Link className="panel" to="/report/problem">
           <span className="option-icon warning">
             <TriangleAlert />
@@ -391,30 +398,33 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
     setError("");
     setBusy(true);
     try {
-      const report = await withPhoto(photo, (photo_ids) =>
-        createReport({
-          target: { type: "place", id: place.id },
-          kind:
-            confirm && answer === "unknown"
-              ? "missing_data"
-              : confirm && answer === "yes"
-                ? "confirmation"
-                : "correction",
-          fact_id: confirm && answer === "unknown" ? null : fact.id,
-          description:
-            description.trim() ||
-            (confirm
-              ? `${labels[fact.attribute] || fact.attribute}: ${answer === "yes" ? "potwierdzam" : answer === "no" ? "nie potwierdzam" : "nie wiem"}`
-              : "Zdjęcie zaobserwowanego problemu"),
-          observations:
-            metricValue !== null
-              ? [{ attribute: fact.attribute, value: metricValue }]
-              : confirm && answer === "yes" && fact.value !== null
-                ? [{ attribute: fact.attribute, value: fact.value }]
-                : [],
-          observed_at: new Date(`${date}T00:00:00`).toISOString(),
-          photo_ids,
-        }),
+      const report = await withPhoto(
+        photo,
+        (photo_ids) =>
+          createReport({
+            target: { type: "place", id: place.id },
+            kind:
+              confirm && answer === "unknown"
+                ? "missing_data"
+                : confirm && answer === "yes"
+                  ? "confirmation"
+                  : "correction",
+            fact_id: confirm && answer === "unknown" ? null : fact.id,
+            description:
+              description.trim() ||
+              (confirm
+                ? `${labels[fact.attribute] || fact.attribute}: ${answer === "yes" ? "potwierdzam" : answer === "no" ? "nie potwierdzam" : "nie wiem"}`
+                : "Zdjęcie zaobserwowanego problemu"),
+            observations:
+              metricValue !== null
+                ? [{ attribute: fact.attribute, value: metricValue }]
+                : confirm && answer === "yes" && fact.value !== null
+                  ? [{ attribute: fact.attribute, value: fact.value }]
+                  : [],
+            observed_at: new Date(`${date}T00:00:00`).toISOString(),
+            photo_ids,
+          }),
+        { address: place.address || place.name, metric: fact.attribute },
       );
       addReport(report);
       navigate(`/report/success?id=${encodeURIComponent(report.id)}`, {

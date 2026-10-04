@@ -6,6 +6,7 @@ from fastapi import (
     APIRouter,
     Body,
     File,
+    Form,
     HTTPException,
     Path,
     Query,
@@ -158,6 +159,51 @@ def delete_profile(id: ResourceId, request: "Request", response: "Response") -> 
     profiles.delete(user.id, id)
 
 
+@router.post(
+    "/place-submissions",
+    response_model=m.PlaceSubmission,
+    status_code=201,
+    tags=["places"],
+)
+def create_place_submission(
+    body: m.PlaceSubmissionCreate, request: Request, response: Response
+) -> m.PlaceSubmission:
+    from hackyeah import place_submissions
+
+    response.headers["Cache-Control"] = "no-store"
+    return place_submissions.create(auth.require_csrf(request), body)
+
+
+@router.get(
+    "/place-submissions", response_model=m.Page[m.PlaceSubmission], tags=["places"]
+)
+def list_place_submissions(
+    request: Request,
+    response: Response,
+    limit: Limit = 20,
+    cursor: Cursor = None,
+    mine: bool = False,
+) -> m.Page[m.PlaceSubmission]:
+    from hackyeah import place_submissions
+
+    response.headers["Cache-Control"] = "no-store"
+    return place_submissions.list_page(
+        auth.require_session(request), limit, cursor, mine
+    )
+
+
+@router.post(
+    "/place-submissions/{id}/review", response_model=m.PlaceSubmission, tags=["places"]
+)
+def review_place_submission(
+    id: ResourceId, body: m.ReportReview, request: Request, response: Response
+) -> m.PlaceSubmission:
+    from hackyeah import place_submissions
+
+    response.headers["Cache-Control"] = "no-store"
+    return place_submissions.review(auth.require_csrf(request), id, body)
+
+
 @router.post("/places/search", response_model=m.PlaceSearchResponse, tags=["places"])
 def search_places(
     body: m.PlaceSearchRequest, request: Request, response: Response
@@ -264,10 +310,17 @@ def upload_photo(
         UploadFile,
         File(description="JPEG, PNG lub WebP; docelowo maks. 10 MiB i 20 mln pikseli."),
     ],
+    address: Annotated[str | None, Form(max_length=300)] = None,
+    metric: Annotated[str | None, Form(max_length=100)] = None,
 ) -> m.PhotoCreated:
     user = auth.require_csrf(request)
     try:
-        return photos.create(user.id, file.file.read(photos.MAX_BYTES + 1))
+        return photos.create(
+            user.id,
+            file.file.read(photos.MAX_BYTES + 1),
+            address=address,
+            metric=metric,
+        )
     finally:
         file.file.close()
 

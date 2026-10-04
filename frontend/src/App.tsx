@@ -1,3 +1,4 @@
+import { NewPlacePage } from "./pages/NewPlace";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import {
   Link,
@@ -569,6 +570,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<SearchPage key="search" />} />
             <Route path="/map" element={<Navigate to="/route" replace />} />
+            <Route path="/places/new" element={<NewPlacePage />} />
             <Route path="/place/:id" element={<PlacePage />} />
             <Route path="/profile/setup" element={<NeedsPage />} />
             <Route path="/profile" element={<Profile />} />

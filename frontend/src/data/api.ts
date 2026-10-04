@@ -285,8 +285,14 @@ export type Photo = {
   status: "processing" | "ready" | "rejected";
   preview_url: string | null;
   error_code: string | null;
+  description: string;
+  address: string | null;
+  metric: string | null;
 };
-export async function uploadPhoto(file: File): Promise<string> {
+export async function uploadPhoto(
+  file: File,
+  metadata: { address?: string | null; metric?: string | null } = {},
+): Promise<string> {
   if (
     !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
     file.size > 10 * 1024 * 1024
@@ -294,6 +300,8 @@ export async function uploadPhoto(file: File): Promise<string> {
     throw new Error("Dodaj zdjęcie JPEG, PNG lub WebP o rozmiarze do 10 MiB.");
   const data = new FormData();
   data.append("file", file);
+  if (metadata.address) data.append("address", metadata.address);
+  if (metadata.metric) data.append("metric", metadata.metric);
   const created = await api<{ id: string; status: "ready" | "processing" }>(
     "/photos",
     { method: "POST", body: data },
@@ -304,8 +312,9 @@ export async function uploadPhoto(file: File): Promise<string> {
 export async function withPhoto<T>(
   file: File | null,
   submit: (ids: string[]) => Promise<T>,
+  metadata: { address?: string | null; metric?: string | null } = {},
 ): Promise<T> {
-  const id = file ? await uploadPhoto(file) : null;
+  const id = file ? await uploadPhoto(file, metadata) : null;
   try {
     return await submit(id ? [id] : []);
   } catch (error) {
@@ -347,6 +356,7 @@ export type Mission = {
   id: string;
   place_id: string;
   place_name: string;
+  address: string | null;
   title: string;
   fact_id: string;
   attribute: Fact["attribute"];
@@ -407,3 +417,15 @@ export const reviewMission = (
     method: "POST",
     body: JSON.stringify({ decision, comment }),
   });
+
+export interface PlaceSubmission {
+  id: string;
+  author_id: string;
+  name: string;
+  category: string;
+  address: string;
+  location: { lat: number; lon: number };
+  description: string;
+  status: "pending" | "accepted" | "rejected";
+  review_comment: string | null;
+}

@@ -4,6 +4,8 @@ import { PageHeading } from "../components/Common";
 import { EvidencePhotos } from "../components/EvidencePhotos";
 import { useDemo } from "../state/DemoContext";
 import {
+  api,
+  type PlaceSubmission,
   getMissions,
   listAll,
   reviewMission,
@@ -130,8 +132,94 @@ function ReviewCard({
   );
 }
 
+function PlaceSubmissionCard({
+  item,
+  done,
+}: {
+  item: PlaceSubmission;
+  done: () => void;
+}) {
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const decision = (event.nativeEvent as SubmitEvent).submitter?.getAttribute(
+      "value",
+    );
+    if (!comment.trim() || !decision) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/place-submissions/${encodeURIComponent(item.id)}/review`, {
+        method: "POST",
+        body: JSON.stringify({ decision, comment: comment.trim() }),
+      });
+      done();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Nie udało się zapisać decyzji.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <article className="panel review-card">
+      <h2>{item.name}</h2>
+      <p>
+        {item.category} · {item.address}
+      </p>
+      <p>
+        Współrzędne: {item.location.lat}, {item.location.lon}
+      </p>
+      <a
+        href={`https://www.openstreetmap.org/?mlat=${item.location.lat}&mlon=${item.location.lon}#map=18/${item.location.lat}/${item.location.lon}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Sprawdź na mapie
+      </a>
+      {item.description && <p>{item.description}</p>}
+      <form onSubmit={submit}>
+        <label className="field">
+          Komentarz administratora
+          <textarea
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            required
+            maxLength={4000}
+          />
+        </label>
+        {error && (
+          <p role="alert" className="warning-box">
+            {error}
+          </p>
+        )}
+        <button
+          className="button primary"
+          value="accepted"
+          disabled={busy || !comment.trim()}
+        >
+          Zatwierdź miejsce
+        </button>
+        <button
+          className="button subtle"
+          value="rejected"
+          disabled={busy || !comment.trim()}
+        >
+          Odrzuć
+        </button>
+      </form>
+    </article>
+  );
+}
+
 export function ReviewPage() {
   const { session } = useDemo();
+  const [places, setPlaces] = useState<PlaceSubmission[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [progress, setProgress] = useState<MissionProgress[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -142,13 +230,18 @@ export function ReviewPage() {
     setLoading(true);
     setError("");
     try {
-      const [pendingReports, pendingMissions, catalog] = await Promise.all([
-        listAll<Report>("/reports?mine=false&status=pending"),
-        listAll<MissionProgress>("/missions/review-queue"),
-        getMissions(),
-      ]);
+      const [pendingReports, pendingMissions, catalog, pendingPlaces] =
+        await Promise.all([
+          listAll<Report>("/reports?mine=false&status=pending"),
+          listAll<MissionProgress>("/missions/review-queue"),
+          getMissions(),
+          listAll<PlaceSubmission>("/place-submissions"),
+        ]);
       setReports(
         pendingReports.filter((item) => item.author_id !== session?.user.id),
+      );
+      setPlaces(
+        pendingPlaces.filter((item) => item.author_id !== session?.user.id),
       );
       setProgress(pendingMissions);
       setMissions(catalog);
@@ -180,7 +273,7 @@ export function ReviewPage() {
   return (
     <div className="page narrow">
       <PageHeading
-        title="Weryfikacja zgłoszeń i misji"
+        title="Weryfikacja zgłoszeń, miejsc i misji"
         description="Sprawdź opis i zdjęcia. Akceptacja misji przyznaje punkty jej autorowi."
       />
       <button
@@ -196,9 +289,20 @@ export function ReviewPage() {
         </p>
       )}
       {loading && <p role="status">Pobieranie kolejki…</p>}
-      {!loading && !error && !reports.length && (
+      {!loading && !error && !reports.length && !places.length && (
         <p>Brak zgłoszeń oczekujących na weryfikację.</p>
       )}
+      {places.map((item) => (
+        <PlaceSubmissionCard
+          key={item.id}
+          item={item}
+          done={() =>
+            setPlaces((current) =>
+              current.filter((value) => value.id !== item.id),
+            )
+          }
+        />
+      ))}
       {reports.map((report) => {
         const item = progress.find((value) => value.report_id === report.id);
         return (

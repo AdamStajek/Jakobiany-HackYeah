@@ -124,6 +124,9 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <h1>{mapOnly ? "Mapa Krakowa" : "Znajdź swoje miejsce"}</h1>
         </div>
       </div>
+      <Link className="button subtle" to="/places/new">
+        Dodaj nowe miejsce
+      </Link>
       <div className="search-controls">
         <SearchBox key={query} initial={query} />
         <label className="field search-sort">

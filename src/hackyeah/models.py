@@ -575,6 +575,9 @@ class Photo(Model):
     status: Literal["processing", "ready", "rejected"]
     preview_url: str | None
     error_code: str | None
+    description: str = ""
+    address: str | None = None
+    metric: str | None = None
 
 
 class ReportTarget(Model):
@@ -656,6 +659,7 @@ class Mission(Model):
     id: Id
     place_id: Id
     place_name: str
+    address: str | None = None
     title: str
     fact_id: Id
     attribute: Attribute
@@ -744,3 +748,30 @@ class RouteDataFeature(Model):
     id: Id
     geometry: Point | LineString
     properties: RouteDataProperties
+
+
+class PlaceSubmissionCreate(Model):
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    category: Annotated[str, Field(min_length=1, max_length=100)]
+    address: Annotated[str, Field(min_length=1, max_length=300)]
+    location: Coordinates
+    description: Description = ""
+
+    @model_validator(mode="after")
+    def check_text(self) -> Self:
+        for field in ("name", "category", "address"):
+            value = getattr(self, field).strip()
+            if not value:
+                raise ValueError("Pole nie może być puste.")
+            setattr(self, field, value)
+        return self
+
+
+class PlaceSubmission(PlaceSubmissionCreate):
+    id: Id
+    author_id: Id
+    status: ReportStatus = "pending"
+    created_at: AwareDatetime
+    reviewed_at: AwareDatetime | None = None
+    reviewer_id: Id | None = None
+    review_comment: str | None = None

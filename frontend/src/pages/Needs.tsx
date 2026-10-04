@@ -140,6 +140,33 @@ export function NeedsPage() {
                   {question}
                 </p>
               ))}
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={
+                    draft.require_step_free_access === true &&
+                    draft.max_steps === 0 &&
+                    draft.max_slope_percent !== null &&
+                    draft.max_slope_percent <= 5
+                  }
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      require_step_free_access: event.target.checked
+                        ? true
+                        : null,
+                      max_steps: event.target.checked ? 0 : null,
+                      max_slope_percent: event.target.checked
+                        ? Math.min(draft.max_slope_percent ?? 5, 5)
+                        : null,
+                    })
+                  }
+                />
+                Poruszam się o kulach lub na wózku
+              </label>
+              <p className="small">
+                Automatycznie unikaj schodów i nachyleń powyżej 5%.
+              </p>
               <div className="form-grid">
                 <Numeric
                   label="Maksymalna liczba stopni"

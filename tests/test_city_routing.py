@@ -150,6 +150,25 @@ class CityRoutingTests(unittest.TestCase):
             result = plan_mobility_route(self.request(max_steps=0))
         self.assertEqual([route.variant for route in result.routes], ["fastest"])
 
+    def test_step_free_slope_limit_excludes_steep_ways_and_nodes(self):
+        request = self.request(
+            max_steps=0, require_step_free_access=True, max_slope_percent=5
+        )
+        for graph in (
+            self.graph(direct={"incline": "-12%"}),
+            self.graph(node_tags={2: {"incline": "12%"}}),
+        ):
+            route = plan_city_route(request, graph).routes[0]
+            self.assertIn(self.nodes[4], route.geometry.coordinates)
+            self.assertNotIn(self.nodes[2], route.geometry.coordinates)
+        graph = self.graph(direct={"incline": "12%"}, detour={"incline": "12%"})
+        self.assertEqual(plan_city_route(request, graph).routes, [])
+        graph = self.graph(direct={"incline": "5%"})
+        self.assertIn(
+            self.nodes[2],
+            plan_city_route(request, graph).routes[0].geometry.coordinates,
+        )
+
     def test_profile_prefers_lit_smooth_paved_less_steep_path_and_low_kerbs(self):
         for tags, constraints in [
             ({"lit": "no"}, {"require_lighting": True}),

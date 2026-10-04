@@ -49,6 +49,36 @@ function response(stepFree = false): RoutePlan {
   };
 }
 
+test("kule lub wózek automatycznie ustawiają brak schodów i limit nachylenia", async ({
+  page,
+}) => {
+  const requests: Record<string, unknown>[] = [];
+  await page.route("**/api/v1/routes/plan", (route) => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: response(true) });
+  });
+  await page.goto("/route");
+  const mobility = page.getByLabel("Poruszam się o kulach lub na wózku");
+  await mobility.check();
+  await expect(page.getByLabel("Unikaj schodów")).toBeChecked();
+  await expect(page.getByLabel("Maks. nachylenie (%)")).toHaveValue("5");
+  await page.getByRole("button", { name: "Pokaż trasę" }).click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({
+    constraints: {
+      max_steps: 0,
+      require_step_free_access: true,
+      max_slope_percent: 5,
+    },
+  });
+  await mobility.uncheck();
+  await expect(page.getByLabel("Unikaj schodów")).not.toBeChecked();
+  await expect(page.getByLabel("Maks. nachylenie (%)")).toHaveValue("");
+  await page.getByLabel("Maks. nachylenie (%)").fill("3");
+  await mobility.check();
+  await expect(page.getByLabel("Maks. nachylenie (%)")).toHaveValue("3");
+});
+
 test("planer otrzymuje punkty i potrzeby; mapa, szczegóły i nawigacja używają odpowiedzi API", async ({
   page,
 }) => {
@@ -261,6 +291,38 @@ test("wybór miejsc z całego miasta i dowolnych współrzędnych na mapie", asy
     lat: expect.any(Number),
     lon: expect.any(Number),
   });
+});
+
+test("opcja kul lub wózka w profilu ustawia ograniczenia planera", async ({
+  page,
+}) => {
+  let planRequest: Record<string, unknown> | null = null;
+  await page.route("**/api/v1/routes/plan", (route) => {
+    planRequest = route.request().postDataJSON();
+    return route.fulfill({ json: response(true) });
+  });
+  await page.goto("/profile/setup");
+  await page.getByRole("button", { name: "Wybierz potrzeby ręcznie" }).click();
+  await page.getByLabel("Poruszam się o kulach lub na wózku").check();
+  await expect(page.getByLabel("Maksymalna liczba stopni")).toHaveValue("0");
+  await expect(page.getByLabel("Maksymalne nachylenie (%)")).toHaveValue("5");
+  await page
+    .getByRole("button", { name: "Zapisz profil", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Wyznacz trasę", exact: true }).click();
+  await expect(
+    page.getByLabel("Poruszam się o kulach lub na wózku"),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Pokaż trasę" }).click();
+  await expect
+    .poll(() => planRequest)
+    .toMatchObject({
+      constraints: {
+        max_steps: 0,
+        require_step_free_access: true,
+        max_slope_percent: 5,
+      },
+    });
 });
 
 test("opis profilu jest interpretowany, zatwierdzany i przekazywany do planera", async ({

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { FactRow } from "../components/Common";
+import GooglePlaceCard from "../components/GooglePlaceCard";
 import { getPlace } from "../data/api";
 import type { Place, PlacePhoto } from "../data/types";
 import { NotFound } from "./Info";
@@ -130,13 +131,7 @@ export function PlacePage() {
               )}
             </span>
           </div>
-          <div className="callout">
-            <ShieldCheck />
-            <p>
-              Sprawdź konkretne cechy miejsca. Ocena dopasowania zależy od
-              wybranych potrzeb.
-            </p>
-          </div>
+          <GooglePlaceCard key={p.id} place={p} />
         </aside>
         <section>
           <div className="detail-heading">

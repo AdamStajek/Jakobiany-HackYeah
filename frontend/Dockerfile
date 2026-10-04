@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG GOOGLE_MAPS_BROWSER_API_KEY
+ENV GOOGLE_MAPS_BROWSER_API_KEY=$GOOGLE_MAPS_BROWSER_API_KEY
 RUN npm test && npm run build
 
 FROM nginx:alpine

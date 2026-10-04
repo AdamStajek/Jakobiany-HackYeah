@@ -22,7 +22,10 @@ services:
       start_period: 10s
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        GOOGLE_MAPS_BROWSER_API_KEY: "${GOOGLE_MAPS_BROWSER_API_KEY:-${GOOGLE_API_KEY:-}}"
     ports:
       - "5173:80"
     depends_on:

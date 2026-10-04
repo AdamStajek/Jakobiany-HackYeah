@@ -4163,3 +4163,14 @@ footer {
     width: calc(100% - 32px);
   }
 }
+
+.google-place-card {
+  margin-top: 1.5rem;
+}
+.google-place-card gmp-place-search,
+.google-place-card gmp-place-details {
+  display: block;
+  width: 100%;
+  max-width: 400px;
+  color-scheme: light;
+}

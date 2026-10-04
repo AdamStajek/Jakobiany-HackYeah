@@ -167,3 +167,39 @@ czasowych), 8 testów jednostkowych frontendu, 2 testy galerii Playwright
 (komputer i telefon), Ruff, kontrola typów zmienionych modułów i build frontendu.
 Sprawdzono odpowiedzi API wszystkich 1307 wzbogaconych miejsc oraz integralność
 bazy i klucze obce. Trzy rzeczywiste URL-e miniatur zwróciły HTTP 200/image/jpeg.
+
+## Karta Google Places UI Kit
+
+Karta Google Maps znajduje się bezpośrednio pod adresem na stronie miejsca.
+Otwarcie strony ładuje SDK i wyszukiwanie UI Kit po nazwie,
+adresie i położeniu miejsca. Użytkownik wybiera właściwą placówkę z wyników;
+aplikacja wyświetla pełną kartę Place Details ze zdjęciami, opiniami i dostępnymi
+podsumowaniami. Nie przypisujemy automatycznie pierwszego wyniku do obiektu OSM.
+Treści i powiązania Google nie są zapisywane do SQLite, eksportów ani ocen
+dostępności. Podsumowania AI mogą nie być dostępne dla danego miejsca/języka.
+
+Vite odczytuje `GOOGLE_MAPS_BROWSER_API_KEY` z głównego `.env` lub środowiska,
+z fallbackiem do istniejącego `GOOGLE_API_KEY`. Compose przekazuje ten sam
+wybór do buildu frontendu. Po zmianie klucza trzeba ponownie zbudować frontend
+(`docker compose build frontend`) lub zrestartować Vite. Brak klucza wyświetla
+komunikat bez ładowania SDK. Do produkcji użyj osobnego klucza przeglądarkowego
+z ograniczeniami HTTP referrer do swoich domen i ograniczeniami API zgodnymi
+z konfiguracją Google Maps JavaScript/Places UI Kit. Taki klucz jest publiczny
+w bundle przeglądarki; nie używaj wspólnego, nieograniczonego klucza serwerowego.
+Inne zmienne `.env`, w tym `OPENAI_API_KEY`, nie są przekazywane do frontendu.
+
+Projekt Cloud wymaga rozliczeń i włączonego Places UI Kit. Integracja nie
+włącza usług ani nie zmienia ograniczeń klucza. Karta i wyszukiwanie generują
+osobne zdarzenia rozliczeniowe; nie tworzymy Google Map. Błędy SDK/usługi
+wyświetlają komunikat i nie blokują lokalnych informacji miejsca.
+
+Dla komercyjnego użycia zachowujemy oryginalne komponenty, atrybucje i linki
+Google, bez modyfikowania ich wnętrza. Wyjątek EOG dla UI Kit umożliwia użycie
+z mapą Leaflet/OSM; nie daje prawa do trwałego kopiowania treści Google do bazy.
+Przed publikacją uwzględnij usługę w regulaminie i polityce prywatności aplikacji.
+
+Źródła: [konfiguracja UI Kit](https://developers.google.com/maps/documentation/javascript/places-ui-kit/get-started),
+[Place Search](https://developers.google.com/maps/documentation/javascript/places-ui-kit/place-search),
+[Place Details](https://developers.google.com/maps/documentation/javascript/places-ui-kit/place-details),
+[warunki EOG, punkty 15–16](https://cloud.google.com/terms/maps-platform/eea/maps-service-terms),
+[zabezpieczenia kluczy](https://developers.google.com/maps/api-security-best-practices).

@@ -4025,6 +4025,10 @@ main h1[tabindex="-1"]:focus-visible {
   max-width: 1040px;
   padding-inline: clamp(16px, 4vw, 40px);
 }
+.nearby-missions.page {
+  min-height: 0;
+  padding-bottom: 0;
+}
 .needs-panel form > .button {
   margin: 0 8px 12px 0;
 }

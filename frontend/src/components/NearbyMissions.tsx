@@ -81,7 +81,7 @@ export function NearbyMissions() {
   }, [session, enabled, location, missions, activity.items, navigate]);
   if (!session || route.pathname !== "/missions") return null;
   return (
-    <div className="page narrow">
+    <div className="page narrow nearby-missions">
       <button
         className="button subtle"
         aria-pressed={enabled}

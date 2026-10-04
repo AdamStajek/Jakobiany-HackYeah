@@ -189,7 +189,7 @@ function Layout({
     const update = () => {
       const heading = content.querySelector("h1");
       const title = heading?.innerText?.replace(/\s+/g, " ").trim();
-      document.title = title ? `${title} · Swoją Drogą` : "Swoją Drogą";
+      document.title = title ? `${title} · ${translate("Swoją Drogą")}` : translate("Swoją Drogą");
       if (heading) {
         heading.tabIndex = -1;
         if (document.activeElement === content)

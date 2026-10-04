@@ -1,3 +1,4 @@
+import { translate } from "../i18n";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, Star, Flag, MapPin, ChevronLeft } from "lucide-react";
@@ -320,7 +321,7 @@ export function MissionPage() {
         }
         description={
           mission
-            ? `${mission.time_minutes} minut · ${mission.points} punktów po zatwierdzeniu`
+            ? `${mission.time_minutes} ${translate("minut")} · ${mission.points} ${translate("punktów po zatwierdzeniu")}`
             : ""
         }
       />

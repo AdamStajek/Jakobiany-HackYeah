@@ -695,6 +695,78 @@ const en: Record<string, string> = Object.fromEntries([
   ["Źródła danych", "Data sources"],
   ["Większy tekst", "Larger text"],
   ["Zwiększony kontrast", "Higher contrast"],
+  ["Ustawienia", "Settings"],
+  ["Dopasuj wygląd strony do swoich potrzeb.", "Adjust the appearance to your needs."],
+  ["Dostępność ekranu", "Screen accessibility"],
+  ["Język", "Language"],
+  ["Swoją Drogą", "Your Own Way"],
+  ["SWOJĄ DROGĄ", "YOUR OWN WAY"],
+  ["Przełącz na polski", "Switch to Polish"],
+  ["Polski", "Polish"],
+  ["Wyszukiwanie AI — opisz swoje potrzeby", "AI search — describe your needs"],
+  ["Opisz, czego szukasz", "Describe what you are looking for"],
+  ["Szukam…", "Searching…"],
+  ["Przygotowuję wyszukiwanie…", "Preparing your search…"],
+  ["Wyszukiwanie zostało zastosowane. Możesz poprawić filtry i wyniki.", "The search has been applied. You can adjust the filters and results."],
+  ["Wybierz punkty trasy z podpowiedzi.", "Choose route points from the suggestions."],
+  ["Twoje potrzeby na trasie", "Your needs along the route"],
+  ["Wskaż początek na mapie", "Choose a starting point on the map"],
+  ["Wskaż cel na mapie", "Choose a destination on the map"],
+  ["kliknięciem na mapie lub przesuń mapę strzałkami i naciśnij Enter.", "by clicking the map, or move it with the arrow keys and press Enter."],
+  ["Anuluj wybór", "Cancel selection"],
+  ["Wybierz punkt w środku mapy klawiszem Enter. Escape anuluje wybór.", "Press Enter to select the point at the map centre. Press Escape to cancel."],
+  ["Przesuń mapę na północ", "Move map north"],
+  ["Przesuń mapę na zachód", "Move map west"],
+  ["Przesuń mapę na wschód", "Move map east"],
+  ["Przesuń mapę na południe", "Move map south"],
+  ["Wybierz środek mapy", "Select map centre"],
+  ["Środek mapy:", "Map centre:"],
+  ["Zaloguj się, aby zgłosić miejsce", "Log in to submit a place"],
+  ["Kategoria", "Category"],
+  ["Wybierz kategorię", "Choose a category"],
+  ["Adres", "Address"],
+  ["Podaj poprawny adres albo współrzędne. Przy samym adresie moderator wskaże miejsce na mapie przed zatwierdzeniem.", "Enter a valid address or coordinates. If you only provide an address, a moderator will locate the place on the map before approval."],
+  ["Szerokość geograficzna", "Latitude"],
+  ["Długość geograficzna", "Longitude"],
+  ["Opis (opcjonalnie)", "Description (optional)"],
+  ["Ładowanie zgłoszeń…", "Loading submissions…"],
+  ["Podaj adres albo obie współrzędne miejsca.", "Enter an address or both coordinates of the place."],
+  ["Podaj obie współrzędne albo usuń je i wpisz adres.", "Enter both coordinates, or clear them and enter an address."],
+  ["Współrzędne muszą mieścić się w poprawnym zakresie.", "Coordinates must be within the valid range."],
+  ["Powiadomimy Cię o misji w promieniu 150 m, gdy aplikacja będzie otwarta. Wymagana jest zgoda na lokalizację i powiadomienia.", "We will notify you about missions within 150 m while the app is open. Location and notification permissions are required."],
+  ["WSPÓLNIE ODKRYWAMY WIĘCEJ", "TOGETHER WE DISCOVER MORE"],
+  ["Punkty są przyznawane po akceptacji odpowiedzi przez model lub moderatora. Postępy i nagrody są zapisywane na Twoim koncie.", "Points are awarded after the model or a moderator accepts your answer. Progress and rewards are saved to your account."],
+  ["Zaloguj się, aby rozpocząć misję", "Log in to start a mission"],
+  ["naliczonych punktów", "points awarded"],
+  ["Aktualizacja:", "Updated:"],
+  ["Odpowiedź wysłano do weryfikacji. Po akceptacji otrzymasz", "Answer submitted for review. After approval you will receive"],
+  ["punktów.", "points."],
+  ["Zdjęcie (opcjonalne)", "Photo (optional)"],
+  ["JPEG, PNG lub WebP, do 10 MiB. Model sprawdzi na zdjęciu cechę wskazaną w misji.", "JPEG, PNG or WebP, up to 10 MiB. The model will check the photo for the feature specified in the mission."],
+  ["Odśwież status", "Refresh status"],
+  ["Ilustracja Krakowa: Wawel, zieleń i ławka przy spacerowej alejce", "Illustration of Kraków: Wawel, greenery and a bench beside a walking path"],
+  ["Sprawdź dostępność miejsc i zaplanuj pieszą trasę dopasowaną do swoich potrzeb.", "Check place accessibility and plan a walking route tailored to your needs."],
+  ["Wybieraj na podstawie konkretów", "Choose based on specific information"],
+  ["Przy miejscach znajdziesz informacje o wejściach, schodach, toaletach, podjazdach i miejscach odpoczynku. Sprawdź ich źródło, datę oraz wiarygodność.", "Places include information about entrances, stairs, toilets, ramps and rest areas. Check its source, date and confidence."],
+  ["Współtwórz mapę", "Help build the map"],
+  ["Zgłaszaj brakujące lub nieaktualne informacje. Możesz też wykonywać misje i dodawać zdjęcia; zgłoszenia i punkty zapisują się po zalogowaniu, a punkty przyznajemy po weryfikacji.", "Report missing or outdated information. You can also complete missions and add photos. Reports and points are saved when you log in, and points are awarded after review."],
+  ["Profil potrzeb pomoże dopasować wyniki, a analiza opisu może zaproponować ustawienia do sprawdzenia. Nie musisz się logować, by przeglądać miejsca.", "A needs profile helps tailor results, and description analysis can suggest settings for you to review. You can browse places without logging in."],
+  ["Dane i piesza sieć Krakowa mogą być niepełne lub nieaktualne. Trasa pomaga zaplanować spacer, ale nie śledzi Twojej pozycji.", "Data and the walking network of Kraków may be incomplete or outdated. A route helps you plan a walk but does not track your position."],
+  ["Informacje źródłowe są niepotwierdzone; sprawdź daty poszczególnych faktów.", "Source information is unconfirmed; check the dates of individual facts."],
+  ["· Ostatnia edycja w OSM:", "· Last edit in OSM:"],
+  ["· Wiarygodność:", "· Confidence:"],
+  ["pkt)", "pts)"],
+  ["Przesuwaj mapę strzałkami lub przyciskami. Powiększaj klawiszami + i − albo przyciskami.", "Move the map with the arrow keys or buttons. Zoom with + and − or the buttons."],
+  ["Jesteś blisko:", "You are near:"],
+  ["Sprawdź miejsce i zdobądź", "Check the place and earn"],
+  ["punktów!", "points!"],
+  ["punktów po zatwierdzeniu", "points after approval"],
+  ["Nie udało się pobrać misji", "Could not load the mission"],
+  ["Współrzędne:", "Coordinates:"],
+  ["Wybierz", "Choose"],
+  ["trasy kliknięciem na mapie lub przesuń mapę strzałkami i naciśnij Enter.", "of the route by clicking the map, or move it with the arrow keys and press Enter."],
+  ["Dostępne dla wózków", "Accessible for wheelchairs"],
+  ["Niedostępne dla wózków", "Inaccessible for wheelchairs"],
 ]);
 const englishCopy = new Set([
   ...Object.values(en),
@@ -704,19 +776,20 @@ const englishCopy = new Set([
 
 export function translate(text: string) {
   const trimmed = text.trim();
+  const normalized = trimmed.replace(/\s+/g, " ");
   if (language === "pl") {
     const polish = Object.entries(en).find(
-      ([, value]) => value === trimmed,
+      ([, value]) => value === normalized,
     )?.[0];
     return polish ? text.replace(trimmed, polish) : text;
   }
-  const translated = en[trimmed];
+  const translated = en[normalized];
   return translated ? text.replace(trimmed, translated) : text;
 }
 
 // Untranslated Polish copy keeps its pronunciation when the UI is in English.
 export function textLanguage(parts: string[]) {
-  const text = parts.map((part) => part.trim()).filter(Boolean);
+  const text = parts.map((part) => part.trim().replace(/\s+/g, " ")).filter(Boolean);
   return text.length > 0 && text.every((part) => englishCopy.has(part))
     ? "en"
     : "pl";

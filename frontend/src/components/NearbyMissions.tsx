@@ -1,3 +1,4 @@
+import { translate } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getMissions, type Mission } from "../data/api";
@@ -73,8 +74,8 @@ export function NearbyMissions() {
     });
     if (!candidate) return;
     try {
-      const notification = new Notification("Mały krok, wielka pomoc!", {
-        body: `Jesteś blisko: ${candidate.place_name}. Sprawdź miejsce i zdobądź ${candidate.points} punktów!`,
+      const notification = new Notification(translate("Mały krok, wielka pomoc!"), {
+        body: `${translate("Jesteś blisko:")} ${candidate.place_name}. ${translate("Sprawdź miejsce i zdobądź")} ${candidate.points} ${translate("punktów!")}`,
         tag: candidate.place_id,
       });
       seen.current.add(candidate.id);

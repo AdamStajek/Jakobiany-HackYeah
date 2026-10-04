@@ -26,6 +26,7 @@ const statuses = {
 export function NewPlacePage() {
   const { session, location } = useDemo();
   const [items, setItems] = useState<PlaceSubmission[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -43,6 +44,7 @@ export function NewPlacePage() {
   useEffect(() => {
     if (!session) return;
     let active = true;
+    setLoadingSubmissions(true);
     listAll<PlaceSubmission>("/place-submissions?mine=true")
       .then((values) => {
         if (active)
@@ -55,6 +57,9 @@ export function NewPlacePage() {
               ? reason.message
               : "Nie udało się pobrać zgłoszeń.",
           );
+      })
+      .finally(() => {
+        if (active) setLoadingSubmissions(false);
       });
     return () => {
       active = false;
@@ -234,21 +239,26 @@ export function NewPlacePage() {
               {busy ? "Wysyłanie…" : "Wyślij do weryfikacji"}
             </button>
           </form>
-          <h2>Twoje zgłoszenia miejsc</h2>
-          {items.map((item) => (
-            <article className="panel" key={item.id}>
-              <h3>{item.name}</h3>
-              <p>{statuses[item.status]}</p>
-              {item.review_comment && (
-                <p>Komentarz administratora: {item.review_comment}</p>
-              )}
-              {item.status === "accepted" && (
-                <Link to={`/place/${encodeURIComponent(item.id)}`}>
-                  Zobacz miejsce
-                </Link>
-              )}
-            </article>
-          ))}
+          {(loadingSubmissions || items.length > 0) && (
+            <section aria-busy={loadingSubmissions}>
+              <h2>Twoje zgłoszenia miejsc</h2>
+              {loadingSubmissions && <p role="status">Ładowanie zgłoszeń…</p>}
+              {items.map((item) => (
+                <article className="panel" key={item.id}>
+                  <h3>{item.name}</h3>
+                  <p>{statuses[item.status]}</p>
+                  {item.review_comment && (
+                    <p>Komentarz administratora: {item.review_comment}</p>
+                  )}
+                  {item.status === "accepted" && (
+                    <Link to={`/place/${encodeURIComponent(item.id)}`}>
+                      Zobacz miejsce
+                    </Link>
+                  )}
+                </article>
+              ))}
+            </section>
+          )}
         </>
       )}
     </div>

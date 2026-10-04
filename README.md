@@ -1,23 +1,117 @@
-# Swoją Drogą — API
+# Swoją Drogą
+
+Swoją Drogą to aplikacja pomagająca osobom z ograniczoną mobilnością znaleźć
+miejsca i zaplanować podróż po Krakowie zgodnie z indywidualnymi potrzebami,
+np. bez schodów lub z miejscami odpoczynku. Łączy dane OpenStreetMap,
+komunikacji miejskiej i parkingów OZN z profilami użytkowników oraz zgłoszeniami
+dostępności miejsc. Użytkownicy mogą dodawać zdjęcia, realizować misje i zdobywać
+punkty za zaakceptowane informacje. Braki danych i niepewność ocen są widoczne
+w wynikach.
+
+Frontend powstał w React i TypeScript, backend w FastAPI, a dane są przechowywane
+w SQLite. AI pomaga interpretować potrzeby oraz analizować zdjęcia zgłoszeń.
 
 API FastAPI na Pythonie 3.13 z modelami Pydantic
 pod prefiksem `/api/v1`. Endpointy i docelowe odpowiedzi są opisane w OpenAPI.
 Modele są w `src/hackyeah/models.py`, endpointy w `src/hackyeah/api.py`.
 Kontrakt API: [docs/kontrakt-frontend-backend.md](docs/kontrakt-frontend-backend.md).
 
-## Uruchomienie lokalne
+## Instalacja i uruchomienie
+
+Wszystkie polecenia poniżej wykonuj w katalogu głównym pobranego repozytorium,
+chyba że wskazano inaczej.
+
+### Wymagania
+
+- Python 3.13 oraz menedżer pakietów `uv`.
+- Node.js >=22.12 i npm do lokalnego uruchomienia frontendu.
+- Docker z Docker Compose v2 do uruchomienia w kontenerach; Node.js na hoście
+  nie jest wtedy potrzebny.
+- Dostęp do internetu do pobrania zależności, danych miejskich i wag modeli.
+
+### Zależności i konfiguracja
 
 ```bash
-uv sync
+uv python install 3.13
+uv sync --locked --group data
+```
+
+`uv` tworzy środowisko `.venv` i instaluje zależności backendu oraz importerów
+danych, w tym PyTorch w wariancie CPU.
+
+Opcjonalnie utwórz plik `.env` w katalogu głównym i dodaj własne klucze:
+
+```dotenv
+OPENAI_API_KEY=twoj_klucz
+GOOGLE_MAPS_BROWSER_API_KEY=twoj_klucz_google
+SESSION_COOKIE_SECURE=false
+```
+
+Klucz `OPENAI_API_KEY` jest potrzebny do funkcji korzystających z OpenAI, np. interpretacji
+opisu potrzeb. Ręczne ustawianie wymagań nie wymaga klucza. Lokalne modele
+analizujące zdjęcia pobierają wagi przy pierwszym użyciu i nie wymagają tego klucza.
+Jeśli `.env` już istnieje, uzupełnij go zamiast zastępować jego zawartość.
+
+Klucz `GOOGLE_MAPS_BROWSER_API_KEY` jest potrzebny do wyświetlania informacji
+o miejscach z Google w Places UI Kit. Możesz też użyć nazwy `GOOGLE_API_KEY`.
+W projekcie Google Cloud włącz Maps JavaScript API oraz Places UI Kit i zapewnij
+kluczowi dostęp do tych usług zgodnie z
+[instrukcją Google](https://developers.google.com/maps/documentation/javascript/places-ui-kit/get-started).
+Klucz jest używany w przeglądarce, więc ogranicz go do dozwolonych adresów witryny
+(w tym `http://localhost:5173/*` podczas pracy lokalnej).
+Frontend wczytuje go z głównego `.env` przy uruchomieniu lub budowaniu;
+po zmianie klucza uruchom ponownie serwer Vite lub przebuduj frontend w Compose.
+
+### Przygotowanie danych
+
+Bazy i graf tras są pomijane w Git, dlatego po pobraniu repozytorium przygotuj je
+przed pierwszym uruchomieniem, również przed budowaniem obrazów Docker:
+
+```bash
+PYTHONPATH=src uv run --group data python -m scripts.download_osm
+PYTHONPATH=src uv run --group data python -m scripts.build_places_db
+PYTHONPATH=src uv run --group data python -m scripts.build_route_graph
+PYTHONPATH=src uv run python -m scripts.import_mobility_data
+```
+
+Powstaną `data/krakow.sqlite3`, `data/routes/city.sqlite3` oraz dane w
+`data/mobility/`. Pobranie OSM i budowa grafu mogą potrwać dłużej.
+Baza kont i zgłoszeń `data/application.sqlite3` jest przygotowywana przy starcie
+backendu. Szczegóły danych: [baza OSM](docs/osm-data.md),
+[graf tras](docs/city-routing.md) i [komunikacja miejska](docs/krakow-mobility.md).
+
+### Uruchomienie lokalne
+
+W pierwszym terminalu uruchom backend:
+
+```bash
 SESSION_COOKIE_SECURE=false uv run uvicorn hackyeah.main:app --app-dir src --reload
 ```
 
-## Docker
+W drugim terminalu uruchom frontend:
 
 ```bash
-PYTHONPATH=src uv run python -m scripts.import_mobility_data
+cd frontend
+npm ci
+npm run dev
+```
+
+Aplikacja jest dostępna pod http://localhost:5173, a dokumentacja API pod
+http://localhost:8000/docs. Frontend przekazuje żądania `/api/` do backendu
+na porcie 8000; oba procesy muszą działać równocześnie.
+
+### Uruchomienie przez Docker Compose
+
+Po przygotowaniu danych wykonaj:
+
+```bash
 docker compose up --build -d --wait
 ```
+
+Zatrzymanie aplikacji: `docker compose down`. Logi:
+`docker compose logs -f`. Dane użytkowników pozostają w wolumenie `backend_data`.
+
+## Backend i przechowywanie danych
 
 Frontend: http://localhost:5173. Compose buduje obie aplikacje;
 frontend korzysta z API. Ścieżka `/api/` na porcie frontendu
@@ -183,8 +277,7 @@ Dokumentacja: [dane czasowe](docs/dane-czasowe.md).
 ## Frontend
 
 Responsywny interfejs React + TypeScript znajduje się w [frontend](frontend/README.md).
-Wyszukiwanie i szczegóły miejsc pobierają dane z API; trasy i część profilu
-pozostają demonstracyjne.
+Wyszukiwanie, szczegóły miejsc, planowanie tras i profile korzystają z API.
 
 ```bash
 cd frontend
@@ -222,7 +315,8 @@ Wyniki, komendy, zasady dopasowania i możliwości Google Places:
 
 ## Automatyczna weryfikacja zdjęć zgłoszeń
 
-Upload zdjęć najpierw uruchamia lokalny detektor
+Upload sprawdza format i usuwa metadane, zapisuje prywatny plik roboczy
+i od razu zwraca `201` ze statusem `processing`. Zadanie w tle uruchamia lokalny detektor
 [Grounding DINO Tiny](https://huggingface.co/IDEA-Research/grounding-dino-tiny).
 Wykryte prostokąty ludzi, twarzy, tablic rejestracyjnych, dokumentów, ekranów
 i tekstu są zamazywane jednolitym kolorem. Tekst jest traktowany ostrożnościowo
@@ -231,11 +325,12 @@ poza prostokątami pozostają niezmienione po uwzględnieniu orientacji EXIF;
 wynik jest zapisywany bezstratnie w PNG bez metadanych.
 `PHOTO_PRIVACY_MODEL` pozwala wskazać kompatybilny model lub lokalny katalog.
 Wagi są pobierane przy pierwszym uploadzie; zdjęcia nie opuszczają serwera.
-Awaria detektora zwraca `503 PHOTO_ANALYSIS_UNAVAILABLE` bez zapisu zdjęcia.
+Awaria detektora zmienia zdjęcie na `rejected`, usuwa prywatny plik roboczy
+i oznacza analizę zgłoszenia jako `failed`. Podgląd jest dostępny dopiero przy `ready`.
 Detekcja może przeoczyć obiekt; nie stanowi gwarancji usunięcia wszystkich danych.
 
 Zgłoszenia zawierające zdjęcia i `observations` są weryfikowane automatycznie
-przy utworzeniu i edycji. Lokalny [SmolVLM-256M-Instruct](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct)
+w tle po utworzeniu i edycji. Lokalny [SmolVLM-256M-Instruct](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct)
 otrzymuje zdjęcia i prompt z nazwą oraz typem metryki, bez wartości użytkownika
 ani jego opisu. Inferencja używa wyłącznie CPU (PyTorch float32, eager attention),
 bez klucza API. `uv sync` instaluje wariant PyTorch CPU; Docker używa tych samych zależności.
@@ -244,7 +339,15 @@ Model jest pobierany z Hugging Face przy pierwszym użyciu i następnie przechow
 w cache. `REPORT_VLM_MODEL` pozwala wskazać kompatybilny model lub jego lokalny katalog;
 `HF_HOME` zmienia katalog cache, a `HF_HUB_OFFLINE=1` umożliwia pracę z wcześniej
 pobranymi wagami. `REPORT_VLM_THREADS` ustawia liczbę wątków CPU (domyślnie 4). Pierwsze zgłoszenie trwa dłużej z powodu pobrania i ładowania.
-Zdjęcia pozostają lokalne. Model jest ładowany raz na proces, a inferencje są wykonywane kolejno.
+Zdjęcia pozostają lokalne. Model jest ładowany raz w nadzorowanym procesie analizy,
+a zadania wykonywane są kolejno. `PHOTO_ANALYSIS_TIMEOUT_SECONDS` ustawia twardy
+limit na etap (domyślnie 120 s, od 1 do 600 s). Anonimizacja i opis to jeden etap,
+weryfikacja metryki — drugi. Zawieszony proces jest kończony i odtwarzany przy
+kolejnym zadaniu. Timeout ustawia `ai_status=failed`; misja pokazuje błąd i pozwala
+wysłać nowe zdjęcie, bez naliczania punktów za nieukończoną analizę. Błąd samego
+opisu nie blokuje weryfikacji metryki. Stan kolejki jest zapisany w SQLite,
+więc po restarcie przetwarzanie jest wznawiane. Obecny worker jest przeznaczony
+do jednego procesu API. Widok misji i podglądy odświeżają stan co 3 sekundy.
 
 Zgodność **wszystkich** wartości daje `status=accepted`, różnica lub nieodczytana
 wartość (`null`, także błędny format odpowiedzi) daje `status=rejected`.
@@ -254,7 +357,7 @@ Propozycje mają `confidence_percent=0`, ponieważ model nie zwraca skalibrowane
 Metryki wymiarowe wymagają widocznej skali lub pomiaru na zdjęciu.
 
 Brak zdjęcia lub metryk pozostawia `pending` / `not_requested`; awaria modelu
-pozostawia `pending` / `failed` do weryfikacji moderatora. Decyzja automatyczna
+pozostawia `pending` / `failed`, z możliwością ponownego wysłania zdjęcia w misji. Decyzja automatyczna
 aktualizuje również misję i punkty. Zmiana treści zwykłego zgłoszenia uruchamia
 weryfikację ponownie. Mały VLM może błędnie odczytać zdjęcie; zgodność wyniku
 z deklaracją nie gwarantuje poprawności fizycznego pomiaru.

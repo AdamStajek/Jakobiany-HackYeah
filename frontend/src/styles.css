@@ -3023,7 +3023,7 @@ strong,
   height: 690px;
 }
 
-/* Routes: map on the left, planner on the right, preferences below. */
+/* Routes: preferences above the map and planner. */
 .route-grid {
   grid-template-columns: minmax(520px, 1.7fr) minmax(360px, 0.75fr);
   gap: 0;
@@ -3031,7 +3031,7 @@ strong,
 
 .route-map {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
 }
 
 .route-map .map-view {
@@ -3040,7 +3040,7 @@ strong,
 
 .route-form {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   display: block;
   padding: 34px;
   border-left: 0;
@@ -3065,7 +3065,7 @@ strong,
 
 .route-needs {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 34px;
@@ -3325,6 +3325,12 @@ footer {
   }
   .route-map {
     order: -1;
+  }
+  .route-needs {
+    order: -2;
+  }
+  .route-form {
+    order: 0;
   }
   .route-form {
     border-left: 1px solid #456b62;

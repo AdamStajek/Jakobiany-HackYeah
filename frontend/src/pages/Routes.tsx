@@ -520,6 +520,87 @@ export function RoutePage() {
         description="Wybierz cel i ustaw to, co ma znaczenie po drodze."
       />
       <div className="route-grid">
+        {mode !== "car" && (
+          <section className="panel route-needs">
+            <h2>Twoje potrzeby na trasie</h2>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={
+                  constraints.require_step_free_access === true &&
+                  constraints.max_steps === 0 &&
+                  constraints.max_slope_percent !== null &&
+                  constraints.max_slope_percent <= 5
+                }
+                onChange={(event) =>
+                  setConstraints({
+                    ...constraints,
+                    require_step_free_access: event.target.checked
+                      ? true
+                      : null,
+                    max_steps: event.target.checked ? 0 : null,
+                    max_slope_percent: event.target.checked
+                      ? Math.min(constraints.max_slope_percent ?? 5, 5)
+                      : null,
+                  })
+                }
+              />
+              Poruszam się o kulach lub na wózku
+            </label>
+            <p className="small">
+              Automatycznie unikaj schodów i nachyleń powyżej 5%.
+            </p>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={constraints.require_step_free_access === true}
+                onChange={(event) =>
+                  setConstraints({
+                    ...constraints,
+                    require_step_free_access: event.target.checked
+                      ? true
+                      : null,
+                    max_steps: event.target.checked ? 0 : null,
+                  })
+                }
+              />
+              Unikaj schodów
+            </label>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={constraints.allowed_surfaces !== null}
+                onChange={(event) =>
+                  setConstraints({
+                    ...constraints,
+                    allowed_surfaces: event.target.checked
+                      ? ["paved", "asphalt"]
+                      : null,
+                  })
+                }
+              />
+              Utwardzona nawierzchnia
+            </label>
+            <Numeric
+              label="Maks. nachylenie (%)"
+              value={constraints.max_slope_percent}
+              onChange={(value) =>
+                setConstraints({ ...constraints, max_slope_percent: value })
+              }
+            />
+            <Numeric
+              label="Odpoczynek co (m)"
+              min={1}
+              value={constraints.max_distance_without_rest_m}
+              onChange={(value) =>
+                setConstraints({
+                  ...constraints,
+                  max_distance_without_rest_m: value,
+                })
+              }
+            />
+          </section>
+        )}
         <form className="panel route-form" onSubmit={submit}>
           <h2>Dokąd się wybierasz?</h2>
           <fieldset className="route-modes">
@@ -672,87 +753,6 @@ export function RoutePage() {
             <ArrowRight size={18} />
           </button>
         </form>
-        {mode !== "car" && (
-          <section className="panel route-needs">
-            <h2>Twoje potrzeby na trasie</h2>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={
-                  constraints.require_step_free_access === true &&
-                  constraints.max_steps === 0 &&
-                  constraints.max_slope_percent !== null &&
-                  constraints.max_slope_percent <= 5
-                }
-                onChange={(event) =>
-                  setConstraints({
-                    ...constraints,
-                    require_step_free_access: event.target.checked
-                      ? true
-                      : null,
-                    max_steps: event.target.checked ? 0 : null,
-                    max_slope_percent: event.target.checked
-                      ? Math.min(constraints.max_slope_percent ?? 5, 5)
-                      : null,
-                  })
-                }
-              />
-              Poruszam się o kulach lub na wózku
-            </label>
-            <p className="small">
-              Automatycznie unikaj schodów i nachyleń powyżej 5%.
-            </p>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={constraints.require_step_free_access === true}
-                onChange={(event) =>
-                  setConstraints({
-                    ...constraints,
-                    require_step_free_access: event.target.checked
-                      ? true
-                      : null,
-                    max_steps: event.target.checked ? 0 : null,
-                  })
-                }
-              />
-              Unikaj schodów
-            </label>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={constraints.allowed_surfaces !== null}
-                onChange={(event) =>
-                  setConstraints({
-                    ...constraints,
-                    allowed_surfaces: event.target.checked
-                      ? ["paved", "asphalt"]
-                      : null,
-                  })
-                }
-              />
-              Utwardzona nawierzchnia
-            </label>
-            <Numeric
-              label="Maks. nachylenie (%)"
-              value={constraints.max_slope_percent}
-              onChange={(value) =>
-                setConstraints({ ...constraints, max_slope_percent: value })
-              }
-            />
-            <Numeric
-              label="Odpoczynek co (m)"
-              min={1}
-              value={constraints.max_distance_without_rest_m}
-              onChange={(value) =>
-                setConstraints({
-                  ...constraints,
-                  max_distance_without_rest_m: value,
-                })
-              }
-            />
-          </section>
-        )}
         <div className="route-map" ref={mapContainer}>
           <MapView
             places={noPlaces}

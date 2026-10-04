@@ -209,6 +209,14 @@ function RouteSources({ plan }: { plan: SavedPlan }) {
     </p>
   );
 }
+function planEndpoints(plan: SavedPlan) {
+  const coordinates = plan.route.geometry.coordinates;
+  if (!coordinates.length) return [];
+  return [
+    { coordinates: coordinates[0], label: `Start: ${plan.origin}` },
+    { coordinates: coordinates[coordinates.length - 1], label: `Cel: ${plan.destination}` },
+  ].map(({ coordinates: [lon, lat], label }) => ({ lat, lon, label }));
+}
 function routeMarkers(route: PlannedRoute): MobilityPoint[] {
   const stops = route.segments
     .filter((s) => s.mode === "transit")
@@ -780,7 +788,7 @@ export function RoutePage() {
                 ? [plan.route.parking]
                 : []),
             ]}
-            endpoints={endpoints}
+            endpoints={plan ? planEndpoints(plan) : endpoints}
             onSelectPoint={picking ? selectMapPoint : undefined}
             onCancelSelection={finishPicking}
           />
@@ -896,6 +904,16 @@ export function RoutePage() {
                       <TransitTime segment={s} />
                     </div>
                   ))}
+                <details className="route-steps-preview">
+                  <summary>Krok po kroku · {plan.route.segments.length} odcinków</summary>
+                  <ol>
+                    {plan.route.segments.map((segment) => (
+                      <li key={segment.id}>
+                        {segment.instruction} <strong>{distanceLabel(segment.distance_m)}</strong>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
                 <Status assessment={plan.route.assessment} />
                 <RouteNotes warnings={plan.warnings} />
                 <RouteSources plan={plan} />
@@ -950,6 +968,7 @@ export function RouteDetails() {
         route={plan.route.geometry}
         segments={plan.route.segments}
         mobility={routeMarkers(plan.route)}
+        endpoints={planEndpoints(plan)}
       />
       {plan.route.segments.length === 0 && (
         <p>Jesteś już w punkcie docelowym. Trasa nie zawiera odcinków.</p>
@@ -1066,6 +1085,7 @@ export function Navigation() {
         route={plan.route.geometry}
         segments={plan.route.segments}
         mobility={routeMarkers(plan.route)}
+        endpoints={planEndpoints(plan)}
       />
       <p className="route-note">
         Podgląd zaplanowanej trasy — bez śledzenia pozycji. Sprawdź warunki w

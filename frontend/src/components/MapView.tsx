@@ -252,7 +252,7 @@ export default function MapView({
         fillColor: index === 0 ? "#1a73e8" : "#ea4335",
         fillOpacity: 1,
       })
-        .bindTooltip(point.label)
+        .bindTooltip(point.label, { permanent: true, direction: "top" })
         .addTo(layers);
     }
     for (const variant of [...variants].sort(
@@ -304,21 +304,25 @@ export default function MapView({
                     ? "7 7"
                     : undefined,
               },
-            ).addTo(layers);
+            )
+              .bindTooltip(`${segment.instruction} · ${Math.round(segment.distance_m)} m`)
+              .addTo(layers);
           }
         } else L.polyline(points, { color: "#1a73e8", weight: 5 }).addTo(layers);
       }
-      for (const [index, point] of [
+      for (const [index, point] of (endpoints.length ? [] : [
         points[0],
         points[points.length - 1],
-      ].entries()) {
+      ]).entries()) {
         L.circleMarker(point, {
           radius: 7,
           color: "white",
           weight: 3,
           fillColor: index === 0 ? "#1a73e8" : "#ea4335",
           fillOpacity: 1,
-        }).addTo(layers);
+        })
+          .bindTooltip(index === 0 ? "Start trasy" : "Cel trasy", { permanent: true, direction: "top" })
+          .addTo(layers);
       }
     }
     const bounds = layers.getBounds();

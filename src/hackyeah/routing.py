@@ -299,6 +299,7 @@ def demo_graph():
         "planty": m.Coordinates(lat=50.0605, lon=19.9325),
         "wawel": m.Coordinates(lat=50.0543, lon=19.9354),
     }
+    names = {"rynek": "Rynek Główny", "planty": "Planty", "wawel": "Wawel"}
     now = datetime.now(UTC)
     edges = []
     for source, target, steps in (
@@ -346,7 +347,7 @@ def demo_graph():
             segment = m.RouteSegment(
                 id=f"{a}-{b}",
                 distance_m=distance(nodes[a], nodes[b]),
-                instruction=f"Idź do: {b} (odcinek demonstracyjny).",
+                instruction=f"Przejdź z punktu {names[a]} do punktu {names[b]} (odcinek demonstracyjny).",
                 geometry=m.LineString(
                     type="LineString",
                     coordinates=[

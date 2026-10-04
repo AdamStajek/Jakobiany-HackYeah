@@ -122,41 +122,31 @@ export function About() {
   return (
     <div className="page narrow">
       <PageHeading
-        eyebrow="KRAKÓW BEZ BARIER"
-        title="Każdy ma swoją drogę"
-        description="Swoją Drogą pomaga sprawdzić konkretne cechy miejsc i zaplanować spacer dopasowany do własnych potrzeb."
+        eyebrow="SWOJĄ DROGĄ"
+        title="Bo najkrótsza nie musi być twoja"
+        description="Sprawdź dostępność miejsc i zaplanuj pieszą trasę dopasowaną do swoich potrzeb."
       />
       <div className="panel prose">
-        <h2>Informacje, które dają wybór</h2>
+        <h2>Wybieraj na podstawie konkretów</h2>
         <p>
-          Pokazujemy stopnie, progi, szerokość wejść, toalety, podjazdy i
-          miejsca odpoczynku. Każda informacja ma źródło, datę oraz ocenę
-          wiarygodności.
+          Przy miejscach znajdziesz informacje o wejściach, schodach, toaletach,
+          podjazdach i miejscach odpoczynku. Sprawdź ich źródło, datę oraz
+          wiarygodność.
         </p>
-        <h2>Co wiemy, a czego jeszcze nie?</h2>
+        <h2>Współtwórz mapę</h2>
         <p>
-          Brakujące, sprzeczne i stare dane oznaczamy jako niepotwierdzone.
-          Procent wiarygodności nie zastępuje potwierdzenia. Dopasowanie zależy
-          od wskazanych przez Ciebie potrzeb.
-        </p>
-        <h2>Zakres działania</h2>
-        <p>
-          Mapa i informacje o miejscach pochodzą z dostępnych danych, ale mogą
-          być niepełne lub nieaktualne. Planowanie tras wykorzystuje sieć pieszą
-          Krakowa z OSM. Nawigacja nie śledzi pozycji.
+          Zgłaszaj brakujące lub nieaktualne informacje. Możesz też wykonywać
+          misje i dodawać zdjęcia; zgłoszenia i punkty zapisują się po
+          zalogowaniu, a punkty przyznajemy po weryfikacji.
         </p>
         <p>
-          Po zalogowaniu profil potrzeb, zapisane miejsca, zgłoszenia i postępy
-          misji są zapisywane na Twoim koncie. Analiza opisu proponuje
-          ustawienia, które możesz poprawić przed zatwierdzeniem. Zdjęcia są
-          dostępne tylko Tobie i moderatorom, a punkty przyznajemy po
-          weryfikacji misji.
+          Profil potrzeb pomoże dopasować wyniki, a analiza opisu może
+          zaproponować ustawienia do sprawdzenia. Nie musisz się logować, by
+          przeglądać miejsca.
         </p>
-        <h2>Dostępność</h2>
         <p>
-          Interfejs ma tekstowy odpowiednik mapy, etykiety formularzy, widoczny
-          fokus i obsługę klawiaturą. Pełna zgodność z WCAG 2.2 AA wymaga
-          osobnego badania, w tym czytnikiem ekranu.
+          Dane i piesza sieć Krakowa mogą być niepełne lub nieaktualne. Trasa
+          pomaga zaplanować spacer, ale nie śledzi Twojej pozycji.
         </p>
         <Link className="button primary" to="/search">
           Znajdź swoje miejsce <ArrowRight size={18} />

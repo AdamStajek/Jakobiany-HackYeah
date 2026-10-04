@@ -31,7 +31,7 @@ export function Privacy() {
         <h2>Ty wybierasz, co podajesz</h2>
         <p>Miejsca i trasy możesz przeglądać bez konta. Do dopasowania wystarczą preferencje: schody, szerokość przejścia, podjazdy czy miejsca odpoczynku. Nie wymagamy informacji o niepełnosprawności ani dokumentacji medycznej.</p>
         <h2>Co zapisujemy</h2>
-        <p>Konto zawiera e-mail, nazwę użytkownika i zabezpieczone hasło. Zapisujemy też wybrane potrzeby, ulubione miejsca, zgłoszenia i postępy misji. Zgłoszenie może zawierać opis, miejsce i dodane przez Ciebie zdjęcia. Nie umieszczaj w nim danych wrażliwych ani danych innych osób.</p>
+        <p>Konto zawiera e-mail, nazwę użytkownika i zabezpieczone hasło. Zapisujemy też wybrane potrzeby, ulubione miejsca, zgłoszenia i postępy misji. Zdjęcia zgłoszeń przetwarza lokalny model, który tworzy krótki opis i sprawdza obecność ludzi oraz danych osobowych. Jeśli je wykryje, zdjęcie zapisujemy w mocno zgrubnej pikselizacji. Oryginał nie jest zachowywany; mimo tego nie dodawaj danych wrażliwych.</p>
         <p>Lokalizację odczytujemy tylko za zgodą przeglądarki, aby pokazać pobliskie miejsca. Możesz odmówić lub cofnąć zgodę. Przy wyszukiwaniu i planowaniu trasy współrzędne są przekazywane do usługi; do prognozy trafia punkt początku trasy.</p>
         <h2>Ochrona kont i zgłoszeń</h2>
         <p>Hasła zapisujemy jako skróty z indywidualną solą. Sesja korzysta z ciasteczka HttpOnly, a operacje zapisu mają ochronę przed CSRF. Ograniczamy liczbę prób logowania. Dostęp do danych konta wymaga uwierzytelnienia; zdjęcia zgłoszeń widzą ich autor i moderatorzy.</p>

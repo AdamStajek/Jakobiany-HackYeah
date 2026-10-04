@@ -89,6 +89,23 @@ def extract_metric(image_data: list[bytes], prompt: str) -> str:
         ).strip()
 
 
+def describe_photo(image: bytes) -> tuple[str, bool]:
+    """Describe an image and flag people or personal information for redaction."""
+    raw = extract_metric(
+        [image],
+        'Inspect the image. Return ONLY JSON with keys "description" (at most 10 '
+        'Polish words describing visible accessibility evidence), and "sensitive" '
+        "(true if any person, face, name, phone number, address, license plate, "
+        "screen, or other personal data is visible; otherwise false).",
+    )
+    result = json.loads(raw)
+    description = " ".join(str(result["description"]).split()[:10])
+    sensitive = result["sensitive"]
+    if not description or not isinstance(sensitive, bool):
+        raise ValueError("Invalid photo analysis")
+    return description, sensitive
+
+
 def parse_metric(raw: str, attribute: m.Attribute) -> m.Observation:
     if raw.startswith("```") and raw.endswith("```"):
         raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()

@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime
 from io import BytesIO
+import os
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -15,11 +17,28 @@ MAX_PIXELS = 20_000_000
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 _lock = atomic
 _photos = Store[str, tuple[str, m.Photo]]("photos.photos")
-_files = Store[str, bytes]("photos.files", binary=True)
+_legacy_files = Store[str, bytes]("photos.files", binary=True)
 _links = Store[str, set[str]]("photos.links")
 
 
-def create(user_id: str, data: bytes) -> m.PhotoCreated:
+def _file_path(photo_id: str) -> Path:
+    root = Path(os.environ.get("PHOTO_STORAGE_PATH", database_root() / "photos"))
+    return root / f"{photo_id}.png"
+
+
+def database_root() -> Path:
+    from hackyeah.database import database_path
+
+    return database_path().parent
+
+
+def create(
+    user_id: str,
+    data: bytes,
+    *,
+    address: str | None = None,
+    metric: str | None = None,
+) -> m.PhotoCreated:
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "PHOTO_TOO_LARGE")
     try:
@@ -45,16 +64,41 @@ def create(user_id: str, data: bytes) -> m.PhotoCreated:
         raise HTTPException(422, "INVALID_PHOTO_DIMENSIONS") from exc
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError) as exc:
         raise HTTPException(422, "INVALID_PHOTO") from exc
+    from hackyeah.report_ai import describe_photo
+
+    try:
+        description, sensitive = describe_photo(sanitized)
+        if sensitive:
+            with Image.open(BytesIO(sanitized)) as image:
+                size = image.size
+                image = image.convert("RGB")
+                image.thumbnail((16, 16))
+                image = image.resize(size, Image.Resampling.NEAREST)
+                output = BytesIO()
+                image.save(output, format="PNG")
+                sanitized = output.getvalue()
+    except Exception as exc:
+        raise HTTPException(503, "PHOTO_ANALYSIS_UNAVAILABLE") from exc
     photo_id = f"photo_{uuid4().hex}"
     photo = m.Photo(
         id=photo_id,
         status="ready",
         preview_url=f"/api/v1/photos/{photo_id}/content",
         error_code=None,
+        description=description,
+        address=address,
+        metric=metric,
     )
-    with _lock:
-        _photos[photo_id] = (user_id, photo)
-        _files[photo_id] = sanitized
+    path = _file_path(photo_id)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path.write_bytes(sanitized)
+    path.chmod(0o600)
+    try:
+        with _lock:
+            _photos[photo_id] = (user_id, photo)
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
     return m.PhotoCreated(id=photo_id, status="ready", created_at=datetime.now(UTC))
 
 
@@ -71,7 +115,8 @@ def content(user: m.User, photo_id: str) -> bytes:
         photo = get(user, photo_id)
         if photo.status != "ready":
             raise HTTPException(409, "PHOTO_REJECTED")
-        return _files[photo_id]
+        path = _file_path(photo_id)
+        return path.read_bytes() if path.exists() else _legacy_files[photo_id]
 
 
 def owned_contents(user: m.User, photo_ids: list[str]) -> list[bytes]:
@@ -109,5 +154,7 @@ def delete(user: m.User, photo_id: str) -> None:
         if _links.get(photo_id):
             raise HTTPException(409, "PHOTO_IN_USE")
         del _photos[photo_id]
-        del _files[photo_id]
+        _file_path(photo_id).unlink(missing_ok=True)
+        if photo_id in _legacy_files:
+            del _legacy_files[photo_id]
         _links.pop(photo_id, None)

@@ -298,6 +298,7 @@ export function MissionPage() {
               ? []
               : [{ attribute: mission.attribute, value: metricValue }],
           ),
+          { address: mission.address || mission.place_name, metric: mission.attribute },
         ),
       );
       setPhoto(null);

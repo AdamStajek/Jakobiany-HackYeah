@@ -3094,7 +3094,7 @@ strong,
   padding: 34px 44px;
   border: 2px solid var(--green);
   border-radius: 0;
-  background: linear-gradient(100deg, #f2f3e9 0 78%, #075b45 78%);
+  background: #f2f3e9;
 }
 
 .mission-banner > svg {
@@ -3112,7 +3112,7 @@ strong,
 
 .mission-banner > span {
   min-width: 170px;
-  color: white;
+  color: var(--green);
   font-size: 2rem;
   text-align: center;
 }
@@ -3578,7 +3578,6 @@ main {
   --muted: #364431;
   --warning: #633500;
 }
-.high-contrast .mission-banner > span,
 .high-contrast .toast small {
   color: white;
 }

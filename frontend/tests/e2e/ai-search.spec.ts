@@ -35,6 +35,7 @@ test("AI miejsc stosuje frazę i wymagania dopiero po zatwierdzeniu", async ({
     });
   });
   await page.goto("/search");
+  await page.locator(".ai-search > summary").click();
   await page.getByLabel("Opisz, czego szukasz").fill("Kawiarnia bez schodów");
   await page.getByRole("button", { name: "Przygotuj wyszukiwanie" }).click();
   await expect(page.getByText("Fraza: kawiarnia")).toBeVisible();
@@ -91,6 +92,7 @@ test("AI trasy wyszukuje prawdziwe punkty i wymaga ich wyboru", async ({
     });
   });
   await page.goto("/route");
+  await page.locator(".ai-search > summary").click();
   await page
     .getByLabel("Opisz, czego szukasz")
     .fill("Z Rynku Głównego na Wawel bez schodów");

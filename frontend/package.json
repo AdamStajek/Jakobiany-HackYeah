@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "test:account": "playwright test --config=playwright.account.config.ts",
     "test:a11y": "playwright test --config=playwright.accessibility.config.ts",
+    "test:ux": "playwright test --config=playwright.ux.config.ts",
     "format": "prettier --write src tests *.ts *.json index.html"
   },
   "dependencies": {

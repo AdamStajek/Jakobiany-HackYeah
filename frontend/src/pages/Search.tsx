@@ -39,6 +39,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
   const [selectedPlace, setSelectedPlace] = useState<PlaceSummary | null>(null);
   useEffect(() => {
     let active = true;
+    setSelectedPlace(null);
     setLoading(true);
     setError("");
     setResults([]);
@@ -123,17 +124,26 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <p className="eyebrow">ODKRYWAJ PO SWOJEMU</p>
           <h1>{mapOnly ? "Mapa Krakowa" : "Znajdź swoje miejsce"}</h1>
         </div>
+        <Link className="button subtle" to="/places/new">
+          Dodaj nowe miejsce
+        </Link>
       </div>
-      <Link className="button subtle" to="/places/new">
-        Dodaj nowe miejsce
-      </Link>
       <div className="search-controls">
         <SearchBox key={query} initial={query} />
         <label className="field search-sort">
           Sortuj według
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <select
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value);
+              setCurrentPage(1);
+              setSelectedPlace(null);
+            }}
+          >
             <option value="match">Najlepsze dopasowanie</option>
-            <option value="distance">Odległość</option>
+            <option value="distance" disabled={!location}>
+              Odległość
+            </option>
             <option value="name">Nazwa miejsca</option>
           </select>
         </label>
@@ -179,7 +189,7 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           id="search-filters"
           aria-label="Filtry wyszukiwania"
         >
-          <h3>Dopasuj do swoich potrzeb</h3>
+          <h2>Dopasuj do swoich potrzeb</h2>
           {filterOptions.map((o) => (
             <label className="check-field" key={o.key}>
               <input
@@ -245,7 +255,9 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           <div className="results-heading">
             <h2>{category || query || "Miejsca w Krakowie"}</h2>
             <span aria-live="polite">
-              {loading ? "Pobieranie…" : `${totalCount} wyników`}
+              {loading
+                ? "Pobieranie…"
+                : `${totalCount} ${totalCount === 1 ? "wynik" : totalCount % 10 >= 2 && totalCount % 10 <= 4 && (totalCount % 100 < 12 || totalCount % 100 > 14) ? "wyniki" : "wyników"}`}
             </span>
           </div>
           {error && (
@@ -272,57 +284,59 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
                     }}
                   />
                 ))}
-              <nav className="results-pagination" aria-label="Strony wyników">
-                <button
-                  className="button subtle"
-                  aria-label="Pierwsza strona"
-                  title="Pierwsza strona"
-                  onClick={() => goToPage(1)}
-                  disabled={loadingMore || currentPage === 1}
-                >
-                  <ChevronsLeft size={18} />
-                </button>
-                <button
-                  className="button subtle"
-                  aria-label="Poprzednie 5 stron"
-                  title="Poprzednie 5 stron"
-                  onClick={() => goToPage(Math.max(1, pageWindowStart - 5))}
-                  disabled={loadingMore || pageWindowStart === 1}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                {visiblePages.map((page) => (
+              {totalPages > 1 && (
+                <nav className="results-pagination" aria-label="Strony wyników">
                   <button
-                    key={page}
-                    className={`button subtle ${page === currentPage ? "active" : ""}`}
-                    onClick={() => goToPage(page)}
-                    disabled={loadingMore}
-                    aria-current={page === currentPage ? "page" : undefined}
+                    className="button subtle"
+                    aria-label="Pierwsza strona"
+                    title="Pierwsza strona"
+                    onClick={() => goToPage(1)}
+                    disabled={loadingMore || currentPage === 1}
                   >
-                    {page}
+                    <ChevronsLeft size={18} />
                   </button>
-                ))}
-                <button
-                  className="button subtle"
-                  aria-label="Następne 5 stron"
-                  title="Następne 5 stron"
-                  onClick={() =>
-                    goToPage(Math.min(totalPages, pageWindowStart + 5))
-                  }
-                  disabled={loadingMore || pageWindowStart + 5 > totalPages}
-                >
-                  <ChevronRight size={18} />
-                </button>
-                <button
-                  className="button subtle"
-                  aria-label="Ostatnia strona"
-                  title="Ostatnia strona"
-                  onClick={() => goToPage(totalPages)}
-                  disabled={loadingMore || currentPage === totalPages}
-                >
-                  <ChevronsRight size={18} />
-                </button>
-              </nav>
+                  <button
+                    className="button subtle"
+                    aria-label="Poprzednie 5 stron"
+                    title="Poprzednie 5 stron"
+                    onClick={() => goToPage(Math.max(1, pageWindowStart - 5))}
+                    disabled={loadingMore || pageWindowStart === 1}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  {visiblePages.map((page) => (
+                    <button
+                      key={page}
+                      className={`button subtle ${page === currentPage ? "active" : ""}`}
+                      onClick={() => goToPage(page)}
+                      disabled={loadingMore}
+                      aria-current={page === currentPage ? "page" : undefined}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    className="button subtle"
+                    aria-label="Następne 5 stron"
+                    title="Następne 5 stron"
+                    onClick={() =>
+                      goToPage(Math.min(totalPages, pageWindowStart + 5))
+                    }
+                    disabled={loadingMore || pageWindowStart + 5 > totalPages}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <button
+                    className="button subtle"
+                    aria-label="Ostatnia strona"
+                    title="Ostatnia strona"
+                    onClick={() => goToPage(totalPages)}
+                    disabled={loadingMore || currentPage === totalPages}
+                  >
+                    <ChevronsRight size={18} />
+                  </button>
+                </nav>
+              )}
             </>
           ) : !error && !loading ? (
             <div className="empty-state">
@@ -345,8 +359,20 @@ export function SearchPage({ mapOnly = false }: { mapOnly?: boolean }) {
           className={`search-map ${view === "list" ? "mobile-hidden" : ""}`}
           aria-label="Mapa wyników"
         >
+          {selectedPlace && (
+            <button
+              className="button subtle"
+              onClick={() => setSelectedPlace(null)}
+            >
+              Pokaż wszystkie wyniki na mapie
+            </button>
+          )}
           <MapView
-            places={selectedPlace ? [selectedPlace] : []}
+            places={
+              selectedPlace
+                ? [selectedPlace]
+                : orderedResults.slice((currentPage - 1) * 10, currentPage * 10)
+            }
             userLocation={location}
           />
 

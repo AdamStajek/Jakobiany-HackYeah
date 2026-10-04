@@ -101,22 +101,25 @@ export function PlaceCard({
           {place.distance_m !== null &&
             ` · ${(place.distance_m / 1000).toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km od Ciebie`}
         </p>
-        {onShowOnMap && (
-          <button className="button subtle" onClick={onShowOnMap}>
-            Pokaż na mapie
+        {place.assessment && <Status assessment={place.assessment} />}
+        <div className="place-card-actions">
+          {onShowOnMap && (
+            <button className="button subtle" onClick={onShowOnMap}>
+              Pokaż na mapie
+            </button>
+          )}
+          <button
+            className="button subtle place-route-button"
+            onClick={() =>
+              navigate(
+                `/route?to=${encodeURIComponent(place.id)}&from=${location ? "location" : "empty"}`,
+              )
+            }
+          >
+            <RouteIcon size={17} />
+            Wyznacz trasę
           </button>
-        )}
-        <button
-          className="button subtle place-route-button"
-          onClick={() =>
-            navigate(
-              `/route?to=${encodeURIComponent(place.id)}&from=${location ? "location" : "empty"}`,
-            )
-          }
-        >
-          <RouteIcon size={17} />
-          Wyznacz trasę
-        </button>
+        </div>
       </div>
     </article>
   );

@@ -616,12 +616,7 @@ export function RoutePage() {
           >
             Wskaż początek na mapie
           </button>
-          <p role="status" className="small">
-            Wybrany początek:{" "}
-            {points.find((point) => point.id === origin)?.name ||
-              (origin ? originName : "Nie wybrano")}
-          </p>
-          <p className="small route-selected-point">
+          <p role="status" className="small route-selected-point">
             Skąd:{" "}
             {points.find((p) => p.id === origin)?.name ||
               (origin || originCoordinates ? originName : "Wybierz punkt")}
@@ -645,12 +640,7 @@ export function RoutePage() {
           >
             Wskaż cel na mapie
           </button>
-          <p role="status" className="small">
-            Wybrany cel:{" "}
-            {points.find((point) => point.id === destination)?.name ||
-              (destination ? destinationName : "Nie wybrano")}
-          </p>
-          <p className="small route-selected-point">
+          <p role="status" className="small route-selected-point">
             Dokąd:{" "}
             {points.find((p) => p.id === destination)?.name ||
               (destination || destinationCoordinates

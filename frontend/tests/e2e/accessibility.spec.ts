@@ -322,6 +322,9 @@ test("zalogowany użytkownik: formularze, błędy, kroki i odpowiedź misji", as
     report_id: "a11y-report",
   };
   // Test the pending UI without calling an external photo verification model.
+  await page.route("**/api/v1/photos", (route) =>
+    route.fulfill({ json: { id: "a11y-photo", status: "ready" } }),
+  );
   await page.route("**/api/v1/missions/*/submit", (route) =>
     route.fulfill({ json: pending }),
   );
@@ -506,6 +509,7 @@ test("wynik AI i instrukcje nawigacji mają dostępny fokus i kontrast", async (
     }),
   );
   await visit(page, "/search");
+  await page.locator(".ai-search > summary").click();
   await page.getByLabel("Opisz, czego szukasz").fill("Muzeum bez schodów");
   await page
     .getByRole("button", { name: "Przygotuj wyszukiwanie", exact: true })

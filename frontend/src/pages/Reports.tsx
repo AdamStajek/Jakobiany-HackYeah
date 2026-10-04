@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   ChevronLeft,
   ClipboardCheck,
+  MapPin,
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
 import { PageHeading, FactRow } from "../components/Common";
@@ -50,6 +51,9 @@ export function ReportHub() {
       />
       <div className="report-options">
         <Link className="panel" to="/places/new">
+          <span className="option-icon good">
+            <MapPin />
+          </span>
           <h2>Dodaj nowe miejsce</h2>
           <p>Zgłoś miejsce do weryfikacji przez administratora.</p>
           <span className="button subtle">

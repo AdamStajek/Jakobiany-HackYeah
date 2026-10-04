@@ -402,13 +402,12 @@ export const startMission = (id: string) =>
   });
 export const submitMission = (
   id: string,
-  description: string,
   photo_ids: string[],
   observations: Report["observations"] = [],
 ) =>
   api<MissionProgress>(`/missions/${encodeURIComponent(id)}/submit`, {
     method: "POST",
-    body: JSON.stringify({ description, photo_ids, observations }),
+    body: JSON.stringify({ photo_ids, observations }),
   });
 export const reviewMission = (
   id: string,

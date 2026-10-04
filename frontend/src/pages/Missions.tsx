@@ -217,7 +217,6 @@ export function MissionPage() {
   const { activity, session, refreshActivity } = useDemo();
   const [mission, setMission] = useState<Mission | null>(null);
   const [current, setCurrent] = useState<MissionProgress | null>(null);
-  const [answer, setAnswer] = useState("");
   const [metricValue, setMetricValue] = useState<Fact["value"]>(null);
   useEffect(() => setMetricValue(null), [id]);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -256,11 +255,6 @@ export function MissionPage() {
       activity.items.find((item) => item.mission_id === id) || null;
     setCurrent(progress);
   }, [id, activity.items]);
-  useEffect(() => {
-    setAnswer(
-      activity.items.find((item) => item.mission_id === id)?.answer || "",
-    );
-  }, [id]);
   async function start() {
     if (!mission || busy) return;
     setBusy(true);
@@ -281,24 +275,24 @@ export function MissionPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!mission || busy) return;
-    if (!photo) {
-      setError("Dodaj zdjęcie, aby zweryfikować misję.");
-      return;
-    }
     setBusy(true);
     setError("");
     try {
       setCurrent(
-        await withPhoto(photo, (ids) =>
-          submitMission(
-            mission.id,
-            answer.trim(),
-            ids,
-            metricValue === null
-              ? []
-              : [{ attribute: mission.attribute, value: metricValue }],
-          ),
-          { address: mission.address || mission.place_name, metric: mission.attribute },
+        await withPhoto(
+          photo,
+          (ids) =>
+            submitMission(
+              mission.id,
+              ids,
+              metricValue === null
+                ? []
+                : [{ attribute: mission.attribute, value: metricValue }],
+            ),
+          {
+            address: mission.address || mission.place_name,
+            metric: mission.attribute,
+          },
         ),
       );
       setPhoto(null);
@@ -338,6 +332,9 @@ export function MissionPage() {
       {mission && (
         <div className="panel">
           <p>{mission.description}</p>
+          <p>
+            <strong>Adres:</strong> {mission.address || "Adres niedostępny"}
+          </p>
           <p>
             <strong>
               Do sprawdzenia: {labels[mission.attribute] || mission.attribute}
@@ -387,35 +384,16 @@ export function MissionPage() {
                 current.status === "rejected") && (
                 <form onSubmit={submit}>
                   <fieldset disabled={busy} className="form-fields">
-                    <label className="field">
-                      <span id="mission-answer-label">
-                        Co udało Ci się sprawdzić?
-                      </span>
-                      <textarea
-                        aria-labelledby="mission-answer-label"
-                        required
-                        minLength={10}
-                        aria-describedby="mission-answer-help"
-                        maxLength={4000}
-                        rows={4}
-                        value={answer}
-                        onChange={(event) => setAnswer(event.target.value)}
-                      />
-                      <small id="mission-answer-help">
-                        Wpisz co najmniej 10 znaków.
-                      </small>
-                    </label>
                     <MetricInput
                       attribute={mission.attribute}
                       value={metricValue}
                       onChange={setMetricValue}
                     />
                     <label className="field">
-                      Zdjęcie (wymagane)
+                      Zdjęcie (opcjonalne)
                       <input
                         type="file"
-                        required
-                        aria-label="Zdjęcie (wymagane)"
+                        aria-label="Zdjęcie (opcjonalne)"
                         aria-describedby="mission-photo-help"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={(event) =>

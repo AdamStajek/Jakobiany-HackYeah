@@ -674,15 +674,9 @@ class MissionRequest(Model):
 
 
 class MissionSubmit(Model):
-    description: Annotated[str, Field(min_length=10, max_length=4000)]
+    description: Annotated[str, Field(max_length=4000)] | None = None
     observations: list[Observation] = Field(default_factory=list)
-    photo_ids: Annotated[list[Id], Field(min_length=1, max_length=5)]
-
-    @model_validator(mode="after")
-    def check_description(self) -> Self:
-        if len(self.description.strip()) < 10:
-            raise ValueError("Opisz wynik sprawdzenia w co najmniej 10 znakach.")
-        return self
+    photo_ids: Annotated[list[Id], Field(max_length=5)] = Field(default_factory=list)
 
 
 class MissionProgress(Model):

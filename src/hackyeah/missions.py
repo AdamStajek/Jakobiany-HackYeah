@@ -269,7 +269,12 @@ def submit(user: m.User, mission_id: str, body: m.MissionSubmit) -> m.MissionPro
             target=m.ReportTarget(type="place", id=mission.place_id),
             kind="missing_data",
             fact_id=mission.fact_id,
-            description=body.description.strip(),
+            description=(
+                body.description.strip()
+                if body.description and body.description.strip()
+                else f"Weryfikacja misji: {mission.title} — {mission.place_name}"
+                + (f", {mission.address}" if mission.address else "")
+            ),
             observations=body.observations,
             photo_ids=body.photo_ids,
         ),
@@ -287,7 +292,7 @@ def submit(user: m.User, mission_id: str, body: m.MissionSubmit) -> m.MissionPro
             update={
                 "status": "pending",
                 "report_id": report.id,
-                "answer": body.description.strip(),
+                "answer": report.description or "",
                 "review_comment": None,
                 "updated_at": datetime.now(UTC),
             }

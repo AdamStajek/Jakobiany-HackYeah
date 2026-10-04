@@ -491,7 +491,7 @@ Misje są tworzone dla rzeczywistych miejsc z brakującymi faktami i zapisane w 
 | `GET /missions`, `GET /missions/{id}` | Publiczny katalog i szczegóły `{ id, place_id, place_name, title, fact_id, attribute, points, time_minutes }` |
 | `GET /missions/progress` | Własne `{ items: MissionProgress[], points }`; suma przyznanych punktów |
 | `POST /missions/{id}/start` | Wymaga sesji i CSRF; idempotentnie tworzy postęp `in_progress` |
-| `POST /missions/{id}/submit` | `{ description, observations?, photo_ids? }`; opis 10–4000 znaków, maksymalnie 5 własnych zdjęć; dozwolone w `in_progress` lub `rejected` |
+| `POST /missions/{id}/submit` | `{ description?, observations?, photo_ids? }`; opis opcjonalny (do 4000 znaków), maksymalnie 5 własnych zdjęć; znana misja i miejsce tworzą kontekst zgłoszenia, metryka jest opcjonalną obserwacją; dozwolone w `in_progress` lub `rejected` |
 | `GET /missions/review-queue` | Stronicowana kolejka `pending`, tylko moderator; pomija własne odpowiedzi |
 | `POST /missions/progress/{id}/review` | `{ decision: "accepted" \| "rejected", comment }`, sesja moderatora i CSRF; nie może dotyczyć jego własnej misji |
 

@@ -3,6 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { getMissions, type Mission } from "../data/api";
 import { useDemo } from "../state/DemoContext";
 
+const notificationKey = (userId: string, missionId: string) =>
+  `nearby-mission-notified:${userId}:${missionId}`;
+
 export function NearbyMissions() {
   const { session, location, activity, notify } = useDemo();
   const route = useLocation();
@@ -42,10 +45,18 @@ export function NearbyMissions() {
     )
       return;
     const candidate = missions.find((mission) => {
+      let notifiedThisVisit = seen.current.has(mission.id);
+      try {
+        notifiedThisVisit ||=
+          sessionStorage.getItem(notificationKey(session.user.id, mission.id)) ===
+          "1";
+      } catch {
+        // Keep the in-memory guard if session storage is unavailable.
+      }
       if (
         !mission.available ||
         !mission.location ||
-        seen.current.has(mission.place_id)
+        notifiedThisVisit
       )
         return false;
       if (activity.items.some((item) => item.mission_id === mission.id))
@@ -66,7 +77,15 @@ export function NearbyMissions() {
         body: `Jesteś blisko: ${candidate.place_name}. Sprawdź miejsce i zdobądź ${candidate.points} punktów!`,
         tag: candidate.place_id,
       });
-      seen.current.add(candidate.place_id);
+      seen.current.add(candidate.id);
+      try {
+        sessionStorage.setItem(
+          notificationKey(session.user.id, candidate.id),
+          "1",
+        );
+      } catch {
+        // The in-memory guard still prevents repeat notifications this mount.
+      }
       notification.onclick = () => {
         window.focus();
         navigate(`/missions/${encodeURIComponent(candidate.id)}`);

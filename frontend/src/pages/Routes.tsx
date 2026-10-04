@@ -523,7 +523,7 @@ export function RoutePage() {
         {mode !== "car" && (
           <section className="panel route-needs">
             <h2>Twoje potrzeby na trasie</h2>
-            <label className="check-field">
+            <label className="check-field route-mobility-choice">
               <input
                 type="checkbox"
                 checked={
@@ -545,11 +545,13 @@ export function RoutePage() {
                   })
                 }
               />
-              Poruszam się o kulach lub na wózku
+              <span className="route-mobility-copy">
+                <span>Poruszam się o kulach lub na wózku</span>
+                <span className="small">
+                  Automatycznie unikaj schodów i nachyleń powyżej 5%.
+                </span>
+              </span>
             </label>
-            <p className="small">
-              Automatycznie unikaj schodów i nachyleń powyżej 5%.
-            </p>
             <label className="check-field">
               <input
                 type="checkbox"

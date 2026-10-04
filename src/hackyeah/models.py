@@ -777,7 +777,7 @@ class PlaceSubmissionReview(Model):
     location: Coordinates | None = None
 
     @model_validator(mode="after")
-    def check_acceptance_location(self) -> Self:
+    def check_comment(self) -> Self:
         self.comment = self.comment.strip()
         if not self.comment:
             raise ValueError("Pole nie może być puste.")

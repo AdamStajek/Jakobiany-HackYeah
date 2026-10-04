@@ -51,8 +51,6 @@ def list_page(
 def review(user: m.User, id: str, body: m.PlaceSubmissionReview) -> m.PlaceSubmission:
     if "moderator" not in user.roles:
         raise HTTPException(403, "FORBIDDEN")
-    if not body.comment.strip() or body.accepted_ai_proposal_indexes:
-        raise HTTPException(422, "VALIDATION_ERROR")
     with atomic as db:
         item = submissions.get(id)
         if item is None:

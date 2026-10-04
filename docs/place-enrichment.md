@@ -171,10 +171,9 @@ bazy i klucze obce. Trzy rzeczywiste URL-e miniatur zwróciły HTTP 200/image/jp
 ## Karta Google Places UI Kit
 
 Karta Google Maps znajduje się bezpośrednio pod adresem na stronie miejsca.
-Otwarcie strony ładuje SDK i wyszukiwanie UI Kit po nazwie,
-adresie i położeniu miejsca. Użytkownik wybiera właściwą placówkę z wyników;
-aplikacja wyświetla pełną kartę Place Details ze zdjęciami, opiniami i dostępnymi
-podsumowaniami. Nie przypisujemy automatycznie pierwszego wyniku do obiektu OSM.
+Otwarcie strony ładuje pełną kartę Place Details na podstawie współrzędnych;
+Google automatycznie dopasowuje lokalizację do swoich danych. Karta może
+zawierać zdjęcia, opinie i dostępne podsumowania.
 Treści i powiązania Google nie są zapisywane do SQLite, eksportów ani ocen
 dostępności. Podsumowania AI mogą nie być dostępne dla danego miejsca/języka.
 

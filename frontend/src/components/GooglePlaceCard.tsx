@@ -55,57 +55,22 @@ export default function GooglePlaceCard({ place }: { place: PlaceSummary }) {
     loadPlaces()
       .then(() => {
         if (cancelled) return;
-        const search = document.createElement("gmp-place-search");
-        search.setAttribute("selectable", "");
-        search.append(document.createElement("gmp-place-standard-content"));
-        const query = document.createElement(
-          "gmp-place-text-search-request",
-        ) as HTMLElement & {
-          textQuery: string;
-          locationBias: { lat: number; lng: number };
-        };
-        query.locationBias = {
-          lat: place.location.lat,
-          lng: place.location.lon,
-        };
-        query.textQuery = `${place.name} ${place.address_is_nearest ? "" : place.address || ""} Kraków`;
-        search.append(query);
-        search.addEventListener("gmp-load", () => {
+        const details = document.createElement("gmp-place-details");
+        const request = document.createElement(
+          "gmp-place-details-location-request",
+        );
+        request.setAttribute(
+          "location",
+          `${place.location.lat},${place.location.lon}`,
+        );
+        details.append(request, document.createElement("gmp-place-all-content"));
+        details.addEventListener("gmp-error", failed);
+        details.addEventListener("gmp-load", () => {
           window.clearTimeout(timer);
-          if (!cancelled) {
-            const results = (search as HTMLElement & { places?: unknown[] })
-              .places;
-            setStatus(
-              results?.length === 0
-                ? "Nie znaleziono pasującego miejsca w Google Maps."
-                : "Wybierz poniżej właściwe miejsce Google Maps.",
-            );
-          }
+          if (!cancelled) setStatus("");
         });
-        search.addEventListener("gmp-error", failed);
-        search.addEventListener("gmp-select", (event) => {
-          const selected = (event as Event & { place?: { id?: string } }).place;
-          if (!selected?.id || cancelled) return;
-          const details = document.createElement("gmp-place-details");
-          const request = document.createElement(
-            "gmp-place-details-place-request",
-          );
-          request.setAttribute("place", selected.id);
-          details.append(
-            request,
-            document.createElement("gmp-place-all-content"),
-          );
-          details.addEventListener("gmp-error", failed);
-          details.addEventListener("gmp-load", () => {
-            window.clearTimeout(timer);
-            if (!cancelled) setStatus("");
-          });
-          setStatus("Ładowanie karty Google Maps…");
-          window.clearTimeout(timer);
-          timer = window.setTimeout(failed, 25000);
-          host.replaceChildren(details);
-        });
-        host.replaceChildren(search);
+        setStatus("Ładowanie karty Google Maps…");
+        host.replaceChildren(details);
       })
       .catch(failed);
     return () => {
@@ -117,11 +82,6 @@ export default function GooglePlaceCard({ place }: { place: PlaceSummary }) {
 
   return (
     <section className="google-place-card" aria-label="Informacje Google Maps">
-      <h3>Miejsce w Google Maps</h3>
-      <p>
-        Zdjęcia, opinie i godziny z Google Maps. Te informacje nie potwierdzają
-        pomiarów dostępności w naszej aplikacji.
-      </p>
       {!__GOOGLE_MAPS_BROWSER_KEY__ && (
         <p>Informacje Google Maps są obecnie niedostępne.</p>
       )}

@@ -120,7 +120,11 @@ export function PlaceCard({
           {place.distance_m !== null &&
             ` · ${(place.distance_m / 1000).toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km od Ciebie`}
         </p>
-        {place.assessment && <Status assessment={place.assessment} />}
+        {place.assessment &&
+          place.assessment.summary !==
+            "Brak wymagań lub potwierdzonych danych do oceny." && (
+            <Status assessment={place.assessment} />
+          )}
         <div className="place-card-actions">
           {onShowOnMap && (
             <button className="button subtle" onClick={onShowOnMap}>

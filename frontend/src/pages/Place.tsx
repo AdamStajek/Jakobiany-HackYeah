@@ -10,7 +10,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useDemo } from "../state/DemoContext";
-import { Status, FactRow } from "../components/Common";
+import { FactRow } from "../components/Common";
 import { getPlace } from "../data/api";
 import type { Place, PlacePhoto } from "../data/types";
 import { NotFound } from "./Info";
@@ -143,15 +143,6 @@ export function PlacePage() {
             <div>
               <p className="eyebrow">{p.category}</p>
               <h1 data-no-translate>{p.name}</h1>
-              <Status
-                assessment={
-                  p.assessment || {
-                    status: "uncertain",
-                    summary: "Dopasowanie nieznane.",
-                    reasons: [],
-                  }
-                }
-              />
             </div>
             <button
               className="button subtle"

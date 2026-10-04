@@ -70,7 +70,14 @@ def prepare(
         updated_at=now,
     )
     images = photos.owned_contents(user, report.photo_ids)
-    report_ai.verify(report, images, verification_attribute)
+    if any(
+        photos.get(user, photo_id).error_code == "PHOTO_ANALYSIS_UNAVAILABLE"
+        for photo_id in report.photo_ids
+    ):
+        report.ai_status = "failed"
+        report.review_comment = "Analiza zdjęcia jest niedostępna; wymagana ręczna weryfikacja."
+    else:
+        report_ai.verify(report, images, verification_attribute)
     return report
 
 

@@ -5,6 +5,7 @@ from contextlib import closing
 from datetime import UTC, datetime
 from hashlib import sha256
 from math import cos, radians
+from typing import get_args
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -23,23 +24,18 @@ def catalog(near: m.Coordinates | None = None, offset: int = 0) -> list[m.Missio
     """Refresh tasks from current facts, retaining completed tasks for history."""
 
     candidates = []
+    attributes = set(get_args(m.Attribute))
     with closing(places._connect()) as db:
-        updated = datetime.fromisoformat(
-            json.loads(
-                db.execute(
-                    "SELECT value_json FROM metadata WHERE key='imported_at'"
-                ).fetchone()[0]
-            )
-        )
         if near is None:
             rows = db.execute(
-                "SELECT * FROM places ORDER BY id LIMIT 100 OFFSET ?", (offset,)
+                "SELECT id, name, lat, lon, street, housenumber FROM places ORDER BY id LIMIT 100 OFFSET ?",
+                (offset,),
             ).fetchall()
         else:
             lat_delta = 200 / 111000
             lon_delta = lat_delta / max(0.01, abs(cos(radians(near.lat))))
             rows = db.execute(
-                "SELECT * FROM places WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? ORDER BY id",
+                "SELECT id, name, lat, lon, street, housenumber FROM places WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? ORDER BY id",
                 (
                     near.lat - lat_delta,
                     near.lat + lat_delta,
@@ -47,9 +43,51 @@ def catalog(near: m.Coordinates | None = None, offset: int = 0) -> list[m.Missio
                     near.lon + lon_delta,
                 ),
             ).fetchall()
+        place_ids = [row["id"] for row in rows]
+        facts_by_place: dict[str, dict[str, tuple[object, str]]] = {
+            place_id: {} for place_id in place_ids
+        }
+        if place_ids:
+            marks = ",".join("?" for _ in place_ids)
+            for place_id, attribute, value, reason in db.execute(
+                f"SELECT place_id, attribute, value_json, unconfirmed_reason "
+                f"FROM accessibility_facts WHERE place_id IN ({marks})",
+                place_ids,
+            ):
+                if attribute in attributes:
+                    facts_by_place[place_id][attribute] = (
+                        json.loads(value) if value is not None else None,
+                        reason,
+                    )
+            # External observations can introduce a fact or turn a missing OSM
+            # fact into one awaiting verification, which affects mission priority.
+            if db.execute(
+                "SELECT 1 FROM sqlite_master WHERE name='external_place_data'"
+            ).fetchone():
+                for place_id, data_json in db.execute(
+                    f"SELECT place_id, data_json FROM external_place_data "
+                    f"WHERE place_id IN ({marks}) ORDER BY source, source_id",
+                    place_ids,
+                ):
+                    facts = facts_by_place[place_id]
+                    for raw in json.loads(data_json).get(
+                        "accessibility_observations", []
+                    ):
+                        attribute = raw.get("attribute")
+                        value = raw.get("value")
+                        if attribute not in attributes or value is None:
+                            continue
+                        old = facts.get(attribute)
+                        if old is not None and old[1] == "conflicting":
+                            continue
+                        if old is not None and old[0] is not None and old[0] != value:
+                            facts[attribute] = (None, "conflicting")
+                        else:
+                            facts[attribute] = (value, "pending_verification")
+
         for row in rows:
-            facts = places._facts(db, row, updated)
-            known = {fact.attribute for fact in facts}
+            facts = facts_by_place[row["id"]]
+            known = facts.keys()
             for attribute in (
                 "steps_count",
                 "threshold_height_cm",
@@ -58,57 +96,32 @@ def catalog(near: m.Coordinates | None = None, offset: int = 0) -> list[m.Missio
                 "elevator_available",
             ):
                 if attribute not in known:
-                    facts.append(
-                        m.Fact(
-                            id=f"{row['id']}:{attribute}",
-                            attribute=attribute,
-                            value=None,
-                            unit=None,
-                            status="unconfirmed",
-                            confidence_percent=None,
-                            observed_at=None,
-                            updated_at=updated,
-                            valid_until=None,
-                            sources=[],
-                            unconfirmed_reason="missing",
-                        )
-                    )
-            for fact in facts:
-                missing = fact.unconfirmed_reason == "missing" or (
-                    fact.value is None and fact.unconfirmed_reason != "conflicting"
+                    facts[attribute] = (None, "missing")
+            for attribute, (value, reason) in facts.items():
+                # Imported facts are unconfirmed. An absent value is missing
+                # unless conflicting sources prevent a safe conclusion.
+                missing = reason == "missing" or (
+                    value is None and reason != "conflicting"
                 )
-                uncertain = (
-                    fact.status == "unconfirmed"
-                    or fact.confidence_level == "uncertain"
-                    or (
-                        fact.confidence_percent is not None
-                        and fact.confidence_percent <= 60
-                    )
-                    or (
-                        fact.valid_until is not None
-                        and fact.valid_until <= datetime.now(UTC)
-                    )
-                )
-                candidates.append((row, fact, missing, uncertain))
+                candidates.append((row, attribute, missing))
     with atomic:
         active = []
-        for row, fact, missing, uncertain in candidates:
-            mission_id = "mission_" + sha256(fact.id.encode()).hexdigest()[:24]
+        for row, attribute, missing in candidates:
+            fact_id = f"{row['id']}:{attribute}"
+            mission_id = "mission_" + sha256(fact_id.encode()).hexdigest()[:24]
             previous = _catalog.get(mission_id)
             requested = previous is not None and previous.priority == 1
-            available = missing or uncertain
-            if not available and previous is None:
-                continue
             mission = m.Mission(
                 id=mission_id,
                 place_id=row["id"],
                 place_name=row["name"] or "Miejsce bez nazwy",
+                address=" ".join(filter(None, (row["street"], row["housenumber"]))) or None,
                 title=f"Sprawdź: {row['name'] or 'Miejsce bez nazwy'}",
-                fact_id=fact.id,
-                attribute=fact.attribute,
+                fact_id=fact_id,
+                attribute=attribute,
                 priority=1 if requested else 2 if missing else 3,
                 location=m.Coordinates(lat=row["lat"], lon=row["lon"]),
-                available=available,
+                available=True,
                 points=30,
                 time_minutes=10,
             )

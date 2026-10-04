@@ -96,6 +96,11 @@ const en: Record<string, string> = Object.fromEntries([
   ["Utwardzona nawierzchnia", "Paved surface"],
   ["Maks. liczba stopni", "Maximum number of steps"],
   ["Maks. nachylenie (%)", "Maximum slope (%)"],
+  ["Poruszam się o kulach lub na wózku", "I use crutches or a wheelchair"],
+  [
+    "Automatycznie unikaj schodów i nachyleń powyżej 5%.",
+    "Automatically avoid stairs and slopes above 5%.",
+  ],
   ["Odpoczynek co (m)", "Rest every (m)"],
   ["Sortuj według", "Sort by"],
   ["Najlepsze dopasowanie", "Best match"],

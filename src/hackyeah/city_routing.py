@@ -292,11 +292,13 @@ def resolve(point):
     }
     if point.place_id in landmarks:
         return landmarks[point.place_id]
+    from hackyeah.places import catalogue_table
+
     with closing(
         sqlite3.connect(database_path().as_uri() + "?mode=ro", uri=True)
     ) as db:
         row = db.execute(
-            "SELECT lon,lat FROM places WHERE id=?", (point.place_id,)
+            f"SELECT lon,lat FROM {catalogue_table(db)} WHERE id=?", (point.place_id,)
         ).fetchone()
     return tuple(row) if row else None
 
@@ -352,6 +354,13 @@ def edge_cost(edge, graph, constraints, checks, fastest=False):
         step_free and (data["steps_present"] or tags.get("wheelchair") == "no")
     ):
         return None
+    if (
+        step_free
+        and constraints.max_slope_percent is not None
+        and data["slope_percent"] is not None
+        and data["slope_percent"] > constraints.max_slope_percent
+    ):
+        return None
     multiplier = {"gravel": 1.25, "cobblestone": 1.3, "ground": 1.4, "other": 1.4}.get(
         data["surface"], 1
     )
@@ -390,6 +399,13 @@ def edge_cost(edge, graph, constraints, checks, fastest=False):
         ) not in {"yes", "designated", "permissive"}:
             return None
         node_values = values(node_tags)
+        if (
+            step_free
+            and constraints.max_slope_percent is not None
+            and node_values["slope_percent"] is not None
+            and node_values["slope_percent"] > constraints.max_slope_percent
+        ):
+            return None
         if node_tags.get("barrier") in {"wall", "fence", "block"}:
             return None
         if step_free and (

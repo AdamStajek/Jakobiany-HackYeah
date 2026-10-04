@@ -684,6 +684,33 @@ export function RoutePage() {
             <label className="check-field">
               <input
                 type="checkbox"
+                checked={
+                  constraints.require_step_free_access === true &&
+                  constraints.max_steps === 0 &&
+                  constraints.max_slope_percent !== null &&
+                  constraints.max_slope_percent <= 5
+                }
+                onChange={(event) =>
+                  setConstraints({
+                    ...constraints,
+                    require_step_free_access: event.target.checked
+                      ? true
+                      : null,
+                    max_steps: event.target.checked ? 0 : null,
+                    max_slope_percent: event.target.checked
+                      ? Math.min(constraints.max_slope_percent ?? 5, 5)
+                      : null,
+                  })
+                }
+              />
+              Poruszam się o kulach lub na wózku
+            </label>
+            <p className="small">
+              Automatycznie unikaj schodów i nachyleń powyżej 5%.
+            </p>
+            <label className="check-field">
+              <input
+                type="checkbox"
                 checked={constraints.require_step_free_access === true}
                 onChange={(event) =>
                   setConstraints({

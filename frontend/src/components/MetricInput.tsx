@@ -1,5 +1,23 @@
 import type { Fact } from "../data/types";
 import { useId } from "react";
+import { labels } from "../data/mock";
+
+const valueLabels: Record<string, string> = {
+  paved: "Utwardzona",
+  asphalt: "Asfaltowa",
+  gravel: "Żwirowa",
+  cobblestone: "Kostka brukowa",
+  ground: "Gruntowa",
+  other: "Inna",
+  excellent: "Bardzo dobra",
+  good: "Dobra",
+  intermediate: "Umiarkowana",
+  bad: "Zła",
+  very_bad: "Bardzo zła",
+  horrible: "Bardzo nierówna",
+  very_horrible: "Skrajnie nierówna",
+  impassable: "Nieprzejezdna",
+};
 
 export function MetricInput({
   attribute,
@@ -31,7 +49,9 @@ export function MetricInput({
         : ["true", "false"];
   return (
     <label className="field">
-      <span id={labelId}>Zaobserwowana wartość metryki (opcjonalnie)</span>
+      <span id={labelId}>
+        {labels[attribute] || "Zaobserwowana cecha"} (opcjonalnie)
+      </span>
       {numeric ? (
         <input
           aria-labelledby={labelId}
@@ -67,7 +87,11 @@ export function MetricInput({
           <option value="">Nie podaję wartości</option>
           {options.map((option) => (
             <option key={option} value={option}>
-              {option === "true" ? "Tak" : option === "false" ? "Nie" : option}
+              {option === "true"
+                ? "Tak"
+                : option === "false"
+                  ? "Nie"
+                  : valueLabels[option] || option}
             </option>
           ))}
         </select>

@@ -10,3 +10,5 @@ src/**/*.pyc
 
 !data/routes/
 !data/routes/city.sqlite3
+!data/mobility/
+!data/mobility/**

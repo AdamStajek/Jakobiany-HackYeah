@@ -5,12 +5,14 @@ services:
       - path: .env
         required: false
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       DATABASE_PATH: /app/data/application.sqlite3
       OSM_DATABASE_PATH: /app/data/krakow.sqlite3
       # Local HTTP only. Set true behind HTTPS in a deployment.
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+      # Trust HTTPS headers forwarded by nginx; host ports are loopback-only.
+      FORWARDED_ALLOW_IPS: "*"
     volumes:
       - backend_data:/app/data
     restart: unless-stopped
@@ -27,7 +29,7 @@ services:
       args:
         GOOGLE_MAPS_BROWSER_API_KEY: "${GOOGLE_MAPS_BROWSER_API_KEY:-${GOOGLE_API_KEY:-}}"
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     depends_on:
       api:
         condition: service_healthy

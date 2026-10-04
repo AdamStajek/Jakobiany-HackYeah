@@ -15,11 +15,13 @@ import { translate, useLanguage } from "../i18n";
 
 const noEndpoints: { lat: number; lon: number; label: string }[] = [];
 const noMobility: MobilityPoint[] = [];
+const noVariants: PlannedRoute[] = [];
 const center: L.LatLngTuple = [50.061, 19.936];
 export default function MapView({
   places,
   selectedPlaceId,
   route,
+  routeVariants = noVariants,
   onSelectPoint,
   onCancelSelection,
   endpoints = noEndpoints,
@@ -30,6 +32,7 @@ export default function MapView({
   places: PlaceSummary[];
   selectedPlaceId?: string | null;
   route?: RouteGeometry;
+  routeVariants?: PlannedRoute[];
   onSelectPoint?: (point: { lat: number; lon: number }) => void;
   onCancelSelection?: () => void;
   endpoints?: { lat: number; lon: number; label: string }[];
@@ -52,6 +55,9 @@ export default function MapView({
     lon: center[1],
   });
   const active = places.find((place) => place.id === selected);
+  const variants = routeVariants.filter(
+    (variant) => variant.variant === "fastest" || variant.variant === "constrained",
+  );
 
   useEffect(() => {
     if (!container.current) return;
@@ -249,35 +255,59 @@ export default function MapView({
         .bindTooltip(point.label)
         .addTo(layers);
     }
+    for (const variant of [...variants].sort(
+      (a, b) => Number(b.variant === "fastest") - Number(a.variant === "fastest"),
+    )) {
+      L.polyline(
+        variant.geometry.coordinates.map(
+          ([lon, lat]) => [lat, lon] as L.LatLngTuple,
+        ),
+        {
+          color: variant.variant === "fastest" ? "#b45309" : "#1a73e8",
+          weight: variant.variant === "fastest" ? 9 : 5,
+          dashArray: variant.variant === "constrained" ? "10 6" : undefined,
+        },
+      )
+        .bindTooltip(
+          translate(
+            variant.variant === "fastest"
+              ? "Najszybsza trasa"
+              : "Trasa z uwzględnieniem ograniczeń",
+          ),
+        )
+        .addTo(layers);
+    }
     if (route && route.coordinates.length >= 2) {
       const points: L.LatLngTuple[] = route.coordinates.map(([lon, lat]) => [
         lat,
         lon,
       ]);
-      L.polyline(points, { color: "white", weight: 9 }).addTo(layers);
-      if (segments?.length) {
-        for (const segment of segments) {
-          L.polyline(
-            segment.geometry.coordinates.map(
-              ([lon, lat]) => [lat, lon] as L.LatLngTuple,
-            ),
-            {
-              color:
-                segment.mode === "transit"
-                  ? "#087f5b"
-                  : segment.mode === "car"
-                    ? "#7851a9"
-                    : "#1a73e8",
-              weight: 5,
-              dashArray:
-                segment.mode === "walk" &&
-                segments.some((s) => s.mode === "transit")
-                  ? "7 7"
-                  : undefined,
-            },
-          ).addTo(layers);
-        }
-      } else L.polyline(points, { color: "#1a73e8", weight: 5 }).addTo(layers);
+      if (!variants.length) {
+        L.polyline(points, { color: "white", weight: 9 }).addTo(layers);
+        if (segments?.length) {
+          for (const segment of segments) {
+            L.polyline(
+              segment.geometry.coordinates.map(
+                ([lon, lat]) => [lat, lon] as L.LatLngTuple,
+              ),
+              {
+                color:
+                  segment.mode === "transit"
+                    ? "#087f5b"
+                    : segment.mode === "car"
+                      ? "#7851a9"
+                      : "#1a73e8",
+                weight: 5,
+                dashArray:
+                  segment.mode === "walk" &&
+                  segments.some((s) => s.mode === "transit")
+                    ? "7 7"
+                    : undefined,
+              },
+            ).addTo(layers);
+          }
+        } else L.polyline(points, { color: "#1a73e8", weight: 5 }).addTo(layers);
+      }
       for (const [index, point] of [
         points[0],
         points[points.length - 1],
@@ -299,7 +329,15 @@ export default function MapView({
     return () => {
       layers.remove();
     };
-  }, [places, selectedPlaceId, route, endpoints, userLocation, segments]);
+  }, [
+    places,
+    selectedPlaceId,
+    route,
+    routeVariants,
+    endpoints,
+    userLocation,
+    segments,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -432,6 +470,18 @@ export default function MapView({
           </div>
         )}
       </div>
+      {variants.length > 0 && (
+        <p className="small route-map-legend">
+          {variants.some((variant) => variant.variant === "fastest") && (
+            <span style={{ color: "#b45309" }}>━ Najszybsza trasa </span>
+          )}
+          {variants.some((variant) => variant.variant === "constrained") && (
+            <span style={{ color: "#1a73e8" }}>
+              ┄ Trasa z uwzględnieniem ograniczeń
+            </span>
+          )}
+        </p>
+      )}
       <div className="map-tools" role="group" aria-label="Przesuwanie mapy">
         {[
           { label: "Przesuń mapę na północ", delta: [0, -120], Icon: ArrowUp },

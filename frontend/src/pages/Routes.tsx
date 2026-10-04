@@ -770,6 +770,7 @@ export function RoutePage() {
           <MapView
             places={noPlaces}
             route={plan?.route.geometry}
+            routeVariants={plan?.alternatives}
             segments={plan?.route.segments}
             mobility={[
               ...mobility,

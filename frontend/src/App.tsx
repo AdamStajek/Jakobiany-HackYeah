@@ -52,7 +52,7 @@ import { Profile } from "./pages/Profile";
 import { Settings } from "./pages/Settings";
 import { ReviewPage } from "./pages/Review";
 import { Auth, About, NotFound } from "./pages/Info";
-import { PublicData, Privacy, DataQuality } from "./pages/DataPolicies";
+import { PublicData, Privacy } from "./pages/DataPolicies";
 const nav = [
   { to: "/search", label: "Miejsca", icon: Search },
   { to: "/route", label: "Trasy", icon: RouteIcon },
@@ -95,14 +95,14 @@ function Layout({
     const root = document.getElementById("root");
     if (!root) return;
     const updateTextLanguage = (node: HTMLElement) => {
-    const copy = Array.from(node.childNodes)
-      .filter((child) => child.nodeType === Node.TEXT_NODE)
-      .map((child) => child.textContent || "");
-    for (const attr of ["aria-label", "title", "alt"]) {
-      const value = node.getAttribute(attr);
-      if (value) copy.push(value);
-    }
-    node.lang = textLanguage(copy);
+      const copy = Array.from(node.childNodes)
+        .filter((child) => child.nodeType === Node.TEXT_NODE)
+        .map((child) => child.textContent || "");
+      for (const attr of ["aria-label", "title", "alt"]) {
+        const value = node.getAttribute(attr);
+        if (value) copy.push(value);
+      }
+      node.lang = textLanguage(copy);
     };
     const apply = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE && node.textContent) {
@@ -182,10 +182,12 @@ function Layout({
     window.scrollTo(0, 0);
     document.getElementById("content")?.focus({ preventScroll: true });
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const animation = document.getElementById("content")?.animate(
-      [{ opacity: 0 }, { opacity: 1 }],
-      { duration: 180, easing: "ease-out" },
-    );
+    const animation = document
+      .getElementById("content")
+      ?.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 180,
+        easing: "ease-out",
+      });
     return () => animation?.cancel();
   }, [location.pathname]);
   useEffect(() => {
@@ -194,7 +196,9 @@ function Layout({
     const update = () => {
       const heading = content.querySelector("h1");
       const title = heading?.innerText?.replace(/\s+/g, " ").trim();
-      document.title = title ? `${title} · ${translate("Swoją Drogą")}` : translate("Swoją Drogą");
+      document.title = title
+        ? `${title} · ${translate("Swoją Drogą")}`
+        : translate("Swoją Drogą");
       if (heading) {
         heading.tabIndex = -1;
         if (document.activeElement === content)
@@ -382,7 +386,6 @@ function Layout({
               <Link to="/about">O projekcie</Link>
               <Link to="/public-data">Dane publiczne</Link>
               <Link to="/privacy">Prywatność i bezpieczeństwo</Link>
-              <Link to="/data-quality">Źródła i aktualność</Link>
             </nav>
           </footer>
           <nav className="bottom-nav" aria-label="Nawigacja mobilna">
@@ -624,7 +627,6 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/public-data" element={<PublicData />} />
             <Route path="/privacy" element={<Privacy />} />
-            <Route path="/data-quality" element={<DataQuality />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         )}

@@ -5,10 +5,11 @@ export default defineConfig({
   testMatch: "accessibility.spec.ts",
   outputDir: "./a11y-results",
   workers: 1,
-  timeout: 180000,
+  timeout: 90000,
   use: {
     baseURL: "http://127.0.0.1:5337",
     actionTimeout: 10000,
+    reducedMotion: "reduce",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

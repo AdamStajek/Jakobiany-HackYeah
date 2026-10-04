@@ -60,4 +60,4 @@ Obliczona trasa jest przechowywana w sessionStorage bieżącej karty. Dane konta
 
 Mapa pobiera kafle OpenStreetMap. Planer oblicza trasy dla całego Krakowa, minimalizując niedogodności z zatwierdzonego profilu. Początek i cel można wyszukać po nazwie/adresie lub wskazać na mapie. Znane naruszenia i braki danych są jawne; niepołączone punkty zwracają pusty wynik. Szczegóły i ograniczenia opisuje [planowanie miejskie](../docs/city-routing.md). Własne ilustracje SVG znajdują się w `public/illustrations`; nie są zdjęciami rzeczywistych miejsc.
 
-Interfejs nie udostępnia opinii, dodawania miejsc, wymiany punktów na zniżki ani paneli właściciela/samorządu. Pełna zgodność WCAG 2.2 AA wymaga osobnego badania.
+Interfejs nie udostępnia opinii, wymiany punktów na zniżki ani paneli właściciela/samorządu. Dodawanie miejsc i ich moderacja są objęte testami dostępności. Pełna zgodność WCAG 2.2 AA wymaga osobnego badania.

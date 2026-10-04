@@ -21,10 +21,26 @@ const publicPaths = [
   "/login",
   "/register",
   "/review",
+  "/settings",
+  "/places/new",
   "/not-found",
 ];
 
 async function scan(page: Page) {
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.effect?.getComputedTiming().iterations !== Infinity,
+        )
+        .map((animation) => animation.finished.catch(() => {})),
+    );
+  });
   const result = await new AxeBuilder({ page })
     .withTags([
       "wcag2a",
@@ -242,15 +258,16 @@ test("mapa: punkt klawiaturą, przyciski bez przeciągania i powrót fokusu", as
   await visit(page, "/search");
   await page
     .getByRole("button", { name: "Pokaż na mapie", exact: true })
+    .first()
     .click();
   await expect(page.locator(".map-canvas")).toBeFocused();
-  await page.locator(".place-marker").press("Enter");
+  await page.locator(".place-marker").first().press("Enter");
   await expect(
     page.getByRole("button", { name: "Zamknij szczegóły znacznika" }),
   ).toBeFocused();
   await scan(page);
   await page.keyboard.press("Escape");
-  await expect(page.locator(".place-marker")).toBeFocused();
+  await expect(page.locator(".place-marker").first()).toBeFocused();
 });
 
 test("zalogowany użytkownik: formularze, błędy, kroki i odpowiedź misji", async ({
@@ -268,6 +285,14 @@ test("zalogowany użytkownik: formularze, błędy, kroki i odpowiedź misji", as
     await scan(page);
     await fits(page);
   }
+  await visit(page, "/report/problem");
+  const placeInput = page.getByLabel("Miejsce do zgłoszenia", { exact: true });
+  await placeInput.fill("Muzeum integracyjne");
+  await page
+    .getByRole("button", { name: "Muzeum integracyjne", exact: true })
+    .click();
+  await expect(placeInput).toBeFocused();
+  await expect(page.locator(".search-results")).toHaveCount(0);
   await visit(page, "/report/problem?place=node%2F1");
   await page
     .getByRole("button", { name: "Wyślij zgłoszenie", exact: true })
@@ -303,11 +328,11 @@ test("zalogowany użytkownik: formularze, błędy, kroki i odpowiedź misji", as
   await page
     .getByRole("button", { name: "Rozpocznij misję", exact: true })
     .click();
-  await expect(page.getByLabel("Co udało Ci się sprawdzić?")).toBeVisible();
+  await expect(
+    page.getByLabel("Zdjęcie (wymagane)", { exact: true }),
+  ).toBeVisible();
   await scan(page);
-  await page
-    .getByLabel("Co udało Ci się sprawdzić?")
-    .fill("Wejście sprawdzono: brak stopni.");
+
   await page
     .locator('input[type="file"]')
     .setInputFiles("tests/fixtures/evidence.png");
@@ -317,6 +342,7 @@ test("zalogowany użytkownik: formularze, błędy, kroki i odpowiedź misji", as
   const pending = {
     ...activity.items[0],
     status: "pending" as const,
+    ai_status: "pending",
     answer: "Wejście sprawdzono: brak stopni.",
     awarded_points: 0,
     report_id: "a11y-report",
@@ -338,7 +364,7 @@ test("zalogowany użytkownik: formularze, błędy, kroki i odpowiedź misji", as
     })
     .click();
   await expect(
-    page.getByText("Oczekuje na weryfikację · 0 naliczonych punktów"),
+    page.getByText("Przetwarzanie · 0 naliczonych punktów"),
   ).toBeVisible();
   await scan(page);
 });
@@ -353,15 +379,15 @@ test("języki, kontrast, trwały komunikat i widoczność fokusu", async ({
     .getByRole("button", { name: "Switch to English", exact: true })
     .click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.locator("h1")).toHaveText("Everyone has their own way");
+  await expect(page.locator("h1")).toHaveText("The best route is your own");
   await expect(page.locator("h1")).toHaveAttribute("lang", "en");
   await expect(page.locator(".prose p").first()).toHaveAttribute("lang", "pl");
   await scan(page);
   await page
-    .getByRole("button", { name: "Przełącz na polski", exact: true })
+    .getByRole("button", { name: "Switch to Polish", exact: true })
     .click();
   await expect(page.locator("html")).toHaveAttribute("lang", "pl");
-  await visit(page, "/profile");
+  await visit(page, "/settings");
   await page.getByLabel("Zwiększony kontrast").check();
   await page.getByLabel("Większy tekst").check();
   await fits(page);
@@ -512,16 +538,13 @@ test("wynik AI i instrukcje nawigacji mają dostępny fokus i kontrast", async (
   await page.locator(".ai-search > summary").click();
   await page.getByLabel("Opisz, czego szukasz").fill("Muzeum bez schodów");
   await page
-    .getByRole("button", { name: "Przygotuj wyszukiwanie", exact: true })
+    .locator(".ai-search")
+    .getByRole("button", { name: "Szukaj", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Zastosuj wyszukiwanie" }),
+    page.getByText("Wyszukiwanie zostało zastosowane.", { exact: false }),
   ).toBeVisible();
   await scan(page);
-  await page.getByRole("button", { name: "Zastosuj wyszukiwanie" }).click();
-  await expect(
-    page.getByRole("button", { name: "Przygotuj wyszukiwanie", exact: true }),
-  ).toBeFocused();
   const assessment = {
     status: "meets_requirements",
     summary: "Spełnia wymagania.",
@@ -570,6 +593,11 @@ test("wynik AI i instrukcje nawigacji mają dostępny fokus i kontrast", async (
     }),
   );
   await visit(page, "/route");
+  await page.getByRole("button", { name: "Wskaż początek na mapie" }).click();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Wskaż cel na mapie" }).click();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Pokaż trasę", exact: true }).click();
   await expect(
     page.getByRole("link", { name: "Szczegóły trasy", exact: true }),
@@ -602,18 +630,35 @@ test("moderator: komentarz, decyzja i fokus po usunięciu karty", async ({
   baseURL,
 }) => {
   await register(page);
-  const description = `Raport dostępności ${test.info().project.name} ${Date.now()}`;
-  await visit(page, "/report/problem?place=node%2F1");
-  await page.getByLabel("Opisz problem", { exact: true }).fill(description);
+  const description = `Miejsce dostępności ${test.info().project.name} ${Date.now()}`;
+  await visit(page, "/places/new");
+  await page.getByLabel("Nazwa miejsca", { exact: true }).fill(description);
+  await page.getByLabel("Kategoria", { exact: true }).selectOption("Muzea");
+  await page.getByRole("button", { name: "Wyślij do weryfikacji" }).click();
+  await expect(page.getByLabel("Adres", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("Adres", { exact: true })).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await scan(page);
   await page
-    .getByRole("button", { name: "Wyślij zgłoszenie", exact: true })
-    .click();
-  await expect(page.locator("h1")).toHaveText("Dziękujemy za pomoc!");
+    .getByLabel("Adres", { exact: true })
+    .fill("Kraków, Rynek Główny 1");
+  await page.getByRole("button", { name: "Wskaż miejsce na mapie" }).click();
+  await expect(page.locator(".map-canvas")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Szerokość geograficzna")).toBeFocused();
+  await page.getByRole("button", { name: "Wyślij do weryfikacji" }).click();
+  await expect(page.locator("#new-place-success")).toBeFocused();
+  await scan(page);
   const context = await browser.newContext({
     baseURL,
     viewport: page.viewportSize() || undefined,
   });
   const moderator = await context.newPage();
+  await moderator.route("https://tile.openstreetmap.org/**", (route) =>
+    route.abort(),
+  );
   try {
     await visit(moderator, "/login");
     await moderator
@@ -636,9 +681,21 @@ test("moderator: komentarz, decyzja i fokus po usunięciu karty", async ({
     await scan(moderator);
     await fits(moderator);
     await card
-      .getByLabel("Komentarz moderatora")
+      .getByLabel("Komentarz administratora")
       .fill("Sprawdzono opis zgłoszenia.");
-    await card.getByRole("button", { name: "Zaakceptuj", exact: true }).click();
+    const mapButton = card.getByRole("button", {
+      name: "Zmień położenie na mapie",
+    });
+    await mapButton.click();
+    await expect(card.locator(".map-canvas")).toBeFocused();
+    await moderator.keyboard.press("Escape");
+    await expect(mapButton).toBeFocused();
+    await mapButton.click();
+    await moderator.keyboard.press("Enter");
+    await expect(mapButton).toBeFocused();
+    await card
+      .getByRole("button", { name: "Zatwierdź miejsce", exact: true })
+      .click();
     await expect(card).toHaveCount(0);
     await expect(moderator.locator("h1")).toBeFocused();
     await expect(moderator.locator(".toast")).toBeVisible();
@@ -646,4 +703,57 @@ test("moderator: komentarz, decyzja i fokus po usunięciu karty", async ({
   } finally {
     await context.close();
   }
+});
+
+test("orientacja pozioma i kolory systemowe zachowują obsługę klawiaturą", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+  await visit(page, "/route");
+  await fits(page);
+  const choose = page.getByRole("button", { name: "Wskaż początek na mapie" });
+  await choose.focus();
+  await page.keyboard.press("Enter");
+  const map = page.locator(".map-canvas");
+  await expect(map).toBeFocused();
+  expect(
+    await map.evaluate((node) => getComputedStyle(node).outlineStyle),
+  ).toBe("solid");
+  await page.keyboard.press("Escape");
+  await expect(choose).toBeFocused();
+  await scan(page);
+});
+
+test("podpowiedzi punktów: wybór i Escape przywracają fokus", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/routes/points?*", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            id: "test-point",
+            name: "Testowy punkt",
+            address: "Kraków",
+            location: { lat: 50.061, lon: 19.936 },
+          },
+        ],
+        next_cursor: null,
+      },
+    }),
+  );
+  await visit(page, "/route");
+  const input = page.getByLabel("Skąd", { exact: true });
+  await input.fill("Testowy");
+  const suggestion = page.getByRole("button", { name: "Testowy punkt Kraków" });
+  await suggestion.focus();
+  await page.keyboard.press("Escape");
+  await expect(input).toBeFocused();
+  await expect(suggestion).toHaveCount(0);
+  await input.fill("Testowy punkt");
+  await suggestion.click();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("Testowy punkt");
+  await scan(page);
 });

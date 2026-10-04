@@ -56,6 +56,8 @@ def prepare(
     verification_attribute: m.Attribute | None = None,
 ) -> m.Report:
     now = datetime.now(UTC)
+    if body.observed_at is None:
+        body = body.model_copy(update={"observed_at": now})
     report = m.Report(
         **body.model_dump(),
         id=f"report_{uuid4().hex}",

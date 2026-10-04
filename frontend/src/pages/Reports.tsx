@@ -316,10 +316,6 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
   const [metricValue, setMetricValue] = useState<Fact["value"]>(null);
   useEffect(() => setMetricValue(null), [placeId, attribute]);
   const [photo, setPhoto] = useState<File | null>(null);
-  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10);
-  const [date, setDate] = useState(today);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -425,7 +421,6 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
                 : confirm && answer === "yes" && fact.value !== null
                   ? [{ attribute: fact.attribute, value: fact.value }]
                   : [],
-            observed_at: new Date(`${date}T00:00:00`).toISOString(),
             photo_ids,
           }),
         { address: place.address || place.name, metric: fact.attribute },
@@ -618,16 +613,6 @@ export function ReportForm({ confirm = false }: { confirm?: boolean }) {
               JPEG, PNG lub WebP, do 10 MiB. Zdjęcie będzie dostępne Tobie i
               moderatorowi.
             </small>
-          </label>
-          <label className="field">
-            Data obserwacji
-            <input
-              type="date"
-              value={date}
-              required
-              max={today}
-              onChange={(event) => setDate(event.target.value)}
-            />
           </label>
           {error && (
             <p id="report-error" className="warning-box" role="alert">
